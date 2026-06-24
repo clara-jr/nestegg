@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import {
   calculateMortgageGrantedAmount,
   calculateSavings,
@@ -287,6 +288,42 @@ export default function SavingsSimulator() {
     && parsedInitialSavingsAccount.isValid
     && parsedInitialInvestments.isValid
     && Math.abs(allocationDifference) <= 0.01;
+
+  function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { year: number; contributed: number; total: number } }> }) {
+    if (!active || !payload?.[0]) return null;
+    const { year, contributed, total } = payload[0].payload;
+    return (
+      <div style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '12px', padding: '12px 16px', fontSize: '14px', fontFamily: 'Heebo, sans-serif' }}>
+        <p style={{ fontWeight: 700, marginBottom: 8, color: '#111827' }}>{year === 0 ? 'Inicio' : `Año ${year}`}</p>
+        <p style={{ color: '#22c55e', marginBottom: 4 }}>{formatCurrency(total)}</p>
+        <p style={{ color: '#6b7280', marginBottom: 4 }}>{formatCurrency(contributed)}</p>
+        <p style={{ color: '#aeb0b4' }}>(+ {formatCurrency(total - contributed)})</p>
+      </div>
+    );
+  }
+
+  const chartData = useMemo(() => {
+    if (!result) return [];
+    const initialTotal = result.initialAvailableForInvestment;
+    let cumulativeContributions = initialTotal;
+    const dataPoints: Array<{ year: number; contributed: number; total: number }> = [
+      { year: 0, contributed: Math.round(initialTotal * 100) / 100, total: Math.round(initialTotal * 100) / 100 },
+    ];
+    const lastIndex = result.monthlyBreakdown.length - 1;
+    for (let i = 0; i < result.monthlyBreakdown.length; i++) {
+      const entry = result.monthlyBreakdown[i];
+      cumulativeContributions += entry.savingsToAccount + entry.savingsToInvestment;
+      if (entry.month === 12 || i === lastIndex) {
+        const totalBalance = entry.savingsAccount + entry.investments;
+        dataPoints.push({
+          year: entry.year,
+          contributed: Math.round(cumulativeContributions * 100) / 100,
+          total: Math.round(totalBalance * 100) / 100,
+        });
+      }
+    }
+    return dataPoints;
+  }, [result]);
 
   const handleAllocationChange = (field: 'savingsAccount' | 'investments', value: string) => {
     const normalizedValue = value.trim().replace(',', '.');
@@ -641,6 +678,33 @@ export default function SavingsSimulator() {
                   </button>
 
                   {showDetail && (
+                    <div className="p-8 sm:p-10 border-b border-gray-200">
+                      <h4 className="text-lg font-bold text-gray-900 mb-6 uppercase tracking-wider">
+                        Aportado vs Total
+                      </h4>
+                      <ResponsiveContainer width="100%" height={350}>
+                        <LineChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                          <XAxis
+                            dataKey="year"
+                            tick={{ fontSize: 13, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                            tickFormatter={(v: number) => v === 0 ? 'Inicio' : `${v}º`}
+                            stroke="#d1d5db"
+                          />
+                          <YAxis
+                            tick={{ fontSize: 13, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                            tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k €`}
+                            stroke="#d1d5db"
+                          />
+                          <Tooltip content={<ChartTooltip />} />
+                          <Legend wrapperStyle={{ fontFamily: 'Heebo, sans-serif', fontSize: '14px' }} />
+                          <Line type="monotone" dataKey="contributed" name="Aportado" stroke="#6b7280" strokeWidth={2} dot={false} />
+                          <Line type="monotone" dataKey="total" name="Total" stroke="#22c55e" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    )}
+                  {showDetail && (
                     <div className="overflow-x-auto">
                       <table className="w-full min-w-full">
                         <thead>
@@ -653,7 +717,7 @@ export default function SavingsSimulator() {
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                           {result.monthlyBreakdown
-                            .filter(m => m.month === 12 || m.year === params.timeHorizonYears)
+                            .filter((m, i, arr) => m.month === 12 || i === arr.length - 1)
                             .map((entry) => (
                               <tr key={`${entry.year}-${entry.month}`} className="hover:bg-gray-50 transition-colors">
                                 <td className="px-4 sm:px-10 py-5 text-base font-medium text-gray-900">{entry.year}º</td>

@@ -37,6 +37,8 @@ export interface SavingsResult {
   finalSavingsAccount: number;
   finalInvestments: number;
   totalSavings: number;
+  initialSavingsAccount: number;
+  initialInvestments: number;
   houseDebtRemaining: number;
   totalHouseExpenses: number;
   mortgageGrantedAmount: number;
@@ -112,8 +114,10 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
       ? maxInitialAllocation / requestedInitialAllocation
       : 1;
 
-  let savingsAccount = Math.max(0, params.initialSavingsAccount) * allocationScale;
-  let investments = Math.max(0, params.initialInvestments) * allocationScale;
+  const savingsAccountAtStart = Math.max(0, params.initialSavingsAccount) * allocationScale;
+  const investmentsAtStart = Math.max(0, params.initialInvestments) * allocationScale;
+  let savingsAccount = savingsAccountAtStart;
+  let investments = investmentsAtStart;
   
   const monthlyBreakdown: MonthlyBreakdown[] = [];
   const totalMonths = params.timeHorizonYears * 12;
@@ -177,6 +181,8 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
     finalSavingsAccount: Math.round(savingsAccount * 100) / 100,
     finalInvestments: Math.round(investments * 100) / 100,
     totalSavings: Math.round((savingsAccount + investments) * 100) / 100,
+    initialSavingsAccount: Math.round(savingsAccountAtStart * 100) / 100,
+    initialInvestments: Math.round(investmentsAtStart * 100) / 100,
     houseDebtRemaining: 0, // Asumimos que la casa fue pagada con los ahorros iniciales
     totalHouseExpenses: Math.round(totalHouseExpenses * 100) / 100,
     mortgageGrantedAmount: Math.round(mortgageGrantedAmount * 100) / 100,
