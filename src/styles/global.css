@@ -1,7 +1,19 @@
+@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Signika:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @layer base {
+  html,
   body {
     @apply antialiased;
+    font-family: 'Heebo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: 'Signika', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   }
 }

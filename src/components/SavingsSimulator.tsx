@@ -28,28 +28,44 @@ function InputField({ label, value, onChange, type = 'number', step, hint }: Rea
         step={step}
         className="px-6 py-4 bg-white border border-gray-300 rounded-xl backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500 text-base"
       />
-      {hint && <p className="text-xs text-gray-600 mt-0.5">{hint}</p>}
+      {hint && <p className="text-sm text-gray-600 mt-0.5">{hint}</p>}
     </div>
   );
 }
 
-interface CheckboxFieldProps {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
+interface HouseTypeFieldProps {
+  isNewBuild: boolean;
+  onChange: (isNewBuild: boolean) => void;
 }
 
-function CheckboxField({ label, checked, onChange }: Readonly<CheckboxFieldProps>) {
+function HouseTypeField({ isNewBuild, onChange }: Readonly<HouseTypeFieldProps>) {
   return (
-    <label className="flex items-center gap-3 cursor-pointer py-3 px-4 rounded-lg hover:bg-gray-100/50 transition-colors">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-5 h-5 text-gray-600 border-gray-300 rounded focus:ring-2 focus:ring-gray-500 cursor-pointer"
-      />
-      <span className="text-sm font-medium text-gray-900">{label}</span>
-    </label>
+    <fieldset className="space-y-3">
+      <legend className="text-base font-semibold text-gray-900">Tipo de vivienda</legend>
+      <p className="text-sm text-gray-600">Obra nueva aplica 11.2%, a reformar aplica 6.5%.</p>
+      <div className="grid grid-cols-1 gap-3 max-w-70">
+        <label className="flex items-center gap-3 cursor-pointer py-3 px-4 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
+          <input
+            type="radio"
+            name="houseType"
+            checked={isNewBuild}
+            onChange={() => onChange(true)}
+            className="w-4 h-4 text-gray-700 border-gray-300 focus:ring-2 focus:ring-gray-500 cursor-pointer"
+          />
+          <span className="text-sm font-medium text-gray-900">Obra nueva</span>
+        </label>
+        <label className="flex items-center gap-3 cursor-pointer py-3 px-4 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors">
+          <input
+            type="radio"
+            name="houseType"
+            checked={!isNewBuild}
+            onChange={() => onChange(false)}
+            className="w-4 h-4 text-gray-700 border-gray-300 focus:ring-2 focus:ring-gray-500 cursor-pointer"
+          />
+          <span className="text-sm font-medium text-gray-900">A reformar</span>
+        </label>
+      </div>
+    </fieldset>
   );
 }
 
@@ -68,7 +84,7 @@ function FormSection({ title, children, cols = 'single' }: Readonly<FormSectionP
 
   return (
     <section className="space-y-6">
-      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">{title}</h3>
+      <h3 className="text-lg font-bold text-gray-900 uppercase tracking-wider">{title}</h3>
       <div className={`grid ${colsClass} gap-8`}>{children}</div>
     </section>
   );
@@ -335,14 +351,14 @@ export default function SavingsSimulator() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-white py-16 sm:py-20 md:py-28 px-6 sm:px-8 lg:px-12">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen py-16 px-6 sm:px-8 lg:px-12">
+      <div className="mx-auto">
         {/* Header */}
-        <header className="mb-16 sm:mb-20 md:mb-28">
+        <header className="mb-16 text-center">
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 sm:mb-6 tracking-tight">
             Simulador de Ahorros
           </h1>
-          <p className="text-lg sm:text-xl text-gray-600 max-w-2xl">
+          <p className="text-lg sm:text-xl text-gray-600">
             Proyecta tu patrimonio con precisión financiera
           </p>
         </header>
@@ -356,33 +372,33 @@ export default function SavingsSimulator() {
             <form className="space-y-14" onSubmit={(e) => { e.preventDefault(); handleCalculate(); }}>
               <FormSection title="Ahorros Iniciales" cols="double">
                 <InputField
-                  label="Ahorros Totales Iniciales"
+                  label="Ahorros Totales Iniciales (€)"
                   value={params.initialTotalSavings}
                   onChange={(v) => handleInputChange('initialTotalSavings', v)}
-                  hint="antes de la compra de la vivienda"
+                  hint="Antes de la compra de la vivienda"
                 />
                 <article className="bg-gray-100 rounded-xl p-6 border border-gray-200">
                   <p className="text-sm font-medium text-gray-600 mb-2">Ahorro Inicial Disponible para Invertir</p>
                   <p className={`text-2xl font-bold ${initialAvailableForInvestment >= 0 ? 'text-gray-900' : 'text-red-700'}`}>
                     {formatCurrency(initialAvailableForInvestment)}
                   </p>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-sm text-gray-500 mt-2">
                     Ahorros totales - gastos finales + hipoteca concedida + préstamo familiar
                   </p>
                 </article>
                 <InputField
-                  label="Cuenta Remunerada Inicial"
+                  label="Cuenta Remunerada Inicial (% o €)"
                   value={initialAllocationInputs.savingsAccount}
                   onChange={(v) => handleAllocationChange('savingsAccount', v)}
                   type="text"
-                  hint="usa % o importe (ej: 40% o 25000)"
+                  hint="Usa % o importe (ej: 40% o 25000)"
                 />
                 <InputField
-                  label="Inversiones Iniciales"
+                  label="Inversiones Iniciales (% o €)"
                   value={initialAllocationInputs.investments}
                   onChange={(v) => handleAllocationChange('investments', v)}
                   type="text"
-                  hint="usa % o importe (ej: 60% o 37500)"
+                  hint="Usa % o importe (ej: 60% o 37500)"
                 />
                 <div className="md:col-span-2 bg-gray-100 border border-gray-300 rounded-xl p-5">
                   <p className={`text-sm font-medium ${allocationStatus.colorClass}`}>{allocationStatus.message}</p>
@@ -392,77 +408,69 @@ export default function SavingsSimulator() {
               <div className="border-t border-gray-200"></div>
 
               <FormSection title="Costes de Casa" cols="double">
-                <article className="md:col-span-2 bg-gray-100 rounded-xl p-6 border border-gray-200">
-                  <p className="text-sm font-medium text-gray-600 mb-2">Gastos Finales de la Casa</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalHouseExpenses)}</p>
-                </article>
                 <InputField
-                  label="Coste Base"
+                  label="Coste Base (€)"
                   value={params.baseCost}
                   onChange={(v) => handleInputChange('baseCost', v)}
                 />
                 <InputField
-                  label="Comisión Inmobiliaria"
+                  label="Comisión Inmobiliaria (%)"
                   value={params.realEstatePercentage}
                   onChange={(v) => handleInputChange('realEstatePercentage', v)}
                   step="0.1"
-                  hint="en %"
                 />
-                <div className="md:col-span-2">
-                  <CheckboxField
-                    label="Obra Nueva (11.2% vs 6.5%)"
-                    checked={params.isNewBuild}
-                    onChange={(v) => handleInputChange('isNewBuild', v)}
-                  />
-                </div>
                 <InputField
-                  label="Reforma y Muebles"
+                  label="Reforma y Muebles (€)"
                   value={params.reformCosts + params.furnitureCosts}
                   onChange={(v) => {
                     const total = Number.parseFloat(v) || 0;
                     handleInputChange('reformCosts', total * 0.75);
                     handleInputChange('furnitureCosts', total * 0.25);
                   }}
-                  hint="distribución: 75% reforma, 25% muebles"
                 />
+                <div className="md:col-span-2">
+                  <HouseTypeField
+                    isNewBuild={params.isNewBuild}
+                    onChange={(v) => handleInputChange('isNewBuild', v)}
+                  />
+                </div>
+                <article className="max-w-70 md:col-span-2 bg-gray-100 rounded-xl p-6 border border-gray-200">
+                  <p className="text-sm font-medium text-gray-600 mb-2">Gastos Finales de la Casa</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalHouseExpenses)}</p>
+                </article>
               </FormSection>
 
               <div className="border-t border-gray-200"></div>
 
               <FormSection title="Hipoteca" cols="triple">
                 <InputField
-                  label="Cuota Mensual"
+                  label="Cuota Mensual (€)"
                   value={params.monthlyMortgagePayment}
                   onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
-                  hint="en €"
                 />
                 <InputField
-                  label="TAE"
+                  label="TAE (%)"
                   value={params.mortgageAnnualRate}
                   onChange={(v) => handleInputChange('mortgageAnnualRate', v)}
                   step="0.1"
-                  hint="tasa anual en %"
                 />
                 <InputField
-                  label="Duración"
+                  label="Duración (años)"
                   value={params.mortgageDurationYears}
                   onChange={(v) => handleInputChange('mortgageDurationYears', v)}
-                  hint="en años"
                 />
               </FormSection>
 
               <FormSection title="Préstamo Familiar (0% interés)" cols="triple">
                 <InputField
-                  label="Importe Total"
+                  label="Importe Total (€)"
                   value={params.familyLoanAmount}
                   onChange={(v) => handleInputChange('familyLoanAmount', v)}
-                  hint="en €"
                 />
                 <InputField
-                  label="Duración"
+                  label="Duración (años)"
                   value={params.familyLoanDurationYears}
                   onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
-                  hint="en años"
                 />
               </FormSection>
 
@@ -470,24 +478,22 @@ export default function SavingsSimulator() {
 
               <FormSection title="Ahorros Mensuales" cols="triple">
                 <InputField
-                  label="Aporte Total"
+                  label="Aporte Total Mensual (€)"
                   value={params.monthlyContribution}
                   onChange={(v) => handleInputChange('monthlyContribution', v)}
-                  hint="en € / mes"
+                  hint={`${params.monthlyMortgagePayment} € hipoteca ${hasFamilyLoan && familyLoanMonthlyPayment ? `| ${familyLoanMonthlyPayment.toFixed(2)} € préstamo familiar` : ''} | ${(params.monthlyContribution - params.monthlyMortgagePayment - (familyLoanMonthlyPayment ?? 0)).toFixed(2)} € inversiones`}
                 />
                 <InputField
-                  label="Rentabilidad Cuenta"
+                  label="Rentabilidad Cuenta (%)"
                   value={params.savingsAccountRate}
                   onChange={(v) => handleInputChange('savingsAccountRate', v)}
                   step="0.1"
-                  hint="% anual"
                 />
                 <InputField
-                  label="Rentabilidad Inversiones"
+                  label="Rentabilidad Inversiones (%)"
                   value={params.investmentRate}
                   onChange={(v) => handleInputChange('investmentRate', v)}
                   step="0.1"
-                  hint="% anual"
                 />
                   
                 <div className="md:col-span-3 bg-gray-100 border border-gray-300 backdrop-blur-sm rounded-xl p-6 space-y-6">
@@ -534,7 +540,7 @@ export default function SavingsSimulator() {
                       </div>
                     );
                   })}
-                  <p className="text-xs text-gray-600">Cuenta ← → Inversiones</p>
+                  <p className="text-sm text-gray-600">Cuenta ← → Inversiones</p>
                 </div>
               </FormSection>
 
@@ -551,7 +557,7 @@ export default function SavingsSimulator() {
               <button
                 type="submit"
                 disabled={!hasValidInitialAllocation}
-                className="w-full py-5 px-8 bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-950 hover:to-gray-900 disabled:from-gray-500 disabled:to-gray-500 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-lg sm:text-xl mt-4"
+                className="cursor-pointer w-full py-5 px-8 bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-950 hover:to-gray-900 disabled:from-gray-500 disabled:to-gray-500 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-all duration-200 shadow-md hover:shadow-lg text-lg sm:text-xl mt-4"
               >
                 Calcular Proyección
               </button>
@@ -575,44 +581,49 @@ export default function SavingsSimulator() {
                   
                   <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
                     <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600 mb-4">Gastos Casa</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{formatCurrency(result.totalHouseExpenses)}</p>
-                    </article>
-                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600 mb-4">Hipoteca Concedida (estimada)</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{formatCurrency(result.mortgageGrantedAmount)}</p>
-                    </article>
-                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
                       <p className="text-sm font-medium text-gray-600 mb-4">Ahorro Inicial Invertible</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{formatCurrency(result.initialAvailableForInvestment)}</p>
                     </article>
                     <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600 mb-4">Hipoteca</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{params.mortgageDurationYears} años</p>
-                    </article>
-                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600 mb-4">Aporte Mensual</p>
+                      <p className="text-sm font-medium text-gray-600 mb-4">Aporte Mensual (Préstamos + Ahorro)</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{formatCurrency(params.monthlyContribution)}</p>
                     </article>
                     <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
+                      <p className="text-sm font-medium text-gray-600 mb-4">Coste Casa</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{formatCurrency(result.totalHouseExpenses)}</p>
+                    </article>
+                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
+                      <p className="text-sm font-medium text-gray-600 mb-4">Préstamo Hipotecario Estimado</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{formatCurrency(result.mortgageGrantedAmount)}</p>
+                    </article>
+                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
+                      <p className="text-sm font-medium text-gray-600 mb-4">Cuota Hipoteca</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{formatCurrency(params.monthlyMortgagePayment)}</p>
+                    </article>
+                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
+                      <p className="text-sm font-medium text-gray-600 mb-4">Duración Hipoteca</p>
+                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{params.mortgageDurationYears} años</p>
+                    </article>
+                    { hasFamilyLoan ?
+                      (<>
+                        <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
+                          <p className="text-sm font-medium text-gray-600 mb-4">Cuota Préstamo Familiar</p>
+                          <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{formatCurrency(familyLoanMonthlyPayment)}</p>
+                        </article>
+                        <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
+                        <p className="text-sm font-medium text-gray-600 mb-4">Duración Préstamo Familiar</p>
+                          <p className="text-xl sm:text-2xl font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
+                        </article>
+                      </>) : (
+                      <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
+                        <p className="text-sm font-medium text-gray-600 mb-4">Préstamo Familiar</p>
+                        <p className="text-xl sm:text-2xl font-bold text-gray-900">Activo</p>
+                      </article>
+                      )
+                    }
+                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
                       <p className="text-sm font-medium text-gray-600 mb-4">Horizonte</p>
                       <p className="text-xl sm:text-2xl font-bold text-gray-900">{params.timeHorizonYears} años</p>
-                    </article>
-                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600 mb-4">Préstamo Familiar</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{hasFamilyLoan ? 'Activo' : 'No activo'}</p>
-                    </article>
-                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600 mb-4">Cuota Familiar</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{formatCurrency(familyLoanMonthlyPayment)}</p>
-                    </article>
-                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600 mb-4">Inicio Familiar</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900">En paralelo con hipoteca</p>
-                    </article>
-                    <article className="bg-gray-100 rounded-xl p-7 sm:p-8 border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600 mb-4">Duración Familiar</p>
-                      <p className="text-xl sm:text-2xl font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
                     </article>
                   </div>
                 </section>
@@ -623,8 +634,8 @@ export default function SavingsSimulator() {
                     onClick={() => setShowDetail(!showDetail)}
                     className="w-full px-12 sm:px-14 py-7 sm:py-8 flex items-center justify-between hover:bg-gray-100 transition-colors border-b border-gray-200"
                   >
-                    <h3 className="text-xl sm:text-2xl font-bold text-gray-900">Desglose Anual</h3>
-                    <svg className={`w-6 h-6 text-gray-600 transition-transform flex-shrink-0 ${showDetail ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <h3 className="text-2xl sm:text-3xl font-bold text-gray-900">Desglose Anual</h3>
+                    <svg className={`cursor-pointer w-6 h-6 text-gray-600 transition-transform flex-shrink-0 ${showDetail ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                     </svg>
                   </button>
@@ -634,10 +645,10 @@ export default function SavingsSimulator() {
                       <table className="w-full min-w-full">
                         <thead>
                           <tr className="border-b border-gray-200 bg-gray-100">
-                            <th className="px-8 sm:px-10 py-5 text-left text-sm font-bold text-gray-900">Año</th>
-                            <th className="px-8 sm:px-10 py-5 text-right text-sm font-bold text-gray-900">Cuenta</th>
-                            <th className="px-8 sm:px-10 py-5 text-right text-sm font-bold text-gray-900">Inversiones</th>
-                            <th className="px-8 sm:px-10 py-5 text-right text-sm font-bold text-gray-900">Total</th>
+                            <th className="px-4 sm:px-10 py-5 text-left text-sm font-bold text-gray-900">Año</th>
+                            <th className="px-4 sm:px-10 py-5 text-right text-sm font-bold text-gray-900">Cuenta</th>
+                            <th className="px-4 sm:px-10 py-5 text-right text-sm font-bold text-gray-900">Inversiones</th>
+                            <th className="px-4 sm:px-10 py-5 text-right text-sm font-bold text-gray-900">Total</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
@@ -645,10 +656,10 @@ export default function SavingsSimulator() {
                             .filter(m => m.month === 12 || m.year === params.timeHorizonYears)
                             .map((entry) => (
                               <tr key={`${entry.year}-${entry.month}`} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-8 sm:px-10 py-5 text-base font-medium text-gray-900">{entry.year}º</td>
-                                <td className="px-8 sm:px-10 py-5 text-right text-base text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
-                                <td className="px-8 sm:px-10 py-5 text-right text-base text-gray-700">{formatCurrency(entry.investments)}</td>
-                                <td className="px-8 sm:px-10 py-5 text-right text-base font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
+                                <td className="px-4 sm:px-10 py-5 text-base font-medium text-gray-900">{entry.year}º</td>
+                                <td className="px-4 sm:px-10 py-5 text-right text-base text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
+                                <td className="px-4 sm:px-10 py-5 text-right text-base text-gray-700">{formatCurrency(entry.investments)}</td>
+                                <td className="px-4 sm:px-10 py-5 text-right text-base font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
                               </tr>
                             ))}
                         </tbody>
