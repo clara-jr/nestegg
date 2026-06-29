@@ -633,7 +633,7 @@ export default function SavingsSimulator() {
             {result && (
               <div className="space-y-6">
                 {/* Summary Section: details first, then results */}
-                <section className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
+                <section className="bg-white border border-gray-200 rounded-xl px-6 sm:px-8 pt-6 sm:pt-8 pb-0 shadow-sm overflow-hidden">
 
                   <section className="space-y-3 -mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 first:border-t-0 first:pt-0">
                     <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-3">Datos del escenario</h3>
@@ -676,7 +676,7 @@ export default function SavingsSimulator() {
                         </>) : (
                         <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                           <p className="text-xs font-medium text-gray-600 mb-1">Préstamo Familiar</p>
-                          <p className="text-base font-bold text-gray-900">Activo</p>
+                          <p className="text-base font-bold text-gray-900">Inactivo</p>
                         </article>
                         )
                       }
@@ -691,7 +691,7 @@ export default function SavingsSimulator() {
                     </div>
                   </section>
 
-                  <section className="space-y-3 -mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 first:border-t-0 first:pt-0">
+                  <section className="space-y-3 -mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 first:border-t-0 first:pt-0 mb-5">
                     <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-3">Resultados de la proyección</h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -700,14 +700,12 @@ export default function SavingsSimulator() {
                       <ResultCard label="Inversiones" value={formatCurrency(result.finalInvestments)} icon="📈" />
                     </div>
                   </section>
-                </section>
 
                 {/* Breakdown Table */}
-                <section className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                  <section className="-mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 first:border-t-0 first:pt-0">
+                  <section className="-mx-6 sm:-mx-8 border-t border-gray-200 first:border-t-0 first:pt-0">
                     <button
                       onClick={() => setShowDetail(!showDetail)}
-                      className="w-full px-6 sm:px-8 py-5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-200"
+                      className="py-5 w-full px-6 sm:px-8 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-200"
                     >
                       <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">Desglose Anual</h3>
                       <svg className={`cursor-pointer w-4 h-4 text-gray-600 transition-transform flex-shrink-0 ${showDetail ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -716,7 +714,7 @@ export default function SavingsSimulator() {
                     </button>
 
                     {showDetail && (
-                      <div className="p-5 sm:p-6 border-b border-gray-200">
+                      <div className="px-6 sm:px-8 pt-5 pb-6 border-b border-gray-200">
                         <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">
                           Aportado vs Total
                         </p>
@@ -746,14 +744,14 @@ export default function SavingsSimulator() {
                       <>
                       <div className="relative">
                         <div className="overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain">
-                          <table className="w-full min-w-full mb-2">
+                          <table className="w-full min-w-full mb-3">
                             <thead>
                               <tr className="border-b border-gray-200 bg-gray-50">
-                                <th className="px-5 sm:px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Año</th>
-                                <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Cuenta</th>
-                                <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Inversiones</th>
-                                <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Total</th>
-                                <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Impuestos</th>
+                                <th className="px-6 sm:px-8 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Año</th>
+                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Cuenta</th>
+                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Inversiones</th>
+                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Total</th>
+                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Impuestos</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
@@ -761,11 +759,11 @@ export default function SavingsSimulator() {
                                 .filter((m, i, arr) => m.month === 12 || i === arr.length - 1)
                                 .map((entry) => (
                                   <tr key={`${entry.year}-${entry.month}`} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-5 sm:px-6 py-2.5 text-sm font-medium text-gray-900">{entry.year}º</td>
-                                    <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
-                                    <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.investments)}</td>
-                                    <td className="px-5 sm:px-6 py-2.5 text-right text-sm font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
-                                    <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-red-600">{entry.yearlyGainsTaxPaid > 0 ? formatCurrency(entry.yearlyGainsTaxPaid) : '—'}</td>
+                                    <td className="px-6 sm:px-8 py-2.5 text-sm font-medium text-gray-900">{entry.year}º</td>
+                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
+                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.investments)}</td>
+                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
+                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-red-600">{entry.yearlyGainsTaxPaid > 0 ? formatCurrency(entry.yearlyGainsTaxPaid) : '—'}</td>
                                   </tr>
                                 ))}
                             </tbody>
@@ -773,7 +771,7 @@ export default function SavingsSimulator() {
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white from-50% to-transparent pointer-events-none" />
                       </div>
-                      <div className="px-5 sm:px-6 py-3 bg-amber-50 border-t border-amber-200">
+                      <div className="px-6 sm:px-8 py-3 bg-amber-50 border-t border-amber-200">
                         <p className="text-xs text-amber-800 leading-relaxed">
                           <strong>⚠️ Nota fiscal:</strong> Los intereses de la cuenta remunerada tributan cada año en la 
                           declaración de la Renta (junio) según los tramos progresivos del ahorro (19%–26%). 
