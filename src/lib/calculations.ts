@@ -45,6 +45,8 @@ export interface SavingsResult {
   initialAvailableForInvestment: number;
   monthlyBreakdown: MonthlyBreakdown[];
   totalTaxesPaid: number;
+  totalInvestmentContributions: number;
+  investmentSaleTax: number;
 }
 
 export interface MonthlyBreakdown {
@@ -121,6 +123,7 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
   const investmentsAtStart = Math.max(0, params.initialInvestments) * allocationScale;
   let savingsAccount = savingsAccountAtStart;
   let investments = investmentsAtStart;
+  let totalInvestmentContributions = investmentsAtStart;
 
   // Tax tracking (solo intereses cuenta remunerada — las plusvalías de inversiones tributan al vender)
   let savingsGainsThisYear = 0;
@@ -181,6 +184,7 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
     
     savingsAccount = savingsAccount * (1 + monthlyAccountRate) + savingsToAccount;
     investments = investments * (1 + monthlyInvestmentRate) + savingsToInvestment;
+    totalInvestmentContributions += savingsToInvestment;
 
     // Track gains for the current year (solo cuenta remunerada — inversiones tributan al vender)
     savingsGainsThisYear += accountInterest;
@@ -235,9 +239,14 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
     }
   }
 
+  const finalInvestmentsRounded = Math.round(investments * 100) / 100;
+  const totalInvestmentContributionsRounded = Math.round(totalInvestmentContributions * 100) / 100;
+  const investmentGain = Math.max(0, finalInvestmentsRounded - totalInvestmentContributionsRounded);
+  const investmentSaleTax = calculateTax(investmentGain);
+
   return {
     finalSavingsAccount: Math.round(savingsAccount * 100) / 100,
-    finalInvestments: Math.round(investments * 100) / 100,
+    finalInvestments: finalInvestmentsRounded,
     totalSavings: Math.round((savingsAccount + investments) * 100) / 100,
     initialSavingsAccount: Math.round(savingsAccountAtStart * 100) / 100,
     initialInvestments: Math.round(investmentsAtStart * 100) / 100,
@@ -247,6 +256,8 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
     initialAvailableForInvestment: Math.round(initialAvailableForInvestment * 100) / 100,
     monthlyBreakdown,
     totalTaxesPaid: Math.round(totalTaxesPaid * 100) / 100,
+    totalInvestmentContributions: totalInvestmentContributionsRounded,
+    investmentSaleTax: Math.round(investmentSaleTax * 100) / 100,
   };
 }
 

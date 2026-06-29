@@ -773,11 +773,11 @@ export default function SavingsSimulator() {
                       </div>
                       <div className="px-6 sm:px-8 py-3 bg-amber-50 border-t border-amber-200">
                         <p className="text-xs text-amber-800 leading-relaxed">
-                          <strong>⚠️ Nota fiscal:</strong> Los intereses de la cuenta remunerada tributan cada año en la 
-                          declaración de la Renta (junio) según los tramos progresivos del ahorro (19%–26%). 
-                          Esta simulación descuenta ese impuesto anualmente. Las plusvalías de las inversiones 
-                          solo tributan al vender (no se modelan aquí al asumir buy-and-hold). 
-                          El importe total pagado en impuestos estimado es <strong>{formatCurrency(result.totalTaxesPaid)}</strong>.
+                          <strong>⚠️ Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
+                          Los intereses de la cuenta remunerada ya están descontados anualmente.
+                          Las plusvalías de inversiones solo tributan al vender, por lo que no se han descontado en la simulación al asumir <i>buy-and-hold</i>; 
+                          si se vendieran al final del horizonte, se pagarían <strong>{formatCurrency(result.investmentSaleTax)}</strong> en impuestos,
+                          con lo que el dinero total neto resultante de la simulación sería <strong>{formatCurrency(result.totalSavings - result.investmentSaleTax)}</strong>.
                         </p>
                       </div>
                       </>
