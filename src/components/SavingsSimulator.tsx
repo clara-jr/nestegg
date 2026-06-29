@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import {
   calculateMortgageGrantedAmount,
@@ -16,20 +16,47 @@ interface InputFieldProps {
   type?: 'number' | 'text';
   step?: string;
   hint?: string;
+  disabled?: boolean;
+  error?: string;
 }
 
-function InputField({ label, value, onChange, type = 'number', step, hint }: Readonly<InputFieldProps>) {
+function InputField({ label, value, onChange, type = 'number', step, hint, disabled, error }: Readonly<InputFieldProps>) {
+  const [raw, setRaw] = useState(() => String(value ?? ''));
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused.current) {
+      setRaw(String(value ?? ''));
+    }
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setRaw(e.target.value);
+    onChange(e.target.value);
+  };
+
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wider">{label}</label>
+      <label className={`text-xs font-semibold uppercase tracking-wider ${disabled ? 'text-gray-400' : error ? 'text-red-700' : 'text-gray-600'}`}>{label}</label>
       <input
         type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+        value={raw}
+        onChange={handleChange}
+        onFocus={() => { isFocused.current = true; }}
+        onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
         step={step}
-        className="px-3.5 py-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all text-gray-900 text-sm"
+        disabled={disabled}
+        title={disabled ? 'Introduce un coste base de casa para activar la hipoteca' : undefined}
+        className={`px-3.5 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all text-sm ${
+          disabled
+            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+            : error
+              ? 'bg-white border-red-400 text-gray-900 focus:ring-red-400'
+              : 'bg-white border-gray-300 text-gray-900 focus:ring-gray-500 focus:border-transparent'
+        }`}
       />
-      {hint && <p className="text-xs text-gray-500">{hint}</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      {!error && hint && <p className={`text-xs ${disabled ? 'text-gray-300' : 'text-gray-500'}`}>{hint}</p>}
     </div>
   );
 }
@@ -114,11 +141,6 @@ interface ParsedInitialAllocation {
   isValid: boolean;
 }
 
-interface AllocationStatus {
-  colorClass: string;
-  message: string;
-}
-
 function parseInitialAllocation(value: string, availableAmount: number): ParsedInitialAllocation {
   const normalizedValue = value.trim().replace(',', '.');
   if (!normalizedValue) {
@@ -147,46 +169,6 @@ function parseInitialAllocation(value: string, availableAmount: number): ParsedI
   return {
     amount: parsed,
     isValid: true,
-  };
-}
-
-function getInitialAllocationStatus(
-  parsedSavingsAccount: ParsedInitialAllocation,
-  parsedInvestments: ParsedInitialAllocation,
-  initialAvailableForInvestment: number,
-  allocationDifference: number,
-): AllocationStatus {
-  if (!parsedSavingsAccount.isValid || !parsedInvestments.isValid) {
-    return {
-      colorClass: 'text-red-700',
-      message: 'Introduce valores válidos para ambos campos iniciales (porcentaje o importe).',
-    };
-  }
-
-  if (initialAvailableForInvestment < 0) {
-    return {
-      colorClass: 'text-red-700',
-      message: 'Los ahorros iniciales no cubren la operación de compra. Ajusta coste, hipoteca o ahorros totales.',
-    };
-  }
-
-  if (Math.abs(allocationDifference) > 0.01) {
-    if (allocationDifference > 0) {
-      return {
-        colorClass: 'text-amber-700',
-        message: `Faltan por asignar ${formatCurrency(Math.abs(allocationDifference))}.`,
-      };
-    }
-
-    return {
-      colorClass: 'text-red-700',
-      message: `La suma supera el disponible por ${formatCurrency(Math.abs(allocationDifference))}.`,
-    };
-  }
-
-  return {
-    colorClass: 'text-green-700',
-    message: 'El reparto del dinero es correcto. La suma de lo destinado a cuenta remunerada e inversiones iniciales coincide con el valor disponible para invertir.',
   };
 }
 
@@ -253,12 +235,14 @@ export default function SavingsSimulator() {
   const totalHouseExpenses = useMemo(() => calculateTotalHouseExpenses(params), [params]);
   const mortgageGrantedAmount = useMemo(
     () =>
-      calculateMortgageGrantedAmount(
-        params.monthlyMortgagePayment,
-        params.mortgageAnnualRate,
-        params.mortgageDurationYears,
-      ),
-    [params.monthlyMortgagePayment, params.mortgageAnnualRate, params.mortgageDurationYears],
+      params.baseCost > 0
+        ? calculateMortgageGrantedAmount(
+            params.monthlyMortgagePayment,
+            params.mortgageAnnualRate,
+            params.mortgageDurationYears,
+          )
+        : 0,
+    [params.baseCost, params.monthlyMortgagePayment, params.mortgageAnnualRate, params.mortgageDurationYears],
   );
   const effectiveFamilyLoan =
     params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0 ? params.familyLoanAmount : 0;
@@ -275,16 +259,22 @@ export default function SavingsSimulator() {
 
   const totalInitialAllocation = parsedInitialSavingsAccount.amount + parsedInitialInvestments.amount;
   const allocationDifference = initialAvailableForInvestment - totalInitialAllocation;
-  const allocationStatus = useMemo(
-    () =>
-      getInitialAllocationStatus(
-        parsedInitialSavingsAccount,
-        parsedInitialInvestments,
-        initialAvailableForInvestment,
-        allocationDifference,
-      ),
-    [parsedInitialSavingsAccount, parsedInitialInvestments, initialAvailableForInvestment, allocationDifference],
-  );
+
+  const computeError = (parsed: ParsedInitialAllocation, amount: number): string | undefined => {
+    if (!parsed.isValid) return 'Introduce un valor válido';
+    if (initialAvailableForInvestment < 0 && amount > 0) return 'No hay disponible para invertir';
+    if (initialAvailableForInvestment >= 0 && amount > initialAvailableForInvestment + 0.01) return 'Supera el disponible para invertir';
+    return undefined;
+  };
+
+  let savingsError = computeError(parsedInitialSavingsAccount, parsedInitialSavingsAccount.amount);
+  let investmentsError = computeError(parsedInitialInvestments, parsedInitialInvestments.amount);
+
+  if (!savingsError && !investmentsError && initialAvailableForInvestment >= 0 && allocationDifference < -0.01) {
+    if (parsedInitialSavingsAccount.amount > 0) savingsError = 'Supera el disponible para invertir';
+    if (parsedInitialInvestments.amount > 0) investmentsError = 'Supera el disponible para invertir';
+  }
+
   const hasValidInitialAllocation =
     initialAvailableForInvestment >= 0
     && parsedInitialSavingsAccount.isValid
@@ -371,6 +361,9 @@ export default function SavingsSimulator() {
       ...params,
       initialSavingsAccount: parsedInitialSavingsAccount.amount,
       initialInvestments: parsedInitialInvestments.amount,
+      monthlyMortgagePayment: params.baseCost > 0 ? params.monthlyMortgagePayment : 0,
+      mortgageAnnualRate: params.baseCost > 0 ? params.mortgageAnnualRate : 0,
+      mortgageDurationYears: params.baseCost > 0 ? params.mortgageDurationYears : 0,
     };
 
     const newResult = calculateSavings(paramsWithInitialAllocation);
@@ -405,11 +398,13 @@ export default function SavingsSimulator() {
       reformCosts: field === 'reformCosts' ? numericValue : params.reformCosts,
       furnitureCosts: field === 'furnitureCosts' ? numericValue : params.furnitureCosts,
     });
-    const newMortgageGranted = calculateMortgageGrantedAmount(
-      field === 'monthlyMortgagePayment' ? numericValue : params.monthlyMortgagePayment,
-      field === 'mortgageAnnualRate' ? numericValue : params.mortgageAnnualRate,
-      field === 'mortgageDurationYears' ? numericValue : params.mortgageDurationYears,
-    );
+    const newMortgageGranted = (field === 'baseCost' ? numericValue : params.baseCost) > 0
+      ? calculateMortgageGrantedAmount(
+          field === 'monthlyMortgagePayment' ? numericValue : params.monthlyMortgagePayment,
+          field === 'mortgageAnnualRate' ? numericValue : params.mortgageAnnualRate,
+          field === 'mortgageDurationYears' ? numericValue : params.mortgageDurationYears,
+        )
+      : 0;
     const famAmt = field === 'familyLoanAmount' ? numericValue : params.familyLoanAmount;
     const famDur = field === 'familyLoanDurationYears' ? numericValue : params.familyLoanDurationYears;
     const newFamilyLoan = famAmt > 0 && famDur > 0 ? famAmt : 0;
@@ -421,8 +416,10 @@ export default function SavingsSimulator() {
     const normalizedSavings = initialAllocationInputs.savingsAccount.trim().replace(',', '.');
     if (normalizedSavings.endsWith('%')) return;
 
-    const savingsAmount = Number.parseFloat(normalizedSavings) || 0;
-    const investmentsAmount = Math.max(0, Math.round((newAvailable - savingsAmount) * 100) / 100);
+    const parsedSavings = parseInitialAllocation(initialAllocationInputs.savingsAccount, newAvailable);
+    if (!parsedSavings.isValid) return;
+
+    const investmentsAmount = Math.max(0, Math.round((newAvailable - parsedSavings.amount) * 100) / 100);
     setInitialAllocationInputs(prev => ({ ...prev, investments: String(investmentsAmount) }));
   };
 
@@ -479,6 +476,7 @@ export default function SavingsSimulator() {
                   onChange={(v) => handleAllocationChange('savingsAccount', v)}
                   type="text"
                   hint="Ej: 40% o 25000"
+                  error={savingsError}
                 />
                 <InputField
                   label="Inversiones Iniciales (% o €)"
@@ -486,13 +484,9 @@ export default function SavingsSimulator() {
                   onChange={(v) => handleAllocationChange('investments', v)}
                   type="text"
                   hint="Ej: 60% o 37500"
+                  error={investmentsError}
                 />
               </FormSection>
-              {!hasValidInitialAllocation && (
-              <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
-                <p className={`text-xs font-medium ${allocationStatus.colorClass}`}>{allocationStatus.message}</p>
-              </div>
-              )}
 
               <FormSection title="Costes de Casa" cols="double">
                 <InputField
@@ -530,22 +524,29 @@ export default function SavingsSimulator() {
                   label="Cuota Hipoteca Mensual (€)"
                   value={params.monthlyMortgagePayment}
                   onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
+                  disabled={params.baseCost === 0}
+                  error={params.baseCost > 0 && mortgageGrantedAmount > totalHouseExpenses ? `La hipoteca concedida (${formatCurrency(mortgageGrantedAmount)}) supera el coste total de la casa (${formatCurrency(totalHouseExpenses)})` : undefined}
                 />
                 <InputField
                   label="TAE Hipoteca (%)"
                   value={params.mortgageAnnualRate}
                   onChange={(v) => handleInputChange('mortgageAnnualRate', v)}
                   step="0.1"
+                  disabled={params.baseCost === 0}
                 />
                 <InputField
                   label="Duración Hipoteca (años)"
                   value={params.mortgageDurationYears}
                   onChange={(v) => handleInputChange('mortgageDurationYears', v)}
+                  disabled={params.baseCost === 0}
                 />
-                <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 flex flex-col justify-center">
+                <div className={`flex flex-col gap-1.5 ${params.baseCost === 0 ? '' : ''}`}>
+                <article className={`rounded-lg px-4 py-3 border flex flex-col justify-center ${params.baseCost === 0 ? 'bg-gray-100 border-gray-200' : 'bg-gray-50 border-gray-200'}`}>
                   <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Hipotecario Estimado</p>
-                  <p className="text-xl font-bold text-gray-900">{formatCurrency(mortgageGrantedAmount)}</p>
+                  <p className={`text-xl font-bold ${params.baseCost === 0 ? 'text-gray-400' : 'text-gray-900'}`}>{formatCurrency(mortgageGrantedAmount)}</p>
                 </article>
+                {params.baseCost === 0 && <p className="text-xs text-gray-400">Introduce un coste base de casa para configurar la hipoteca</p>}
+                </div>
                 <InputField
                   label="Préstamo Familiar (€)"
                   value={params.familyLoanAmount}
@@ -564,7 +565,7 @@ export default function SavingsSimulator() {
                   label="Aporte Total Mensual (€)"
                   value={params.monthlyContribution}
                   onChange={(v) => handleInputChange('monthlyContribution', v)}
-                  hint={`${params.monthlyMortgagePayment} € hipoteca ${hasFamilyLoan && familyLoanMonthlyPayment ? `| ${familyLoanMonthlyPayment.toFixed(2)} € préstamo familiar` : ''} | ${(params.monthlyContribution - params.monthlyMortgagePayment - (familyLoanMonthlyPayment ?? 0)).toFixed(2)} € inversiones`}
+                  hint={`${params.baseCost > 0 ? `${params.monthlyMortgagePayment} € hipoteca ` : ''}${hasFamilyLoan && familyLoanMonthlyPayment ? `| ${familyLoanMonthlyPayment.toFixed(2)} € préstamo familiar ` : ''}| ${(params.monthlyContribution - (params.baseCost > 0 ? params.monthlyMortgagePayment : 0) - (familyLoanMonthlyPayment ?? 0)).toFixed(2)} € inversiones`}
                 />
                 <InputField
                   label="Rentabilidad Cuenta (%)"
@@ -652,7 +653,7 @@ export default function SavingsSimulator() {
           {/* Results Section */}
           <main>
             {result && (
-              <div className="space-y-6">
+              <div className="space-y-6 mb-4">
                 {/* Summary Section: details first, then results */}
                 <section className="bg-white border border-gray-200 rounded-xl px-6 sm:px-8 pt-6 sm:pt-8 pb-0 shadow-sm overflow-hidden">
 
@@ -668,6 +669,7 @@ export default function SavingsSimulator() {
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Aporte Mensual</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(params.monthlyContribution)}</p>
                       </article>
+                      {params.baseCost > 0 && (<>
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Coste Casa</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.totalHouseExpenses)}</p>
@@ -684,23 +686,23 @@ export default function SavingsSimulator() {
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Duración Hipoteca</p>
                         <p className="text-base font-bold text-gray-900">{params.mortgageDurationYears} años</p>
                       </article>
-                      { hasFamilyLoan ?
-                        (<>
-                          <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Cuota Préstamo Familiar</p>
-                            <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(familyLoanMonthlyPayment)}</p>
-                          </article>
-                          <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Duración Préstamo Familiar</p>
-                            <p className="text-base font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
-                          </article>
-                        </>) : (
+                      </>)}
+                      {hasFamilyLoan && (<>
+                        <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Cuota Préstamo Familiar</p>
+                          <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(familyLoanMonthlyPayment)}</p>
+                        </article>
+                        <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Duración Préstamo Familiar</p>
+                          <p className="text-base font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
+                        </article>
+                      </>)}
+                      {params.baseCost > 0 && !hasFamilyLoan && (
                         <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Familiar</p>
                           <p className="text-base font-bold text-gray-900">Inactivo</p>
                         </article>
-                        )
-                      }
+                      )}
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Horizonte</p>
                         <p className="text-base font-bold text-gray-900">{params.timeHorizonYears} años</p>
