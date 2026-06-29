@@ -379,10 +379,30 @@ export default function SavingsSimulator() {
   };
 
   const handleInputChange = (field: keyof SavingsParams, value: any) => {
-    setParams(prev => ({
-      ...prev,
-      [field]: typeof value === 'string' ? Number.parseFloat(value) || 0 : value,
-    }));
+    setParams(prev => {
+      const updated = {
+        ...prev,
+        [field]: typeof value === 'string' ? Number.parseFloat(value) || 0 : value,
+      };
+
+      // When Ahorros Totales Iniciales changes, keep Cuenta Remunerada fixed and auto-calculate Inversiones = disponible - cuentaRemunerada
+      if (field === 'initialTotalSavings') {
+        const normalizedSavings = initialAllocationInputs.savingsAccount.trim().replace(',', '.');
+        const isSavingsPercentage = normalizedSavings.endsWith('%');
+        if (isSavingsPercentage) {
+          const pct = Number.parseFloat(normalizedSavings) || 0;
+          const investmentsPct = Math.max(0, 100 - pct);
+          setInitialAllocationInputs(prev => ({ ...prev, investments: `${investmentsPct}%` }));
+        } else {
+          const newAvailable = updated.initialTotalSavings - totalHouseExpenses + mortgageGrantedAmount + effectiveFamilyLoan;
+          const savingsAmount = parseInitialAllocation(initialAllocationInputs.savingsAccount, newAvailable).amount;
+          const investmentsAmount = Math.max(0, Math.round((newAvailable - savingsAmount) * 100) / 100);
+          setInitialAllocationInputs(prev => ({ ...prev, investments: String(investmentsAmount) }));
+        }
+      }
+
+      return updated;
+    });
   };
 
   React.useEffect(() => {
@@ -748,7 +768,7 @@ export default function SavingsSimulator() {
                     </div>
                     <div className="px-5 sm:px-6 py-3 bg-amber-50 border-t border-amber-200">
                       <p className="text-xs text-amber-800 leading-relaxed">
-                        <strong>⚠︎ Nota fiscal:</strong> Los intereses de la cuenta remunerada tributan cada año en la 
+                        <strong>⚠️ Nota fiscal:</strong> Los intereses de la cuenta remunerada tributan cada año en la 
                         declaración de la Renta (junio) según los tramos progresivos del ahorro (19%–26%). 
                         Esta simulación descuenta ese impuesto anualmente. Las plusvalías de las inversiones 
                         solo tributan al vender (no se modelan aquí al asumir buy-and-hold). 
