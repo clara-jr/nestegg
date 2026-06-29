@@ -379,30 +379,51 @@ export default function SavingsSimulator() {
   };
 
   const handleInputChange = (field: keyof SavingsParams, value: any) => {
+    const numericValue = typeof value === 'string' ? Number.parseFloat(value) || 0 : value;
+
     setParams(prev => {
       const updated = {
         ...prev,
-        [field]: typeof value === 'string' ? Number.parseFloat(value) || 0 : value,
+        [field]: numericValue,
       };
-
-      // When Ahorros Totales Iniciales changes, keep Cuenta Remunerada fixed and auto-calculate Inversiones = disponible - cuentaRemunerada
-      if (field === 'initialTotalSavings') {
-        const normalizedSavings = initialAllocationInputs.savingsAccount.trim().replace(',', '.');
-        const isSavingsPercentage = normalizedSavings.endsWith('%');
-        if (isSavingsPercentage) {
-          const pct = Number.parseFloat(normalizedSavings) || 0;
-          const investmentsPct = Math.max(0, 100 - pct);
-          setInitialAllocationInputs(prev => ({ ...prev, investments: `${investmentsPct}%` }));
-        } else {
-          const newAvailable = updated.initialTotalSavings - totalHouseExpenses + mortgageGrantedAmount + effectiveFamilyLoan;
-          const savingsAmount = parseInitialAllocation(initialAllocationInputs.savingsAccount, newAvailable).amount;
-          const investmentsAmount = Math.max(0, Math.round((newAvailable - savingsAmount) * 100) / 100);
-          setInitialAllocationInputs(prev => ({ ...prev, investments: String(investmentsAmount) }));
-        }
-      }
-
       return updated;
     });
+
+    // When a field that affects Disponible para Invertir changes,
+    // keep Cuenta Remunerada fixed and recalculate Inversiones (unless in % mode)
+    const availableFields: Partial<Record<keyof SavingsParams, true>> = {
+      initialTotalSavings: true, baseCost: true, realEstatePercentage: true, isNewBuild: true,
+      reformCosts: true, furnitureCosts: true, monthlyMortgagePayment: true, mortgageAnnualRate: true,
+      mortgageDurationYears: true, familyLoanAmount: true, familyLoanDurationYears: true,
+    };
+    if (!availableFields[field]) return;
+
+    const newHouseExpenses = calculateTotalHouseExpenses({
+      baseCost: field === 'baseCost' ? numericValue : params.baseCost,
+      realEstatePercentage: field === 'realEstatePercentage' ? numericValue : params.realEstatePercentage,
+      isNewBuild: field === 'isNewBuild' ? !!value : params.isNewBuild,
+      reformCosts: field === 'reformCosts' ? numericValue : params.reformCosts,
+      furnitureCosts: field === 'furnitureCosts' ? numericValue : params.furnitureCosts,
+    });
+    const newMortgageGranted = calculateMortgageGrantedAmount(
+      field === 'monthlyMortgagePayment' ? numericValue : params.monthlyMortgagePayment,
+      field === 'mortgageAnnualRate' ? numericValue : params.mortgageAnnualRate,
+      field === 'mortgageDurationYears' ? numericValue : params.mortgageDurationYears,
+    );
+    const famAmt = field === 'familyLoanAmount' ? numericValue : params.familyLoanAmount;
+    const famDur = field === 'familyLoanDurationYears' ? numericValue : params.familyLoanDurationYears;
+    const newFamilyLoan = famAmt > 0 && famDur > 0 ? famAmt : 0;
+    const newTotal = field === 'initialTotalSavings' ? numericValue : params.initialTotalSavings;
+    const newAvailable = newTotal - newHouseExpenses + newMortgageGranted + newFamilyLoan;
+
+    if (newAvailable < 0) return;
+
+    const normalizedSavings = initialAllocationInputs.savingsAccount.trim().replace(',', '.');
+    if (normalizedSavings.endsWith('%')) return;
+
+    const savingsAmount = Number.parseFloat(normalizedSavings) || 0;
+    const investmentsAmount = Math.max(0, Math.round((newAvailable - savingsAmount) * 100) / 100);
+    setInitialAllocationInputs(prev => ({ ...prev, investments: String(investmentsAmount) }));
   };
 
   React.useEffect(() => {
@@ -443,12 +464,12 @@ export default function SavingsSimulator() {
                   onChange={(v) => handleInputChange('initialTotalSavings', v)}
                   hint="Antes de comprar la vivienda"
                 />
-                <article className="bg-emerald-50 rounded-lg px-4 py-3 border border-emerald-200">
-                  <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1">Disponible para Invertir</p>
+                <article className={`rounded-lg px-4 py-3 border ${initialAvailableForInvestment >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${initialAvailableForInvestment >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>Disponible para Invertir</p>
                   <p className={`text-xl font-bold ${initialAvailableForInvestment >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                     {formatCurrency(initialAvailableForInvestment)}
                   </p>
-                  <p className="text-xs text-emerald-600 mt-1">
+                  <p className={`text-xs mt-1 ${initialAvailableForInvestment >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     Ahorros totales − gastos finales + hipoteca concedida + préstamo familiar
                   </p>
                 </article>
@@ -467,9 +488,11 @@ export default function SavingsSimulator() {
                   hint="Ej: 60% o 37500"
                 />
               </FormSection>
+              {!hasValidInitialAllocation && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
                 <p className={`text-xs font-medium ${allocationStatus.colorClass}`}>{allocationStatus.message}</p>
               </div>
+              )}
 
               <FormSection title="Costes de Casa" cols="double">
                 <InputField
