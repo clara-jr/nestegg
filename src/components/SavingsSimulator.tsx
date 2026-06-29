@@ -632,151 +632,159 @@ export default function SavingsSimulator() {
           <main>
             {result && (
               <div className="space-y-6">
-                {/* Results Grid */}
-                <section className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <ResultCard label="Total Ahorrado" value={formatCurrency(result.totalSavings)} icon="💰" />
-                  <ResultCard label="Cuenta Remunerada" value={formatCurrency(result.finalSavingsAccount)} icon="🏦" />
-                  <ResultCard label="Inversiones" value={formatCurrency(result.finalInvestments)} icon="📈" />
-                </section>
+                {/* Summary Section: details first, then results */}
+                <section className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
 
-                {/* Details Section */}
-                <section className="bg-white border border-gray-200 rounded-xl p-5 sm:p-6 shadow-sm">
-                  <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-4">Detalles de la Proyección</h3>
-                  
-                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-medium text-gray-600 mb-1">Ahorro Inicial Invertible</p>
-                      <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.initialAvailableForInvestment)}</p>
-                    </article>
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-medium text-gray-600 mb-1">Aporte Mensual</p>
-                      <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(params.monthlyContribution)}</p>
-                    </article>
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-medium text-gray-600 mb-1">Coste Casa</p>
-                      <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.totalHouseExpenses)}</p>
-                    </article>
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-medium text-gray-600 mb-1">Préstamo Hipotecario</p>
-                      <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.mortgageGrantedAmount)}</p>
-                    </article>
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-medium text-gray-600 mb-1">Cuota Hipoteca</p>
-                      <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(params.monthlyMortgagePayment)}</p>
-                    </article>
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-medium text-gray-600 mb-1">Duración Hipoteca</p>
-                      <p className="text-base font-bold text-gray-900">{params.mortgageDurationYears} años</p>
-                    </article>
-                    { hasFamilyLoan ?
-                      (<>
-                        <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                          <p className="text-xs font-medium text-gray-600 mb-1">Cuota Préstamo Familiar</p>
-                          <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(familyLoanMonthlyPayment)}</p>
-                        </article>
-                        <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Duración Préstamo Familiar</p>
-                          <p className="text-base font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
-                        </article>
-                      </>) : (
+                  <section className="space-y-3 -mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 first:border-t-0 first:pt-0">
+                    <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-3">Datos del escenario</h3>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Préstamo Familiar</p>
-                        <p className="text-base font-bold text-gray-900">Activo</p>
+                        <p className="text-xs font-medium text-gray-600 mb-1">Ahorro Inicial Invertible</p>
+                        <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.initialAvailableForInvestment)}</p>
                       </article>
-                      )
-                    }
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-medium text-gray-600 mb-1">Horizonte</p>
-                      <p className="text-base font-bold text-gray-900">{params.timeHorizonYears} años</p>
-                    </article>
-                    {/*<article className="bg-red-50 rounded-lg px-3.5 py-3 border border-red-200">
-                      <p className="text-xs font-medium text-red-600 mb-1">Impuestos Estimados</p>
-                      <p className="text-base font-bold text-red-700">{formatCurrency(result.totalTaxesPaid)}</p>
-                    </article>*/}
-                  </div>
+                      <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                        <p className="text-xs font-medium text-gray-600 mb-1">Aporte Mensual</p>
+                        <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(params.monthlyContribution)}</p>
+                      </article>
+                      <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                        <p className="text-xs font-medium text-gray-600 mb-1">Coste Casa</p>
+                        <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.totalHouseExpenses)}</p>
+                      </article>
+                      <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                        <p className="text-xs font-medium text-gray-600 mb-1">Préstamo Hipotecario</p>
+                        <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.mortgageGrantedAmount)}</p>
+                      </article>
+                      <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                        <p className="text-xs font-medium text-gray-600 mb-1">Cuota Hipoteca</p>
+                        <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(params.monthlyMortgagePayment)}</p>
+                      </article>
+                      <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                        <p className="text-xs font-medium text-gray-600 mb-1">Duración Hipoteca</p>
+                        <p className="text-base font-bold text-gray-900">{params.mortgageDurationYears} años</p>
+                      </article>
+                      { hasFamilyLoan ?
+                        (<>
+                          <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                            <p className="text-xs font-medium text-gray-600 mb-1">Cuota Préstamo Familiar</p>
+                            <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(familyLoanMonthlyPayment)}</p>
+                          </article>
+                          <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                          <p className="text-xs font-medium text-gray-600 mb-1">Duración Préstamo Familiar</p>
+                            <p className="text-base font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
+                          </article>
+                        </>) : (
+                        <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                          <p className="text-xs font-medium text-gray-600 mb-1">Préstamo Familiar</p>
+                          <p className="text-base font-bold text-gray-900">Activo</p>
+                        </article>
+                        )
+                      }
+                      <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                        <p className="text-xs font-medium text-gray-600 mb-1">Horizonte</p>
+                        <p className="text-base font-bold text-gray-900">{params.timeHorizonYears} años</p>
+                      </article>
+                      {/*<article className="bg-red-50 rounded-lg px-3.5 py-3 border border-red-200">
+                        <p className="text-xs font-medium text-red-600 mb-1">Impuestos Estimados</p>
+                        <p className="text-base font-bold text-red-700">{formatCurrency(result.totalTaxesPaid)}</p>
+                      </article>*/}
+                    </div>
+                  </section>
+
+                  <section className="space-y-3 -mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 first:border-t-0 first:pt-0">
+                    <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-3">Resultados de la proyección</h3>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <ResultCard label="Total Ahorrado" value={formatCurrency(result.totalSavings)} icon="💰" />
+                      <ResultCard label="Cuenta Remunerada" value={formatCurrency(result.finalSavingsAccount)} icon="🏦" />
+                      <ResultCard label="Inversiones" value={formatCurrency(result.finalInvestments)} icon="📈" />
+                    </div>
+                  </section>
                 </section>
 
                 {/* Breakdown Table */}
                 <section className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                  <button
-                    onClick={() => setShowDetail(!showDetail)}
-                    className="w-full px-5 sm:px-6 py-3.5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-200"
-                  >
-                    <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">Desglose Anual</h3>
-                    <svg className={`cursor-pointer w-4 h-4 text-gray-600 transition-transform flex-shrink-0 ${showDetail ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                    </svg>
-                  </button>
+                  <section className="-mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 first:border-t-0 first:pt-0">
+                    <button
+                      onClick={() => setShowDetail(!showDetail)}
+                      className="w-full px-6 sm:px-8 py-5 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-200"
+                    >
+                      <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">Desglose Anual</h3>
+                      <svg className={`cursor-pointer w-4 h-4 text-gray-600 transition-transform flex-shrink-0 ${showDetail ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    </button>
 
-                  {showDetail && (
-                    <div className="p-5 sm:p-6 border-b border-gray-200">
-                      <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">
-                        Aportado vs Total
-                      </p>
-                      <ResponsiveContainer width="100%" height={280}>
-                        <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                          <XAxis
-                            dataKey="year"
-                            tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
-                            tickFormatter={(v: number) => v === 0 ? 'Inicio' : `${v}º`}
-                            stroke="#d1d5db"
-                          />
-                          <YAxis
-                            tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
-                            tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k €`}
-                            stroke="#d1d5db"
-                          />
-                          <Tooltip content={<ChartTooltip />} />
-                          <Legend wrapperStyle={{ fontFamily: 'Heebo, sans-serif', fontSize: '12px' }} />
-                          <Line type="monotone" dataKey="contributed" name="Aportado" stroke="#6b7280" strokeWidth={2} dot={false} />
-                          <Line type="monotone" dataKey="total" name="Total" stroke="#22c55e" strokeWidth={2} dot={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                    )}
-                  {showDetail && (
-                    <>
-                    <div className="relative">
-                      <div className="overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain">
-                        <table className="w-full min-w-full mb-2">
-                          <thead>
-                            <tr className="border-b border-gray-200 bg-gray-50">
-                              <th className="px-5 sm:px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Año</th>
-                              <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Cuenta</th>
-                              <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Inversiones</th>
-                              <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Total</th>
-                              <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Impuestos</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {result.monthlyBreakdown
-                              .filter((m, i, arr) => m.month === 12 || i === arr.length - 1)
-                              .map((entry) => (
-                                <tr key={`${entry.year}-${entry.month}`} className="hover:bg-gray-50 transition-colors">
-                                  <td className="px-5 sm:px-6 py-2.5 text-sm font-medium text-gray-900">{entry.year}º</td>
-                                  <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
-                                  <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.investments)}</td>
-                                  <td className="px-5 sm:px-6 py-2.5 text-right text-sm font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
-                                  <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-red-600">{entry.yearlyGainsTaxPaid > 0 ? formatCurrency(entry.yearlyGainsTaxPaid) : '—'}</td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
+                    {showDetail && (
+                      <div className="p-5 sm:p-6 border-b border-gray-200">
+                        <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">
+                          Aportado vs Total
+                        </p>
+                        <ResponsiveContainer width="100%" height={280}>
+                          <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis
+                              dataKey="year"
+                              tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                              tickFormatter={(v: number) => v === 0 ? 'Inicio' : `${v}º`}
+                              stroke="#d1d5db"
+                            />
+                            <YAxis
+                              tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                              tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k €`}
+                              stroke="#d1d5db"
+                            />
+                            <Tooltip content={<ChartTooltip />} />
+                            <Legend wrapperStyle={{ fontFamily: 'Heebo, sans-serif', fontSize: '12px' }} />
+                            <Line type="monotone" dataKey="contributed" name="Aportado" stroke="#6b7280" strokeWidth={2} dot={false} />
+                            <Line type="monotone" dataKey="total" name="Total" stroke="#22c55e" strokeWidth={2} dot={false} />
+                          </LineChart>
+                        </ResponsiveContainer>
                       </div>
-                      <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white from-50% to-transparent pointer-events-none" />
-                    </div>
-                    <div className="px-5 sm:px-6 py-3 bg-amber-50 border-t border-amber-200">
-                      <p className="text-xs text-amber-800 leading-relaxed">
-                        <strong>⚠️ Nota fiscal:</strong> Los intereses de la cuenta remunerada tributan cada año en la 
-                        declaración de la Renta (junio) según los tramos progresivos del ahorro (19%–26%). 
-                        Esta simulación descuenta ese impuesto anualmente. Las plusvalías de las inversiones 
-                        solo tributan al vender (no se modelan aquí al asumir buy-and-hold). 
-                        El importe total pagado en impuestos estimado es <strong>{formatCurrency(result.totalTaxesPaid)}</strong>.
-                      </p>
-                    </div>
-                    </>
-                  )}
+                      )}
+                    {showDetail && (
+                      <>
+                      <div className="relative">
+                        <div className="overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain">
+                          <table className="w-full min-w-full mb-2">
+                            <thead>
+                              <tr className="border-b border-gray-200 bg-gray-50">
+                                <th className="px-5 sm:px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Año</th>
+                                <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Cuenta</th>
+                                <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Inversiones</th>
+                                <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Total</th>
+                                <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Impuestos</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {result.monthlyBreakdown
+                                .filter((m, i, arr) => m.month === 12 || i === arr.length - 1)
+                                .map((entry) => (
+                                  <tr key={`${entry.year}-${entry.month}`} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-5 sm:px-6 py-2.5 text-sm font-medium text-gray-900">{entry.year}º</td>
+                                    <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
+                                    <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.investments)}</td>
+                                    <td className="px-5 sm:px-6 py-2.5 text-right text-sm font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
+                                    <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-red-600">{entry.yearlyGainsTaxPaid > 0 ? formatCurrency(entry.yearlyGainsTaxPaid) : '—'}</td>
+                                  </tr>
+                                ))}
+                            </tbody>
+                          </table>
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white from-50% to-transparent pointer-events-none" />
+                      </div>
+                      <div className="px-5 sm:px-6 py-3 bg-amber-50 border-t border-amber-200">
+                        <p className="text-xs text-amber-800 leading-relaxed">
+                          <strong>⚠️ Nota fiscal:</strong> Los intereses de la cuenta remunerada tributan cada año en la 
+                          declaración de la Renta (junio) según los tramos progresivos del ahorro (19%–26%). 
+                          Esta simulación descuenta ese impuesto anualmente. Las plusvalías de las inversiones 
+                          solo tributan al vender (no se modelan aquí al asumir buy-and-hold). 
+                          El importe total pagado en impuestos estimado es <strong>{formatCurrency(result.totalTaxesPaid)}</strong>.
+                        </p>
+                      </div>
+                      </>
+                    )}
+                  </section>
                 </section>
               </div>
             )}
