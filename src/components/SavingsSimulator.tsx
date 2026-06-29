@@ -506,6 +506,10 @@ export default function SavingsSimulator() {
                   onChange={(v) => handleInputChange('realEstatePercentage', v)}
                   step="0.1"
                 />
+                <HouseTypeField
+                  isNewBuild={params.isNewBuild}
+                  onChange={(v) => handleInputChange('isNewBuild', v)}
+                />
                 <InputField
                   label="Reforma y Muebles (€)"
                   value={params.reformCosts + params.furnitureCosts}
@@ -515,13 +519,7 @@ export default function SavingsSimulator() {
                     handleInputChange('furnitureCosts', total * 0.25);
                   }}
                 />
-                <div className="md:col-span-2">
-                  <HouseTypeField
-                    isNewBuild={params.isNewBuild}
-                    onChange={(v) => handleInputChange('isNewBuild', v)}
-                  />
-                </div>
-                <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
+                <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 flex flex-col justify-center">
                   <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos Finales de la Casa</p>
                   <p className="text-xl font-bold text-gray-900">{formatCurrency(totalHouseExpenses)}</p>
                 </article>
