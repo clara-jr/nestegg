@@ -446,10 +446,10 @@ export default function SavingsSimulator() {
                   type="text"
                   hint="Ej: 60% o 37500"
                 />
-                <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
-                  <p className={`text-xs font-medium ${allocationStatus.colorClass}`}>{allocationStatus.message}</p>
-                </div>
               </FormSection>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
+                <p className={`text-xs font-medium ${allocationStatus.colorClass}`}>{allocationStatus.message}</p>
+              </div>
 
               <FormSection title="Costes de Casa" cols="double">
                 <InputField
@@ -669,6 +669,10 @@ export default function SavingsSimulator() {
                       <p className="text-xs font-medium text-gray-600 mb-1">Horizonte</p>
                       <p className="text-base font-bold text-gray-900">{params.timeHorizonYears} años</p>
                     </article>
+                    {/*<article className="bg-red-50 rounded-lg px-3.5 py-3 border border-red-200">
+                      <p className="text-xs font-medium text-red-600 mb-1">Impuestos Estimados</p>
+                      <p className="text-base font-bold text-red-700">{formatCurrency(result.totalTaxesPaid)}</p>
+                    </article>*/}
                   </div>
                 </section>
 
@@ -712,15 +716,17 @@ export default function SavingsSimulator() {
                     </div>
                     )}
                   {showDetail && (
+                    <>
                     <div className="relative">
                       <div className="overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain">
-                        <table className="w-full min-w-full">
+                        <table className="w-full min-w-full mb-2">
                           <thead>
                             <tr className="border-b border-gray-200 bg-gray-50">
                               <th className="px-5 sm:px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Año</th>
                               <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Cuenta</th>
                               <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Inversiones</th>
                               <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Total</th>
+                              <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Impuestos</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
@@ -732,6 +738,7 @@ export default function SavingsSimulator() {
                                   <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
                                   <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.investments)}</td>
                                   <td className="px-5 sm:px-6 py-2.5 text-right text-sm font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
+                                  <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-red-600">{entry.yearlyGainsTaxPaid > 0 ? formatCurrency(entry.yearlyGainsTaxPaid) : '—'}</td>
                                 </tr>
                               ))}
                           </tbody>
@@ -739,6 +746,16 @@ export default function SavingsSimulator() {
                       </div>
                       <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white from-50% to-transparent pointer-events-none" />
                     </div>
+                    <div className="px-5 sm:px-6 py-3 bg-amber-50 border-t border-amber-200">
+                      <p className="text-xs text-amber-800 leading-relaxed">
+                        <strong>⚠︎ Nota fiscal:</strong> Los intereses de la cuenta remunerada tributan cada año en la 
+                        declaración de la Renta (junio) según los tramos progresivos del ahorro (19%–26%). 
+                        Esta simulación descuenta ese impuesto anualmente. Las plusvalías de las inversiones 
+                        solo tributan al vender (no se modelan aquí al asumir buy-and-hold). 
+                        El importe total pagado en impuestos estimado es <strong>{formatCurrency(result.totalTaxesPaid)}</strong>.
+                      </p>
+                    </div>
+                    </>
                   )}
                 </section>
               </div>
