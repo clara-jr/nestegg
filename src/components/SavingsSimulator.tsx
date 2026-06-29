@@ -104,7 +104,7 @@ function ResultCard({ label, value, icon }: Readonly<ResultCardProps>) {
         <span className="text-lg">{icon}</span>
         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">{label}</p>
       </div>
-      <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{value}</p>
+      <p className="text-xl font-bold text-gray-900 break-words">{value}</p>
     </article>
   );
 }
@@ -444,7 +444,7 @@ export default function SavingsSimulator() {
                   hint="Antes de comprar la vivienda"
                 />
                 <article className="bg-emerald-50 rounded-lg px-4 py-3 border border-emerald-200">
-                  <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider pb-2">Disponible para Invertir</p>
+                  <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider mb-1">Disponible para Invertir</p>
                   <p className={`text-xl font-bold ${initialAvailableForInvestment >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                     {formatCurrency(initialAvailableForInvestment)}
                   </p>
@@ -499,7 +499,7 @@ export default function SavingsSimulator() {
                   />
                 </div>
                 <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider pb-2">Gastos Finales de la Casa</p>
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos Finales de la Casa</p>
                   <p className="text-xl font-bold text-gray-900">{formatCurrency(totalHouseExpenses)}</p>
                 </article>
               </FormSection>
@@ -522,7 +522,7 @@ export default function SavingsSimulator() {
                   onChange={(v) => handleInputChange('mortgageDurationYears', v)}
                 />
                 <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 flex flex-col justify-center">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider  pb-2">Préstamo Hipotecario Estimado</p>
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Hipotecario Estimado</p>
                   <p className="text-xl font-bold text-gray-900">{formatCurrency(mortgageGrantedAmount)}</p>
                 </article>
                 <InputField
@@ -620,7 +620,7 @@ export default function SavingsSimulator() {
                 <button
                   type="submit"
                   disabled={!hasValidInitialAllocation}
-                  className="cursor-pointer py-2.5 px-8 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all text-sm"
+                   className="cursor-pointer py-2.5 px-8 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all text-sm uppercase tracking-wider"
                 >
                   Calcular Proyección
                 </button>
@@ -640,52 +640,52 @@ export default function SavingsSimulator() {
 
                     <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Ahorro Inicial Invertible</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Ahorro Inicial Invertible</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.initialAvailableForInvestment)}</p>
                       </article>
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Aporte Mensual</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Aporte Mensual</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(params.monthlyContribution)}</p>
                       </article>
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Coste Casa</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Coste Casa</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.totalHouseExpenses)}</p>
                       </article>
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Préstamo Hipotecario</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Hipotecario</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.mortgageGrantedAmount)}</p>
                       </article>
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Cuota Hipoteca</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Cuota Hipoteca</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(params.monthlyMortgagePayment)}</p>
                       </article>
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Duración Hipoteca</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Duración Hipoteca</p>
                         <p className="text-base font-bold text-gray-900">{params.mortgageDurationYears} años</p>
                       </article>
                       { hasFamilyLoan ?
                         (<>
                           <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                            <p className="text-xs font-medium text-gray-600 mb-1">Cuota Préstamo Familiar</p>
+                            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Cuota Préstamo Familiar</p>
                             <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(familyLoanMonthlyPayment)}</p>
                           </article>
                           <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                          <p className="text-xs font-medium text-gray-600 mb-1">Duración Préstamo Familiar</p>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Duración Préstamo Familiar</p>
                             <p className="text-base font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
                           </article>
                         </>) : (
                         <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                          <p className="text-xs font-medium text-gray-600 mb-1">Préstamo Familiar</p>
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Familiar</p>
                           <p className="text-base font-bold text-gray-900">Inactivo</p>
                         </article>
                         )
                       }
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-medium text-gray-600 mb-1">Horizonte</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Horizonte</p>
                         <p className="text-base font-bold text-gray-900">{params.timeHorizonYears} años</p>
                       </article>
                       {/*<article className="bg-red-50 rounded-lg px-3.5 py-3 border border-red-200">
-                        <p className="text-xs font-medium text-red-600 mb-1">Impuestos Estimados</p>
+                        <p className="text-xs font-medium text-red-600 uppercase tracking-wider mb-1">Impuestos Estimados</p>
                         <p className="text-base font-bold text-red-700">{formatCurrency(result.totalTaxesPaid)}</p>
                       </article>*/}
                     </div>
