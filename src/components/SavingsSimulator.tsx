@@ -186,7 +186,7 @@ function getInitialAllocationStatus(
 
   return {
     colorClass: 'text-green-700',
-    message: 'Distribución inicial válida: cuenta + inversiones = ahorro disponible.',
+    message: 'El reparto del dinero es correcto. La suma de lo destinado a cuenta remunerada e inversiones iniciales coincide con el valor disponible para invertir.',
   };
 }
 
@@ -393,10 +393,22 @@ export default function SavingsSimulator() {
     <div className="min-h-screen py-6 px-3 sm:px-4 lg:px-8">
       <div className="mx-auto max-w-6xl">
         {/* Header */}
-        <header className="mb-6 text-center">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-            Simulador de Ahorros
-          </h1>
+        <header className="mb-6 flex flex-col items-center gap-4">
+          {/*<svg width="56" height="56" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M20 4C16 4 10 8 10 16C10 18 11 22 14 26L12 34C12 35 13 36 14 36H26C27 36 28 35 28 34L26 26C29 22 30 18 30 16C30 8 24 4 20 4Z" fill="#e5e7eb" stroke="#6b7280" strokeWidth="1.5"/>
+            <ellipse cx="20" cy="16" rx="6" ry="7" fill="#d1d5db" stroke="#6b7280" strokeWidth="1.2"/>
+            <path d="M20 12C21 12 22 13 22 14" stroke="#6b7280" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
+          </svg>*/}
+          <div className="text-center">
+            {/*<h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
+              NestEgg
+            </h1>*/}
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight mt-3">
+              Simulador de Ahorros
+            </h1>
+            <p className="text-sm text-gray-500 mt-3">Simula el estado de tus ahorros en un intervalo de tiempo determinado.</p>
+            <p className="text-sm text-gray-500 mt-1 mb-2">Proyecta tu patrimonio, hipoteca e inversiones al detalle.</p>
+          </div>
         </header>
 
         {/* Main Layout */}
@@ -412,7 +424,7 @@ export default function SavingsSimulator() {
                   hint="Antes de comprar la vivienda"
                 />
                 <article className="bg-emerald-50 rounded-lg px-4 py-3 border border-emerald-200">
-                  <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider">Disponible para Invertir</p>
+                  <p className="text-xs font-semibold text-emerald-800 uppercase tracking-wider pb-2">Disponible para Invertir</p>
                   <p className={`text-xl font-bold ${initialAvailableForInvestment >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
                     {formatCurrency(initialAvailableForInvestment)}
                   </p>
@@ -434,7 +446,7 @@ export default function SavingsSimulator() {
                   type="text"
                   hint="Ej: 60% o 37500"
                 />
-                <div className="md:col-span-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
                   <p className={`text-xs font-medium ${allocationStatus.colorClass}`}>{allocationStatus.message}</p>
                 </div>
               </FormSection>
@@ -466,8 +478,8 @@ export default function SavingsSimulator() {
                     onChange={(v) => handleInputChange('isNewBuild', v)}
                   />
                 </div>
-                <article className="md:col-span-2 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Gastos Finales de la Casa</p>
+                <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider pb-2">Gastos Finales de la Casa</p>
                   <p className="text-xl font-bold text-gray-900">{formatCurrency(totalHouseExpenses)}</p>
                 </article>
               </FormSection>
@@ -489,8 +501,8 @@ export default function SavingsSimulator() {
                   value={params.mortgageDurationYears}
                   onChange={(v) => handleInputChange('mortgageDurationYears', v)}
                 />
-                <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Préstamo Hipotecario Estimado</p>
+                <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 flex flex-col justify-center">
+                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider  pb-2">Préstamo Hipotecario Estimado</p>
                   <p className="text-xl font-bold text-gray-900">{formatCurrency(mortgageGrantedAmount)}</p>
                 </article>
                 <InputField
@@ -529,21 +541,23 @@ export default function SavingsSimulator() {
                 <div className="md:col-span-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Distribución por tramos</p>
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={sameDistributionForAll}
-                        onChange={(e) => {
-                          setSameDistributionForAll(e.target.checked);
-                          if (e.target.checked) {
-                            const first = params.distributionPeriods[0] ?? 50;
-                            setParams(prev => ({ ...prev, distributionPeriods: prev.distributionPeriods.map(() => first) }));
-                          }
-                        }}
-                        className="w-3.5 h-3.5 text-gray-600 border-gray-300 rounded cursor-pointer"
-                      />
-                      <span className="text-xs font-medium text-gray-700">Igual en todos</span>
-                    </label>
+                    {params.timeHorizonYears > 10 && (
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={sameDistributionForAll}
+                          onChange={(e) => {
+                            setSameDistributionForAll(e.target.checked);
+                            if (e.target.checked) {
+                              const first = params.distributionPeriods[0] ?? 50;
+                              setParams(prev => ({ ...prev, distributionPeriods: prev.distributionPeriods.map(() => first) }));
+                            }
+                          }}
+                          className="w-3.5 h-3.5 text-gray-600 border-gray-300 rounded cursor-pointer"
+                        />
+                        <span className="text-xs font-medium text-gray-700">Igual en todos</span>
+                      </label>
+                    )}
                   </div>
                   {(sameDistributionForAll ? [params.distributionPeriods[0] ?? 50] : params.distributionPeriods).map((pct, i) => {
                     const fromYear = i * 10 + 1;
@@ -672,9 +686,9 @@ export default function SavingsSimulator() {
 
                   {showDetail && (
                     <div className="p-5 sm:p-6 border-b border-gray-200">
-                      <h4 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">
+                      <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">
                         Aportado vs Total
-                      </h4>
+                      </p>
                       <ResponsiveContainer width="100%" height={280}>
                         <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -698,29 +712,32 @@ export default function SavingsSimulator() {
                     </div>
                     )}
                   {showDetail && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-full">
-                        <thead>
-                          <tr className="border-b border-gray-200 bg-gray-50">
-                            <th className="px-3 sm:px-5 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">Año</th>
-                            <th className="px-3 sm:px-5 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider">Cuenta</th>
-                            <th className="px-3 sm:px-5 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider">Inversiones</th>
-                            <th className="px-3 sm:px-5 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                          {result.monthlyBreakdown
-                            .filter((m, i, arr) => m.month === 12 || i === arr.length - 1)
-                            .map((entry) => (
-                              <tr key={`${entry.year}-${entry.month}`} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-3 sm:px-5 py-2.5 text-sm font-medium text-gray-900">{entry.year}º</td>
-                                <td className="px-3 sm:px-5 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
-                                <td className="px-3 sm:px-5 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.investments)}</td>
-                                <td className="px-3 sm:px-5 py-2.5 text-right text-sm font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
-                              </tr>
-                            ))}
-                        </tbody>
-                      </table>
+                    <div className="relative">
+                      <div className="overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain">
+                        <table className="w-full min-w-full">
+                          <thead>
+                            <tr className="border-b border-gray-200 bg-gray-50">
+                              <th className="px-5 sm:px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Año</th>
+                              <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Cuenta</th>
+                              <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Inversiones</th>
+                              <th className="px-5 sm:px-6 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {result.monthlyBreakdown
+                              .filter((m, i, arr) => m.month === 12 || i === arr.length - 1)
+                              .map((entry) => (
+                                <tr key={`${entry.year}-${entry.month}`} className="hover:bg-gray-50 transition-colors">
+                                  <td className="px-5 sm:px-6 py-2.5 text-sm font-medium text-gray-900">{entry.year}º</td>
+                                  <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
+                                  <td className="px-5 sm:px-6 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.investments)}</td>
+                                  <td className="px-5 sm:px-6 py-2.5 text-right text-sm font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white from-50% to-transparent pointer-events-none" />
                     </div>
                   )}
                 </section>
