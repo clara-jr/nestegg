@@ -391,6 +391,7 @@ export default function RetirementSimulator() {
       esJubilacion: boolean;
       finHipoteca: boolean;
       finPrestamo: boolean;
+      residencia: boolean;
       achievable: boolean;
     }> = [];
 
@@ -598,7 +599,7 @@ export default function RetirementSimulator() {
       output.push({
         age,
         memberAges: memberAgesAtAge(age),
-        monthlyPension: result ? result.memberPensions.reduce((a, b) => a + b, 0) : 0,
+        monthlyPension: result ? result.memberPensions.reduce((a, b) => a + b, 0) : results.length > 0 ? results[results.length - 1].memberPensions.reduce((a, b) => a + b, 0) : 0,
         requiredSavings,
         cuenta: Math.round(sa * 100) / 100,
         inversiones: Math.round(inv * 100) / 100,
@@ -610,6 +611,7 @@ export default function RetirementSimulator() {
         esJubilacion: age === firstAchievableAge + 1,
         finHipoteca: age === params.mortgageEndAge + 1 && params.mortgageEndAge > 0,
         finPrestamo: age === params.familyLoanEndAge + 1 && params.familyLoanEndAge > 0,
+        residencia: age === params.residencyAge + 1,
         achievable: achievableNow,
       });
     }
@@ -696,6 +698,7 @@ export default function RetirementSimulator() {
                   label="Esperanza de Vida"
                   value={params.lifeExpectancy}
                   onChange={(v) => handleInputChange('lifeExpectancy', v)}
+                  error={params.residencyAge > params.lifeExpectancy ? 'La edad de residencia no puede ser mayor que la esperanza de vida' : undefined}
                 />
                 {(() => {
                   const totalNet = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
@@ -721,6 +724,7 @@ export default function RetirementSimulator() {
                   label="Edad de Residencia"
                   value={params.residencyAge}
                   onChange={(v) => handleInputChange('residencyAge', v)}
+                  error={params.residencyAge > params.lifeExpectancy ? 'La edad de residencia no puede ser mayor que la esperanza de vida' : undefined}
                 />
                 <div className="md:col-span-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between">
@@ -1051,7 +1055,7 @@ export default function RetirementSimulator() {
                                           </span>
                                         </span>
                                       )}
-                                      {viewMode === 'con-pension' && r.pensionUsada > 0 && r.age > 0 && evolvedResults[Math.max(0, evolvedResults.indexOf(r) - 1)]?.pensionUsada === 0 && (
+                                      {viewMode === 'con-pension' && selectedEarliest && params.members.length === 1 && r.pensionUsada > 0 && r.age > 0 && (() => { const idx = evolvedResults.indexOf(r); return idx >= 2 && evolvedResults[idx - 2].pensionUsada === 0 && evolvedResults[idx - 1].pensionUsada > 0; })() && (
                                         <span className="relative inline-flex items-center group">
                                           <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold cursor-help leading-none">P</span>
                                           <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded-md bg-gray-800 text-white text-[10px] leading-tight whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
@@ -1059,6 +1063,18 @@ export default function RetirementSimulator() {
                                           </span>
                                         </span>
                                       )}
+                                      {viewMode === 'con-pension' && selectedEarliest && params.members.length > 1 && buildPensionSchedule(params.members, selectedEarliest.retirementAge).map((p, i) => {
+                                        const startAge = selectedEarliest.retirementAge + p.startOffset;
+                                        if (r.age !== startAge + 1) return null;
+                                        return (
+                                          <span key={`p-${i}`} className="relative inline-flex items-center group">
+                                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold cursor-help leading-none">P</span>
+                                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded-md bg-gray-800 text-white text-[10px] leading-tight whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
+                                              Pensión M{i + 1}: {formatCurrency(p.monthlyAmount)}/mes
+                                            </span>
+                                          </span>
+                                        );
+                                      })}
                                       {r.finHipoteca && (
                                         <span className="relative inline-flex items-center group">
                                           <span className="flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold cursor-help leading-none">H</span>
@@ -1072,6 +1088,14 @@ export default function RetirementSimulator() {
                                           <span className="flex items-center justify-center w-4 h-4 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold cursor-help leading-none">F</span>
                                           <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded-md bg-gray-800 text-white text-[10px] leading-tight whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
                                             Préstamo familiar pagado
+                                          </span>
+                                        </span>
+                                      )}
+                                      {r.residencia && (
+                                        <span className="relative inline-flex items-center group">
+                                          <span className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold cursor-help leading-none">R</span>
+                                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded-md bg-gray-800 text-white text-[10px] leading-tight whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
+                                            Entrada en residencia
                                           </span>
                                         </span>
                                       )}
@@ -1116,6 +1140,9 @@ export default function RetirementSimulator() {
                         <p className="text-xs text-blue-800 leading-relaxed">
                           ℹ️ La columna <strong>Necesario</strong> indica el ahorro necesario al <strong>final</strong> de ese año para poder jubilarse. La columna <strong>Total</strong> refleja el ahorro total al <strong>final</strong> del año, tras las aportaciones, inversiones o retiradas realizadas durante el mismo.
                           Si el <strong>Total</strong> supera lo <strong>Necesario</strong>, significa que se puede comenzar la jubilación al completar ese año.
+                          {params.members.length > 1 && (
+                            <> La columna <strong>Edad</strong> corresponde a la edad del <strong>Integrante 1</strong>. El resto de integrantes se jubilan el mismo año con edades distintas (reflejadas en el resumen).</>
+                          )}
                         </p>
                       </div>
                       <div className="px-6 sm:px-8 py-3 bg-amber-50 border-t border-amber-200">
