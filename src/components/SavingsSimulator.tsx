@@ -407,6 +407,48 @@ export default function SavingsSimulator() {
     setResult(newResult);
   };
 
+  const handleReformaMueblesChange = (value: string) => {
+    const total = Number.parseFloat(value) || 0;
+    const newReform = Math.round(total * 0.75 * 100) / 100;
+    const newFurniture = Math.round(total * 0.25 * 100) / 100;
+
+    setParams(prev => ({
+      ...prev,
+      reformCosts: newReform,
+      furnitureCosts: newFurniture,
+    }));
+
+    const newHouseExpenses = calculateTotalHouseExpenses({
+      baseCost: params.baseCost,
+      realEstatePercentage: params.realEstatePercentage,
+      isNewBuild: params.isNewBuild,
+      reformCosts: newReform,
+      furnitureCosts: newFurniture,
+    });
+    const newMortgageGranted = params.baseCost > 0
+      ? calculateMortgageGrantedAmount(
+          params.monthlyMortgagePayment,
+          params.mortgageAnnualRate,
+          params.mortgageDurationYears,
+        )
+      : 0;
+    const newFamilyLoan = params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0
+      ? params.familyLoanAmount
+      : 0;
+    const newAvailable = params.initialTotalSavings - newHouseExpenses + newMortgageGranted + newFamilyLoan;
+
+    if (newAvailable < 0) return;
+
+    const normalizedSavings = initialAllocationInputs.savingsAccount.trim().replace(',', '.');
+    if (normalizedSavings.endsWith('%')) return;
+
+    const parsedSavings = parseInitialAllocation(initialAllocationInputs.savingsAccount, newAvailable);
+    if (!parsedSavings.isValid) return;
+
+    const investmentsAmount = Math.max(0, Math.round((newAvailable - parsedSavings.amount) * 100) / 100);
+    setInitialAllocationInputs(prev => ({ ...prev, investments: String(investmentsAmount) }));
+  };
+
   const handleInputChange = (field: keyof SavingsParams, value: any) => {
     const numericValue = typeof value === 'string' ? Number.parseFloat(value) || 0 : value;
 
@@ -543,11 +585,7 @@ export default function SavingsSimulator() {
                 <InputField
                   label="Reforma y Muebles (€)"
                   value={params.reformCosts + params.furnitureCosts}
-                  onChange={(v) => {
-                    const total = Number.parseFloat(v) || 0;
-                    handleInputChange('reformCosts', total * 0.75);
-                    handleInputChange('furnitureCosts', total * 0.25);
-                  }}
+                  onChange={(v) => handleReformaMueblesChange(v)}
                 />
                 <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 flex flex-col justify-center">
                   <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos Finales de la Casa</p>
