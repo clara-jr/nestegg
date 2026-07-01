@@ -100,13 +100,20 @@ function getTotalPensionAtAge(
     .reduce((sum, p) => sum + p.monthlyAmount, 0);
 }
 
-function getResidencyExpenses(
-  age: number,
+function getTotalExpenses(
+  referenceAge: number,
   params: RetirementParams,
 ): number {
-  return age >= params.residencyAge
-    ? params.monthlyExpensesInResidency
-    : params.monthlyExpensesPreResidency;
+  const refCurrentAge = params.members[0].currentAge;
+  const numMembers = params.members.length;
+  let total = 0;
+  for (const m of params.members) {
+    const memberAge = m.currentAge + (referenceAge - refCurrentAge);
+    total += memberAge >= params.residencyAge
+      ? params.monthlyExpensesInResidency / numMembers
+      : params.monthlyExpensesPreResidency / numMembers;
+  }
+  return Math.round(total * 100) / 100;
 }
 
 export function simulateRetirementPhase(
@@ -141,7 +148,7 @@ export function simulateRetirementPhase(
     }
 
     const totalPension = getTotalPensionAtAge(currentAge, retirementAge, pensions);
-    let expenses = getResidencyExpenses(currentAge, params);
+    let expenses = getTotalExpenses(currentAge, params);
 
     if (currentAge < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
       expenses += params.monthlyMortgagePayment;
@@ -572,7 +579,7 @@ export function simulateDetailedPath(
       }
     } else {
       const totalPension = getTotalPensionAtAge(age, retirementAge, pensions);
-      let monthlyExpenses = getResidencyExpenses(age, params);
+      let monthlyExpenses = getTotalExpenses(age, params);
 
       if (age < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
         monthlyExpenses += params.monthlyMortgagePayment;

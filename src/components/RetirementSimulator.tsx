@@ -391,7 +391,6 @@ export default function RetirementSimulator() {
       esJubilacion: boolean;
       finHipoteca: boolean;
       finPrestamo: boolean;
-      residencia: boolean;
       achievable: boolean;
     }> = [];
 
@@ -509,9 +508,15 @@ export default function RetirementSimulator() {
               yearInvestmentContrib += toInvestments;
             }
           } else {
-            let monthlyExpenses = ageDuringMonth >= params.residencyAge
-              ? params.monthlyExpensesInResidency
-              : params.monthlyExpensesPreResidency;
+            const numM = params.members.length;
+            const refCA = params.members[0].currentAge;
+            let monthlyExpenses = params.members.reduce((sum, m) => {
+              const ma = m.currentAge + (ageDuringMonth - refCA);
+              return sum + (ma >= params.residencyAge
+                ? params.monthlyExpensesInResidency / numM
+                : params.monthlyExpensesPreResidency / numM);
+            }, 0);
+            monthlyExpenses = Math.round(monthlyExpenses * 100) / 100;
 
             if (ageDuringMonth < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
               monthlyExpenses += params.monthlyMortgagePayment;
@@ -611,7 +616,6 @@ export default function RetirementSimulator() {
         esJubilacion: age === firstAchievableAge + 1,
         finHipoteca: age === params.mortgageEndAge + 1 && params.mortgageEndAge > 0,
         finPrestamo: age === params.familyLoanEndAge + 1 && params.familyLoanEndAge > 0,
-        residencia: age === params.residencyAge + 1,
         achievable: achievableNow,
       });
     }
@@ -1097,14 +1101,17 @@ export default function RetirementSimulator() {
                                           </span>
                                         </span>
                                       )}
-                                      {r.residencia && (
-                                        <span className="relative inline-flex items-center group">
-                                          <span className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold cursor-help leading-none">R</span>
-                                          <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded-md bg-gray-800 text-white text-[10px] leading-tight whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
-                                            Entrada en residencia
+                                      {r.memberAges.map((ma, i) => {
+                                        if (ma !== 86) return null;
+                                        return (
+                                          <span key={`r-${i}`} className="relative inline-flex items-center group">
+                                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold cursor-help leading-none">R</span>
+                                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded-md bg-gray-800 text-white text-[10px] leading-tight whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
+                                              {params.members.length > 1 ? `Residencia M${i + 1}` : 'Entrada en residencia'}
+                                            </span>
                                           </span>
-                                        </span>
-                                      )}
+                                        );
+                                      })}
                                     </span>
                                   </td>
                                   {viewMode === 'con-pension' && (
