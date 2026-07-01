@@ -584,10 +584,10 @@ export default function RetirementSimulator() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight mt-3">
               Calculadora de Jubilación
             </h1>
-            <p className="text-sm text-gray-500 mt-1 mb-2">
+            <p className="text-sm text-gray-500 mt-3">
               Lleva el simulador de ahorros un paso más allá.
             </p>
-            <p className="text-sm text-gray-500 mt-3">Calcula cuándo jubilarte gestionando bien tus ahorros.</p>
+            <p className="text-sm text-gray-500 mt-1 mb-2">Calcula cuándo jubilarte gestionando bien tus ahorros.</p>
           </div>
         </header>
 
