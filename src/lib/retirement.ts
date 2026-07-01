@@ -1,14 +1,17 @@
 import { calculateTax } from './calculations';
 
-export interface RetirementParams {
+export interface MemberConfig {
   currentAge: number;
   currentSalary: number;
   yearsContributed: number;
+}
+
+export interface RetirementParams {
+  members: MemberConfig[];
   monthlyExpensesPreResidency: number;
   monthlyExpensesInResidency: number;
   residencyAge: number;
   lifeExpectancy: number;
-  pensionStartAge: number;
   initialSavingsAccount: number;
   initialInvestments: number;
   monthlyContribution: number;
@@ -24,8 +27,8 @@ export interface RetirementParams {
 
 export interface RetirementAgeResult {
   retirementAge: number;
-  yearsContributedAtRetirement: number;
-  monthlyPension: number;
+  memberAges: number[];
+  memberPensions: number[];
   requiredSavingsWithoutPension: number;
   requiredSavingsWithPension: number;
   projectedSavingsAtRetirement: number;
@@ -35,6 +38,11 @@ export interface RetirementAgeResult {
   projectedBalanceAtDeathWithPension: number;
   achievableWithoutPension: boolean;
   achievableWithPension: boolean;
+}
+
+export interface PensionEntry {
+  monthlyAmount: number;
+  startOffset: number;
 }
 
 export function estimatePension(
@@ -81,12 +89,32 @@ export function getDistributionPeriodIndex(
   return Math.max(0, Math.min(index, numPeriods - 1));
 }
 
+function getTotalPensionAtAge(
+  age: number,
+  retirementAge: number,
+  pensions: PensionEntry[],
+): number {
+  const yearsSinceRetirement = age - retirementAge;
+  return pensions
+    .filter(p => yearsSinceRetirement >= p.startOffset)
+    .reduce((sum, p) => sum + p.monthlyAmount, 0);
+}
+
+function getResidencyExpenses(
+  age: number,
+  params: RetirementParams,
+): number {
+  return age >= params.residencyAge
+    ? params.monthlyExpensesInResidency
+    : params.monthlyExpensesPreResidency;
+}
+
 export function simulateRetirementPhase(
   savingsAccount: number,
   investments: number,
   costBasis: number,
   retirementAge: number,
-  monthlyPension: number,
+  pensions: PensionEntry[],
   params: RetirementParams,
 ): number {
   const monthlyAccountRate = params.savingsAccountRate / 12 / 100;
@@ -112,10 +140,8 @@ export function simulateRetirementPhase(
       savingsGainsThisYear = 0;
     }
 
-    let expenses =
-      currentAge >= params.residencyAge
-        ? params.monthlyExpensesInResidency
-        : params.monthlyExpensesPreResidency;
+    const totalPension = getTotalPensionAtAge(currentAge, retirementAge, pensions);
+    let expenses = getResidencyExpenses(currentAge, params);
 
     if (currentAge < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
       expenses += params.monthlyMortgagePayment;
@@ -123,8 +149,6 @@ export function simulateRetirementPhase(
     if (currentAge < params.familyLoanEndAge && params.familyLoanMonthlyPayment > 0) {
       expenses += params.familyLoanMonthlyPayment;
     }
-
-    const effectivePension = currentAge >= params.pensionStartAge ? monthlyPension : 0;
 
     const curPeriodIndex = getDistributionPeriodIndex(
       currentAge,
@@ -136,7 +160,7 @@ export function simulateRetirementPhase(
     const accountInterest = sa * monthlyAccountRate;
     savingsGainsThisYear += accountInterest;
 
-    const netFlow = effectivePension - expenses;
+    const netFlow = totalPension - expenses;
 
     if (netFlow >= 0) {
       const toSavings = netFlow * (curSavingsPct / 100);
@@ -207,7 +231,7 @@ export function simulateRetirementPhase(
 
 export function findRequiredSavings(
   retirementAge: number,
-  monthlyPension: number,
+  pensions: PensionEntry[],
   params: RetirementParams,
   accumulatedSavingsAccount: number,
   accumulatedInvestments: number,
@@ -221,7 +245,7 @@ export function findRequiredSavings(
     ? accumulatedCostBasis / accumulatedInvestments
     : 1;
 
-  const zeroResult = simulateRetirementPhase(0, 0, 0, retirementAge, monthlyPension, params);
+  const zeroResult = simulateRetirementPhase(0, 0, 0, retirementAge, pensions, params);
   if (zeroResult >= 0) return 0;
 
   let low = 0;
@@ -229,13 +253,13 @@ export function findRequiredSavings(
 
   let result = simulateRetirementPhase(
     high * saRatio, high * (1 - saRatio), high * (1 - saRatio) * cbRatio,
-    retirementAge, monthlyPension, params,
+    retirementAge, pensions, params,
   );
   while (result < 0 && high < 1_000_000_000) {
     high *= 2;
     result = simulateRetirementPhase(
       high * saRatio, high * (1 - saRatio), high * (1 - saRatio) * cbRatio,
-      retirementAge, monthlyPension, params,
+      retirementAge, pensions, params,
     );
   }
 
@@ -245,7 +269,7 @@ export function findRequiredSavings(
     const mid = (low + high) / 2;
     const res = simulateRetirementPhase(
       mid * saRatio, mid * (1 - saRatio), mid * (1 - saRatio) * cbRatio,
-      retirementAge, monthlyPension, params,
+      retirementAge, pensions, params,
     );
     if (res > 0) {
       high = mid;
@@ -342,25 +366,41 @@ export function simulateAccumulationPhase(
   };
 }
 
+export function buildPensionSchedule(
+  memberConfigs: MemberConfig[],
+  referenceRetirementAge: number,
+): PensionEntry[] {
+  const refCurrentAge = memberConfigs[0].currentAge;
+  return memberConfigs.map(m => {
+    const ageAtRetirement = m.currentAge + (referenceRetirementAge - refCurrentAge);
+    const yearsAtRetirement = m.yearsContributed + (referenceRetirementAge - refCurrentAge);
+    const fullRetirementAge = yearsAtRetirement >= 38 ? 65 : 67;
+    const startOffset = Math.max(0, fullRetirementAge - ageAtRetirement);
+    const pension = estimatePension(m.currentSalary, m.currentAge, m.yearsContributed, ageAtRetirement);
+    return { monthlyAmount: pension, startOffset };
+  });
+}
+
 export function calculateAllRetirementAges(
   params: RetirementParams,
 ): RetirementAgeResult[] {
   const results: RetirementAgeResult[] = [];
-  const minRetirementAge = Math.max(30, params.currentAge + 1);
+  const refMember = params.members[0];
+  const minRetirementAge = Math.max(30, refMember.currentAge + 1);
   const maxRetirementAge = Math.min(params.lifeExpectancy - 1, 85);
   const periods = params.distributionPeriods;
 
-  for (let age = minRetirementAge; age <= maxRetirementAge; age++) {
-    const monthlyPension = estimatePension(
-      params.currentSalary,
-      params.currentAge,
-      params.yearsContributed,
-      age,
+  for (let refAge = minRetirementAge; refAge <= maxRetirementAge; refAge++) {
+    const pensions = buildPensionSchedule(params.members, refAge);
+    const yearsOfAccum = refAge - refMember.currentAge;
+    const memberAges = params.members.map(m => m.currentAge + yearsOfAccum);
+    const memberPensions = memberAges.map((age, i) =>
+      estimatePension(params.members[i].currentSalary, params.members[i].currentAge, params.members[i].yearsContributed, age),
     );
 
     const accResult = simulateAccumulationPhase(
-      params.currentAge,
-      age,
+      refMember.currentAge,
+      refAge,
       params.initialSavingsAccount,
       params.initialInvestments,
       params.monthlyContribution,
@@ -374,23 +414,22 @@ export function calculateAllRetirementAges(
       params.familyLoanEndAge,
     );
 
-    const requiredWithoutPension = findRequiredSavings(age, 0, params, accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis);
-    const requiredWithPension = findRequiredSavings(age, monthlyPension, params, accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis);
+    const requiredWithoutPension = findRequiredSavings(refAge, [], params, accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis);
+    const requiredWithPension = findRequiredSavings(refAge, pensions, params, accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis);
 
     const balanceAtDeathWithoutPension = simulateRetirementPhase(
       accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis,
-      age, 0, params,
+      refAge, [], params,
     );
     const balanceAtDeathWithPension = simulateRetirementPhase(
       accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis,
-      age, monthlyPension, params,
+      refAge, pensions, params,
     );
 
     results.push({
-      retirementAge: age,
-      yearsContributedAtRetirement:
-        params.yearsContributed + Math.max(0, age - params.currentAge),
-      monthlyPension: Math.round(monthlyPension * 100) / 100,
+      retirementAge: refAge,
+      memberAges,
+      memberPensions: memberPensions.map(p => Math.round(p * 100) / 100),
       requiredSavingsWithoutPension: requiredWithoutPension,
       requiredSavingsWithPension: requiredWithPension,
       projectedSavingsAtRetirement: accResult.total,
@@ -456,17 +495,18 @@ export interface YearDetail {
 export function simulateDetailedPath(
   params: RetirementParams,
   retirementAge: number,
-  monthlyPension: number,
+  pensions: PensionEntry[],
 ): YearDetail[] {
   const monthlyAccountRate = params.savingsAccountRate / 12 / 100;
   const monthlyInvestmentRate = params.investmentRate / 12 / 100;
+  const refMember = params.members[0];
 
   let savingsAccount = Math.max(0, params.initialSavingsAccount);
   let investments = Math.max(0, params.initialInvestments);
   let investmentCostBasis = investments;
 
-  const totalMonths = (params.lifeExpectancy - params.currentAge) * 12;
-  const retirementMonth = Math.max(0, (retirementAge - params.currentAge) * 12);
+  const totalMonths = (params.lifeExpectancy - refMember.currentAge) * 12;
+  const retirementMonth = Math.max(0, (retirementAge - refMember.currentAge) * 12);
 
   let savingsGainsThisYear = 0;
   let previousSavingsGains = 0;
@@ -480,7 +520,7 @@ export function simulateDetailedPath(
   let yearPension = 0;
 
   years.push({
-    age: params.currentAge,
+    age: refMember.currentAge,
     total: Math.round((savingsAccount + investments) * 100) / 100,
     savingsAccount: Math.round(savingsAccount * 100) / 100,
     investments: Math.round(investments * 100) / 100,
@@ -492,7 +532,7 @@ export function simulateDetailedPath(
   });
 
   for (let month = 1; month <= totalMonths; month++) {
-    const totalAgeInMonths = params.currentAge * 12 + month - 1;
+    const totalAgeInMonths = refMember.currentAge * 12 + month - 1;
     const age = Math.floor(totalAgeInMonths / 12);
     const monthInYear = ((month - 1) % 12) + 1;
     const yearNum = Math.ceil(month / 12);
@@ -531,9 +571,8 @@ export function simulateDetailedPath(
         yearInvestmentContrib += toInvestments;
       }
     } else {
-      let monthlyExpenses = age >= params.residencyAge
-        ? params.monthlyExpensesInResidency
-        : params.monthlyExpensesPreResidency;
+      const totalPension = getTotalPensionAtAge(age, retirementAge, pensions);
+      let monthlyExpenses = getResidencyExpenses(age, params);
 
       if (age < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
         monthlyExpenses += params.monthlyMortgagePayment;
@@ -542,11 +581,10 @@ export function simulateDetailedPath(
         monthlyExpenses += params.familyLoanMonthlyPayment;
       }
 
-      const pension = age >= params.pensionStartAge ? monthlyPension : 0;
-      const netFlow = pension - monthlyExpenses;
+      const netFlow = totalPension - monthlyExpenses;
 
       yearExpenses += monthlyExpenses;
-      yearPension += pension;
+      yearPension += totalPension;
 
       if (netFlow >= 0) {
         const periodIndex = getDistributionPeriodIndex(age, params.lifeExpectancy, params.distributionPeriods.length);

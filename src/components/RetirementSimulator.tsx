@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { calculateNetSalary, calculateTax, formatCurrency } from '../lib/calculations';
 import {
+  buildPensionSchedule,
   calculateAllRetirementAges,
   estimatePension,
   findRequiredSavings,
@@ -13,6 +14,7 @@ import {
   type RetirementParams,
   type RetirementAgeResult,
   type YearDetail,
+  type MemberConfig,
 } from '../lib/retirement';
 import { getSimulatorData, subscribe, type SimulatorData } from '../lib/sharedStore';
 
@@ -118,33 +120,33 @@ export default function RetirementSimulator() {
     return unsub;
   }, []);
 
-  const pensionStartAge = 67;
+  const defaultMember: MemberConfig = {
+    currentAge: 32,
+    currentSalary: 47000,
+    yearsContributed: 10,
+  };
 
   const [params, setParams] = useState<RetirementParams>(() => {
     const sd = getSimulatorData();
-    const age = 32;
     const lifeExpectancy = 95;
     const hasMtg = sd.baseCost > 0;
     const hasLoan = sd.familyLoanAmount > 0 && sd.familyLoanDurationYears > 0;
     const famPay = hasLoan ? sd.familyLoanAmount / (sd.familyLoanDurationYears * 12) : 0;
     return {
-      currentAge: age,
-      currentSalary: 47000,
-      yearsContributed: 10,
+      members: [defaultMember],
       monthlyExpensesPreResidency: Math.max(0, Math.round(calculateNetSalary(47000) / 12 - sd.monthlyContribution)),
       monthlyExpensesInResidency: 2500,
       residencyAge: 85,
       lifeExpectancy,
-      pensionStartAge: 67,
       initialSavingsAccount: sd.initialSavingsAccount,
       initialInvestments: sd.initialInvestments,
       monthlyContribution: sd.monthlyContribution,
       savingsAccountRate: sd.savingsAccountRate,
       investmentRate: sd.investmentRate,
       monthlyMortgagePayment: hasMtg ? sd.monthlyMortgagePayment : 0,
-      mortgageEndAge: hasMtg ? age + sd.mortgageDurationYears : 0,
+      mortgageEndAge: hasMtg ? defaultMember.currentAge + sd.mortgageDurationYears : 0,
       familyLoanMonthlyPayment: famPay,
-      familyLoanEndAge: hasLoan ? age + sd.familyLoanDurationYears : 0,
+      familyLoanEndAge: hasLoan ? defaultMember.currentAge + sd.familyLoanDurationYears : 0,
       distributionPeriods: sd.distributionPeriods.length > 0
         ? (() => {
             const p = [...sd.distributionPeriods].reverse();
@@ -181,8 +183,8 @@ export default function RetirementSimulator() {
       const hasMtg = sd.baseCost > 0;
       const hasLoan = sd.familyLoanAmount > 0 && sd.familyLoanDurationYears > 0;
       const famPay = hasLoan ? sd.familyLoanAmount / (sd.familyLoanDurationYears * 12) : 0;
-      const newMortEnd = hasMtg ? prev.currentAge + sd.mortgageDurationYears : 0;
-      const newFamEnd = hasLoan ? prev.currentAge + sd.familyLoanDurationYears : 0;
+      const newMortEnd = hasMtg ? prev.members[0].currentAge + sd.mortgageDurationYears : 0;
+      const newFamEnd = hasLoan ? prev.members[0].currentAge + sd.familyLoanDurationYears : 0;
       const numPeriods = Math.ceil(prev.lifeExpectancy / 10);
       const sdPeriods = sd.distributionPeriods.length > 0
         ? [...sd.distributionPeriods].reverse()
@@ -219,17 +221,28 @@ export default function RetirementSimulator() {
   }, [simData]);
 
   useEffect(() => {
-    const derived = Math.max(0, Math.round(calculateNetSalary(params.currentSalary) / 12 - params.monthlyContribution));
+    const totalNetSalary = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
+    const derived = Math.max(0, Math.round(totalNetSalary / 12 - params.monthlyContribution));
     setParams(prev => {
       if (Math.abs(prev.monthlyExpensesPreResidency - derived) < 0.01) return prev;
       return { ...prev, monthlyExpensesPreResidency: derived };
     });
-  }, [params.currentSalary, params.monthlyContribution]);
+  }, [params.members, params.monthlyContribution]);
 
   const handleInputChange = (field: keyof RetirementParams, value: any) => {
     const numericValue = typeof value === 'string' ? Number.parseFloat(value) || 0 : value;
     setParams(prev => {
       const updated = { ...prev, [field]: numericValue };
+      return updated;
+    });
+  };
+
+  const handleMemberChange = (index: number, field: keyof MemberConfig, value: any) => {
+    const numericValue = typeof value === 'string' ? Number.parseFloat(value) || 0 : value;
+    setParams(prev => {
+      const members = [...prev.members];
+      members[index] = { ...members[index], [field]: numericValue };
+      const updated = { ...prev, members };
       if (field === 'currentAge') {
         const sd = getSimulatorData();
         if (sd.baseCost > 0) updated.mortgageEndAge = numericValue + sd.mortgageDurationYears;
@@ -239,6 +252,22 @@ export default function RetirementSimulator() {
       }
       return updated;
     });
+  };
+
+  const addMember = () => {
+    const ref = params.members[0];
+    setParams(prev => ({
+      ...prev,
+      members: [...prev.members, { ...ref }],
+    }));
+  };
+
+  const removeMember = (index: number) => {
+    if (params.members.length <= 1) return;
+    setParams(prev => ({
+      ...prev,
+      members: prev.members.filter((_, i) => i !== index),
+    }));
   };
 
   const handleDistributionChange = (periodIndex: number, value: number) => {
@@ -254,14 +283,15 @@ export default function RetirementSimulator() {
   };
 
   useEffect(() => {
-    if (params.currentAge >= 1 && params.lifeExpectancy > params.currentAge) {
-      const r = calculateAllRetirementAges(params);
-      setResults(r);
+    const refAge = params.members[0].currentAge;
+    if (refAge >= 1 && params.lifeExpectancy > refAge) {
+      setResults(calculateAllRetirementAges(params));
     }
-  }, [params.currentAge, params.lifeExpectancy, params.distributionPeriods]);
+  }, [params.members, params.lifeExpectancy, params.distributionPeriods]);
 
   const visiblePeriods = useMemo(() => {
-    const horizonEndAge = params.currentAge + simData.timeHorizonYears;
+    const refAge = params.members[0].currentAge;
+    const horizonEndAge = refAge + simData.timeHorizonYears;
     const minAge = Math.max(30, horizonEndAge);
     return params.distributionPeriods
       .map((pct, i) => {
@@ -273,7 +303,7 @@ export default function RetirementSimulator() {
         ...p,
         startAge: p.startAge < minAge ? minAge : p.startAge,
       }));
-  }, [params.distributionPeriods, params.lifeExpectancy, params.currentAge, simData.timeHorizonYears]);
+  }, [params.distributionPeriods, params.lifeExpectancy, params.members, simData.timeHorizonYears]);
 
   const earliestWithoutPension = useMemo(() => {
     const achievable = results.filter(r => r.achievableWithoutPension);
@@ -287,12 +317,25 @@ export default function RetirementSimulator() {
 
   const selectedEarliest = viewMode === 'sin-pension' ? earliestWithoutPension : earliestWithPension;
 
+  const isSinPensionAchievable = earliestWithoutPension !== null;
+  const isConPensionAchievable = earliestWithPension !== null;
+  const showDesglose = isSinPensionAchievable || isConPensionAchievable;
+  const bothAchievable = isSinPensionAchievable && isConPensionAchievable;
+
+  useEffect(() => {
+    if (!isSinPensionAchievable && viewMode !== 'con-pension') {
+      setViewMode('con-pension');
+    } else if (!isConPensionAchievable && viewMode !== 'sin-pension') {
+      setViewMode('sin-pension');
+    }
+  }, [isSinPensionAchievable, isConPensionAchievable]);
+
   const detailedPath = useMemo<YearDetail[]>(() => {
     if (!selectedEarliest) return [];
-    const monthlyPension = viewMode === 'con-pension'
-      ? selectedEarliest.monthlyPension
-      : 0;
-    return simulateDetailedPath(params, selectedEarliest.retirementAge, monthlyPension);
+    const pensions = viewMode === 'con-pension'
+      ? buildPensionSchedule(params.members, selectedEarliest.retirementAge)
+      : [];
+    return simulateDetailedPath(params, selectedEarliest.retirementAge, pensions);
   }, [params, selectedEarliest, viewMode]);
 
   const chartData = useMemo(() => {
@@ -308,24 +351,34 @@ export default function RetirementSimulator() {
   const evolvedResults = useMemo(() => {
     const earliestResult = selectedEarliest;
     if (!earliestResult) return [];
+    const refMember = params.members[0];
 
     const timeHorizonYears = getSimulatorData().timeHorizonYears;
     const startAge = Math.max(
-      params.currentAge,
-      Math.min(earliestResult.retirementAge - 5, params.currentAge + timeHorizonYears)
+      refMember.currentAge,
+      Math.min(earliestResult.retirementAge - 5, refMember.currentAge + timeHorizonYears)
     );
     const endAge = params.lifeExpectancy;
     if (startAge >= endAge) return [];
 
     const monthlyAccountRate = params.savingsAccountRate / 12 / 100;
     const monthlyInvestmentRate = params.investmentRate / 12 / 100;
-    const baseMonthlyPension = viewMode === 'con-pension' ? earliestResult.monthlyPension : 0;
+    const pensions = viewMode === 'con-pension'
+      ? buildPensionSchedule(params.members, earliestResult.retirementAge)
+      : [];
+    const currentPensionsForAge = (age: number) => {
+      const yearsSinceRetirement = age - earliestResult.retirementAge;
+      return pensions
+        .filter(p => yearsSinceRetirement >= p.startOffset)
+        .reduce((sum, p) => sum + p.monthlyAmount, 0);
+    };
+    const memberAgesAtAge = (age: number) => params.members.map(m => m.currentAge + (age - refMember.currentAge));
 
     const resultByAge = new Map(results.map(r => [r.retirementAge, r]));
 
     const output: Array<{
       age: number;
-      yearsContributed: number;
+      memberAges: number[];
       monthlyPension: number;
       requiredSavings: number;
       cuenta: number;
@@ -341,7 +394,7 @@ export default function RetirementSimulator() {
       achievable: boolean;
     }> = [];
 
-    // Simulate accumulation from currentAge up to startAge to get initial state
+    // Simulate accumulation from currentAge up to startAge
     let sa = params.initialSavingsAccount;
     let inv = params.initialInvestments;
     let costBasis = inv;
@@ -351,12 +404,12 @@ export default function RetirementSimulator() {
     let preContribSa = 0;
     let preContribInv = 0;
     let preTaxes = 0;
-    const startMonths = (startAge - params.currentAge) * 12;
+    const startMonths = (startAge - refMember.currentAge) * 12;
 
     for (let m = 1; m <= startMonths; m++) {
       const monthInYear = ((m - 1) % 12) + 1;
       const year = Math.ceil(m / 12);
-      const ageDuringMonth = Math.floor((params.currentAge * 12 + m - 1) / 12);
+      const ageDuringMonth = Math.floor((refMember.currentAge * 12 + m - 1) / 12);
 
       if (monthInYear === 1 && year > 1) {
         previousSavingsGains = savingsGainsThisYear;
@@ -407,7 +460,6 @@ export default function RetirementSimulator() {
     monthsElapsed = startMonths;
     let prevYearGains = savingsGainsThisYear;
 
-    // Iterate year by year from startAge to endAge
     let firstAchievableAge: number | null = null;
     for (let age = startAge; age <= endAge; age++) {
       const result = resultByAge.get(age);
@@ -423,7 +475,7 @@ export default function RetirementSimulator() {
         for (let m = 0; m < 12; m++) {
           monthsElapsed++;
           const monthInYear = ((monthsElapsed - 1) % 12) + 1;
-          const ageDuringMonth = Math.floor((params.currentAge * 12 + monthsElapsed - 1) / 12);
+          const ageDuringMonth = Math.floor((refMember.currentAge * 12 + monthsElapsed - 1) / 12);
 
           const accountInterest = sa * monthlyAccountRate;
           sa = sa * (1 + monthlyAccountRate);
@@ -467,8 +519,8 @@ export default function RetirementSimulator() {
               monthlyExpenses += params.familyLoanMonthlyPayment;
             }
 
-            const monthlyPension = ageDuringMonth >= params.pensionStartAge ? baseMonthlyPension : 0;
-            const netFlow = monthlyPension - monthlyExpenses;
+            const totalPension = currentPensionsForAge(ageDuringMonth);
+            const netFlow = totalPension - monthlyExpenses;
 
             if (netFlow >= 0) {
               const toSavings = netFlow * (savingsPct / 100);
@@ -535,7 +587,7 @@ export default function RetirementSimulator() {
         : result
           ? (viewMode === 'sin-pension' ? result.requiredSavingsWithoutPension : result.requiredSavingsWithPension)
           : viewMode === 'sin-pension'
-            ? findRequiredSavings(age, 0, params, sa, inv, costBasis)
+            ? findRequiredSavings(age, [], params, sa, inv, costBasis)
             : -1;
 
       const achievableNow = requiredSavings >= 0 && Math.round((sa + inv) * 100) / 100 >= requiredSavings;
@@ -545,8 +597,8 @@ export default function RetirementSimulator() {
 
       output.push({
         age,
-        yearsContributed: result?.yearsContributedAtRetirement ?? (params.yearsContributed + Math.max(0, age - params.currentAge)),
-        monthlyPension: resultByAge.get(age - 1)?.monthlyPension ?? estimatePension(params.currentSalary, params.currentAge, params.yearsContributed, age - 1),
+        memberAges: memberAgesAtAge(age),
+        monthlyPension: result ? result.memberPensions.reduce((a, b) => a + b, 0) : 0,
         requiredSavings,
         cuenta: Math.round(sa * 100) / 100,
         inversiones: Math.round(inv * 100) / 100,
@@ -554,7 +606,7 @@ export default function RetirementSimulator() {
         aCuenta: age === startAge ? Math.round(preContribSa * 100) / 100 : Math.round(yearAccountContrib * 100) / 100,
         aInversiones: age === startAge ? Math.round(preContribInv * 100) / 100 : Math.round(yearInvestmentContrib * 100) / 100,
         impuestos: age === startAge ? Math.round(preTaxes * 100) / 100 : Math.round(yearTaxes * 100) / 100,
-        pensionUsada: age > params.pensionStartAge ? baseMonthlyPension : 0,
+        pensionUsada: viewMode === 'con-pension' ? currentPensionsForAge(age) : 0,
         esJubilacion: age === firstAchievableAge + 1,
         finHipoteca: age === params.mortgageEndAge + 1 && params.mortgageEndAge > 0,
         finPrestamo: age === params.familyLoanEndAge + 1 && params.familyLoanEndAge > 0,
@@ -594,31 +646,68 @@ export default function RetirementSimulator() {
         <div className="flex flex-col gap-6 md:gap-8">
           <section className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
             <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); setResults(calculateAllRetirementAges(params)); }}>
-              <FormSection title="Datos Personales" cols="double">
-                <InputField
-                  label="Edad Actual"
-                  value={params.currentAge}
-                  onChange={(v) => handleInputChange('currentAge', v)}
-                />
-                <InputField
-                  label="Salario Bruto Anual (€)"
-                  value={params.currentSalary}
-                  onChange={(v) => handleInputChange('currentSalary', v)}
-                  error={params.currentSalary > 0 && calculateNetSalary(params.currentSalary) / 12 < params.monthlyContribution
-                    ? `El salario neto mensual (${(calculateNetSalary(params.currentSalary) / 12).toFixed(0)} €) no cubre la aportación de ${params.monthlyContribution.toFixed(0)} €`
-                    : undefined}
-                />
-                <InputField
-                  label="Años Cotizados"
-                  value={params.yearsContributed}
-                  onChange={(v) => handleInputChange('yearsContributed', v)}
-                  hint="Años que llevas cotizando a la Seguridad Social"
-                />
+              <FormSection title="Datos Personales" cols="single">
+                <div className="space-y-4">
+                  {params.members.map((member, i) => (
+                    <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                          Integrante {i + 1}
+                        </span>
+                        {params.members.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeMember(i)}
+                            className="text-xs text-red-600 hover:text-red-800 font-semibold cursor-pointer"
+                          >
+                            Eliminar
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <InputField
+                          label="Edad Actual"
+                          value={member.currentAge}
+                          onChange={(v) => handleMemberChange(i, 'currentAge', v)}
+                        />
+                        <InputField
+                          label="Salario Bruto Anual (€)"
+                          value={member.currentSalary}
+                          onChange={(v) => handleMemberChange(i, 'currentSalary', v)}
+                        />
+                        <InputField
+                          label="Años Cotizados"
+                          value={member.yearsContributed}
+                          onChange={(v) => handleMemberChange(i, 'yearsContributed', v)}
+                          hint="Años cotizando a la Seguridad Social"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={addMember}
+                    className="cursor-pointer w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-all"
+                  >
+                    + Añadir integrante
+                  </button>
+                </div>
                 <InputField
                   label="Esperanza de Vida"
                   value={params.lifeExpectancy}
                   onChange={(v) => handleInputChange('lifeExpectancy', v)}
                 />
+                {(() => {
+                  const totalNet = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
+                  if (params.monthlyContribution > 0 && totalNet / 12 < params.monthlyContribution) {
+                    return (
+                      <p className="text-xs text-red-600 font-semibold">
+                        El salario neto mensual conjunto ({Math.round(totalNet / 12)} €) no cubre la aportación de {params.monthlyContribution.toFixed(0)} €
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
               </FormSection>
 
               <FormSection title="Gastos en Jubilación" cols="double">
@@ -626,6 +715,7 @@ export default function RetirementSimulator() {
                   label="Gastos Mensuales en Residencia (€)"
                   value={params.monthlyExpensesInResidency}
                   onChange={(v) => handleInputChange('monthlyExpensesInResidency', v)}
+                  hint={"Gastos totales incluyendo a todos los integrantes"}
                 />
                 <InputField
                   label="Edad de Residencia"
@@ -649,13 +739,14 @@ export default function RetirementSimulator() {
                     onChange={(e) => handleInputChange('withdrawalPct', Number(e.target.value))}
                     className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-700"
                   />
-                  <p className="text-xs text-gray-500">De dónde sacar el dinero en etapas sin ingresos suficientes (desde la prejubilación hasta los {params.pensionStartAge} o {params.lifeExpectancy} años o en época de residencia)</p>
+                  <p className="text-xs text-gray-500">De dónde sacar el dinero en etapas sin ingresos suficientes (desde la prejubilación hasta la esperanza de vida o en época de residencia)</p>
                   <p className="text-xs text-gray-500">Cuenta ← → Inversiones</p>
                 </div>
               </FormSection>
 
               {(() => {
-                const horizonEndAge = params.currentAge + simData.timeHorizonYears;
+                const refAge = params.members[0].currentAge;
+                const horizonEndAge = refAge + simData.timeHorizonYears;
                 const fullyDefined = horizonEndAge >= params.lifeExpectancy;
                 return (
                   <FormSection title="Ahorros Mensuales" cols="single">
@@ -669,7 +760,7 @@ export default function RetirementSimulator() {
                       <>
                         <div className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
                           <p className="text-xs text-gray-500 leading-relaxed">
-                            Los primeros {horizonEndAge - params.currentAge} años de ahorro siguen lo pautado en el simulador de ahorros. En esta calculadora se añaden los tramos desde los {horizonEndAge} años hasta la edad de jubilación.
+                            Los primeros {horizonEndAge - refAge} años de ahorro siguen lo pautado en el simulador de ahorros. En esta calculadora se añaden los tramos desde los {horizonEndAge} años hasta la edad de jubilación.
                           </p>
                         </div>
                         <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
@@ -727,11 +818,14 @@ export default function RetirementSimulator() {
               })()}
 
               <div className="flex justify-center">
-                <button
-                  type="submit"
-                  disabled={params.currentSalary > 0 && calculateNetSalary(params.currentSalary) / 12 < params.monthlyContribution}
-                  className="cursor-pointer py-2.5 px-8 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all text-sm uppercase tracking-wider"
-                >
+                  <button
+                    type="submit"
+                    disabled={params.monthlyContribution > 0 && (() => {
+                      const totalNet = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
+                      return totalNet / 12 < params.monthlyContribution;
+                    })()}
+                    className="cursor-pointer py-2.5 px-8 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all text-sm uppercase tracking-wider"
+                  >
                   Calcular Proyección
                 </button>
               </div>
@@ -813,9 +907,17 @@ export default function RetirementSimulator() {
                             icon="💰"
                           />
                         </div>
+                        {earliestWithoutPension && params.members.length > 1 && (
+                          <div className="mt-2 text-xs text-gray-600">
+                            <p>Edades al jubilarse: {earliestWithoutPension.memberAges.map((age, i) => `M${i + 1}: ${age} años`).join(', ')}</p>
+                          </div>
+                        )}
                       </div>
                       <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Con Pensión{earliestWithPension ? ` (${formatCurrency(earliestWithPension.monthlyPension)}/mes a partir de los ${params.pensionStartAge} años)` : ''}</h4>
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                          Con Pensión
+                          {earliestWithPension && ` (${formatCurrency(earliestWithPension.memberPensions.reduce((a, b) => a + b, 0))}/mes${params.members.length > 1 ? ' total' : ''})`}
+                        </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <ResultCard
                             label="Edad mínima de jubilación"
@@ -828,11 +930,18 @@ export default function RetirementSimulator() {
                             icon="💰"
                           />
                         </div>
+                        {earliestWithPension && params.members.length > 1 && (
+                          <div className="mt-2 text-xs text-gray-600 space-y-1">
+                            <p>Edades al jubilarse: {earliestWithPension.memberAges.map((age, i) => `M${i + 1}: ${age} años`).join(', ')}</p>
+                            <p>Pensiones: {earliestWithPension.memberPensions.map((p, i) => `M${i + 1}: ${formatCurrency(p)}/mes`).join(', ')}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </section>
 
                   {/* Ahorro necesario según edad de jubilación */}
+                  {showDesglose && (
                   <section className="-mx-6 sm:-mx-8 border-t border-gray-200">
                     <button
                       onClick={() => setShowDetail(!showDetail)}
@@ -842,6 +951,7 @@ export default function RetirementSimulator() {
                         Desglose Anual
                       </h3>
                       <div className="flex items-center gap-3">
+                        {bothAchievable ? (
                         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => setViewMode('sin-pension')}
@@ -864,6 +974,11 @@ export default function RetirementSimulator() {
                             Con pensión
                           </button>
                         </div>
+                        ) : (
+                          <span className="px-3 py-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                            {viewMode === 'con-pension' ? 'Con pensión' : 'Sin pensión'}
+                          </span>
+                        )}
                         <svg className={`cursor-pointer w-4 h-4 text-gray-600 transition-transform flex-shrink-0 ${showDetail ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
                         </svg>
@@ -936,11 +1051,11 @@ export default function RetirementSimulator() {
                                           </span>
                                         </span>
                                       )}
-                                      {viewMode === 'con-pension' && r.age === params.pensionStartAge + 1 && selectedEarliest && (
+                                      {viewMode === 'con-pension' && r.pensionUsada > 0 && r.age > 0 && evolvedResults[Math.max(0, evolvedResults.indexOf(r) - 1)]?.pensionUsada === 0 && (
                                         <span className="relative inline-flex items-center group">
                                           <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold cursor-help leading-none">P</span>
                                           <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded-md bg-gray-800 text-white text-[10px] leading-tight whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">
-                                            Pensión: {formatCurrency(selectedEarliest.monthlyPension)}/mes
+                                            Pensión: {formatCurrency(r.monthlyPension)}/mes
                                           </span>
                                         </span>
                                       )}
@@ -965,8 +1080,8 @@ export default function RetirementSimulator() {
                                   {viewMode === 'con-pension' && (
                                     <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">{formatCurrency(r.monthlyPension)}</td>
                                   )}
-                                  <td className={`px-6 sm:px-8 py-2.5 text-right text-sm ${r.requiredSavings < 0 || (viewMode === 'con-pension' && r.age >= params.pensionStartAge + 1) ? 'text-gray-400' : r.achievable ? 'text-emerald-600' : 'text-red-600'}`}>
-                                    {r.requiredSavings > 0 && !(viewMode === 'con-pension' && r.age >= params.pensionStartAge + 1)
+                                  <td className={`px-6 sm:px-8 py-2.5 text-right text-sm ${r.requiredSavings < 0 ? 'text-gray-400' : r.achievable ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {r.requiredSavings > 0
                                       ? formatCurrency(r.requiredSavings)
                                       : r.age === params.lifeExpectancy
                                         ? <span className="relative inline-flex items-center group cursor-help">—<span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 rounded-md bg-gray-800 text-white text-[10px] leading-tight whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 shadow-lg">Los ahorros necesarios a los {params.lifeExpectancy} años son nulos porque aquí termina la esperanza de vida</span></span>
@@ -1013,7 +1128,7 @@ export default function RetirementSimulator() {
                       </>
                     )}
                   </section>
-
+                    )}
                 </section>
               </div>
             )}
