@@ -535,7 +535,7 @@ export default function RetirementSimulator() {
         : result
           ? (viewMode === 'sin-pension' ? result.requiredSavingsWithoutPension : result.requiredSavingsWithPension)
           : viewMode === 'sin-pension'
-            ? findRequiredSavings(age, 0, params, sa, inv)
+            ? findRequiredSavings(age, 0, params, sa, inv, costBasis)
             : -1;
 
       const achievableNow = requiredSavings >= 0 && Math.round((sa + inv) * 100) / 100 >= requiredSavings;

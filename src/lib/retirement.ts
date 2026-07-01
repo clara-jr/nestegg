@@ -211,11 +211,15 @@ export function findRequiredSavings(
   params: RetirementParams,
   accumulatedSavingsAccount: number,
   accumulatedInvestments: number,
+  accumulatedCostBasis?: number,
 ): number {
   const baseTotal = accumulatedSavingsAccount + accumulatedInvestments;
   const saRatio = baseTotal > 0
     ? accumulatedSavingsAccount / baseTotal
     : params.withdrawalPct / 100;
+  const cbRatio = accumulatedInvestments > 0 && accumulatedCostBasis !== undefined
+    ? accumulatedCostBasis / accumulatedInvestments
+    : 1;
 
   const zeroResult = simulateRetirementPhase(0, 0, 0, retirementAge, monthlyPension, params);
   if (zeroResult >= 0) return 0;
@@ -224,13 +228,13 @@ export function findRequiredSavings(
   let high = 10_000_000;
 
   let result = simulateRetirementPhase(
-    high * saRatio, high * (1 - saRatio), high * (1 - saRatio),
+    high * saRatio, high * (1 - saRatio), high * (1 - saRatio) * cbRatio,
     retirementAge, monthlyPension, params,
   );
   while (result < 0 && high < 1_000_000_000) {
     high *= 2;
     result = simulateRetirementPhase(
-      high * saRatio, high * (1 - saRatio), high * (1 - saRatio),
+      high * saRatio, high * (1 - saRatio), high * (1 - saRatio) * cbRatio,
       retirementAge, monthlyPension, params,
     );
   }
@@ -240,7 +244,7 @@ export function findRequiredSavings(
   for (let i = 0; i < 80; i++) {
     const mid = (low + high) / 2;
     const res = simulateRetirementPhase(
-      mid * saRatio, mid * (1 - saRatio), mid * (1 - saRatio),
+      mid * saRatio, mid * (1 - saRatio), mid * (1 - saRatio) * cbRatio,
       retirementAge, monthlyPension, params,
     );
     if (res > 0) {
@@ -268,12 +272,13 @@ export function simulateAccumulationPhase(
   mortgageEndAge: number,
   familyLoanMonthlyPayment: number,
   familyLoanEndAge: number,
-): { savingsAccount: number; investments: number; total: number } {
+): { savingsAccount: number; investments: number; total: number; investmentCostBasis: number } {
   if (retirementAge <= currentAge) {
     return {
       savingsAccount: initialSavingsAccount,
       investments: initialInvestments,
       total: initialSavingsAccount + initialInvestments,
+      investmentCostBasis: initialInvestments,
     };
   }
 
@@ -282,6 +287,7 @@ export function simulateAccumulationPhase(
 
   let savingsAccount = initialSavingsAccount;
   let investments = initialInvestments;
+  let investmentCostBasis = initialInvestments;
 
   const totalMonths = (retirementAge - currentAge) * 12;
 
@@ -316,6 +322,7 @@ export function simulateAccumulationPhase(
     if (netContrib > 0) {
       savingsAccount = savingsAccount * (1 + monthlyAccountRate) + netContrib * (savingsPct / 100);
       investments = investments * (1 + monthlyInvestmentRate) + netContrib * ((100 - savingsPct) / 100);
+      investmentCostBasis += netContrib * ((100 - savingsPct) / 100);
     } else {
       savingsAccount = savingsAccount * (1 + monthlyAccountRate);
       investments = investments * (1 + monthlyInvestmentRate);
@@ -331,6 +338,7 @@ export function simulateAccumulationPhase(
     savingsAccount: Math.round(savingsAccount * 100) / 100,
     investments: Math.round(investments * 100) / 100,
     total: Math.round((savingsAccount + investments) * 100) / 100,
+    investmentCostBasis: Math.round(investmentCostBasis * 100) / 100,
   };
 }
 
@@ -366,15 +374,15 @@ export function calculateAllRetirementAges(
       params.familyLoanEndAge,
     );
 
-    const requiredWithoutPension = findRequiredSavings(age, 0, params, accResult.savingsAccount, accResult.investments);
-    const requiredWithPension = findRequiredSavings(age, monthlyPension, params, accResult.savingsAccount, accResult.investments);
+    const requiredWithoutPension = findRequiredSavings(age, 0, params, accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis);
+    const requiredWithPension = findRequiredSavings(age, monthlyPension, params, accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis);
 
     const balanceAtDeathWithoutPension = simulateRetirementPhase(
-      accResult.savingsAccount, accResult.investments, accResult.investments,
+      accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis,
       age, 0, params,
     );
     const balanceAtDeathWithPension = simulateRetirementPhase(
-      accResult.savingsAccount, accResult.investments, accResult.investments,
+      accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis,
       age, monthlyPension, params,
     );
 
