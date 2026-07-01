@@ -60,6 +60,8 @@ export interface MonthlyBreakdown {
   savingsToInvestment: number;
   gainsTaxPaid: number;
   yearlyGainsTaxPaid: number;
+  yearlyToAccount: number;
+  yearlyToInvestment: number;
 }
 
 export function calculateTotalHouseExpenses(params: Pick<SavingsParams, 'baseCost' | 'realEstatePercentage' | 'isNewBuild' | 'reformCosts' | 'furnitureCosts'>): number {
@@ -212,29 +214,37 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
     });
   }
 
-  // Second pass: populate yearlyGainsTaxPaid on the last month of each year
+  // Second pass: populate yearlyGainsTaxPaid, yearlyToAccount, yearlyToInvestment on the last month of each year
   let taxThisYear = 0;
+  let toAccountThisYear = 0;
+  let toInvestmentThisYear = 0;
   let lastYear_ = 1;
   for (let i = 0; i < monthlyBreakdown.length; i++) {
     const entry = monthlyBreakdown[i];
     if (entry.year > lastYear_) {
-      // Assign previous year's total tax to its December entry
       for (let j = i - 1; j >= 0; j--) {
         if (monthlyBreakdown[j].year === lastYear_) {
           monthlyBreakdown[j].yearlyGainsTaxPaid = Math.round(taxThisYear * 100) / 100;
+          monthlyBreakdown[j].yearlyToAccount = Math.round(toAccountThisYear * 100) / 100;
+          monthlyBreakdown[j].yearlyToInvestment = Math.round(toInvestmentThisYear * 100) / 100;
           break;
         }
       }
       taxThisYear = entry.gainsTaxPaid;
+      toAccountThisYear = entry.savingsToAccount;
+      toInvestmentThisYear = entry.savingsToInvestment;
       lastYear_ = entry.year;
     } else {
       taxThisYear += entry.gainsTaxPaid;
+      toAccountThisYear += entry.savingsToAccount;
+      toInvestmentThisYear += entry.savingsToInvestment;
     }
   }
-  // Last year
   for (let j = monthlyBreakdown.length - 1; j >= 0; j--) {
     if (monthlyBreakdown[j].year === lastYear_) {
       monthlyBreakdown[j].yearlyGainsTaxPaid = Math.round(taxThisYear * 100) / 100;
+      monthlyBreakdown[j].yearlyToAccount = Math.round(toAccountThisYear * 100) / 100;
+      monthlyBreakdown[j].yearlyToInvestment = Math.round(toInvestmentThisYear * 100) / 100;
       break;
     }
   }

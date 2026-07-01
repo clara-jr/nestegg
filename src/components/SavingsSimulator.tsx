@@ -8,6 +8,7 @@ import {
   type SavingsParams,
   type SavingsResult,
 } from '../lib/calculations';
+import { setSimulatorData } from '../lib/sharedStore';
 
 interface InputFieldProps {
   label: string;
@@ -226,11 +227,46 @@ export default function SavingsSimulator() {
     });
   }, [params.timeHorizonYears]);
 
+  useEffect(() => {
+    setSimulatorData({
+      monthlyMortgagePayment: params.monthlyMortgagePayment,
+      mortgageDurationYears: params.mortgageDurationYears,
+      baseCost: params.baseCost,
+      familyLoanAmount: params.familyLoanAmount,
+      familyLoanDurationYears: params.familyLoanDurationYears,
+      savingsAccountRate: params.savingsAccountRate,
+      investmentRate: params.investmentRate,
+      totalSavings: params.initialTotalSavings,
+      monthlyContribution: params.monthlyContribution,
+      timeHorizonYears: params.timeHorizonYears,
+      distributionPeriods: params.distributionPeriods,
+    });
+  }, [
+    params.monthlyMortgagePayment, params.mortgageDurationYears, params.baseCost,
+    params.familyLoanAmount, params.familyLoanDurationYears,
+    params.savingsAccountRate, params.investmentRate,
+    params.initialTotalSavings, params.monthlyContribution, params.timeHorizonYears,
+    params.distributionPeriods,
+  ]);
+
+  useEffect(() => {
+    if (!result) return;
+    setSimulatorData({
+      initialSavingsAccount: result.initialSavingsAccount,
+      initialInvestments: result.initialInvestments,
+    });
+  }, [result?.initialSavingsAccount, result?.initialInvestments]);
+
   const hasFamilyLoan = params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0;
 
   const familyLoanMonthlyPayment = hasFamilyLoan
     ? params.familyLoanAmount / (params.familyLoanDurationYears * 12)
     : 0;
+
+  const totalMonthlyDebt = (params.baseCost > 0 ? params.monthlyMortgagePayment : 0) + familyLoanMonthlyPayment;
+  const debtExceedsContribution = totalMonthlyDebt > params.monthlyContribution
+    ? `El total de hipoteca + préstamo (${formatCurrency(totalMonthlyDebt)}) supera el aporte mensual (${formatCurrency(params.monthlyContribution)})`
+    : undefined;
 
   const totalHouseExpenses = useMemo(() => calculateTotalHouseExpenses(params), [params]);
   const mortgageGrantedAmount = useMemo(
@@ -353,7 +389,7 @@ export default function SavingsSimulator() {
   };
 
   const handleCalculate = () => {
-    if (!hasValidInitialAllocation) {
+    if (!hasValidInitialAllocation || debtExceedsContribution) {
       return;
     }
 
@@ -525,7 +561,7 @@ export default function SavingsSimulator() {
                   value={params.monthlyMortgagePayment}
                   onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
                   disabled={params.baseCost === 0}
-                  error={params.baseCost > 0 && mortgageGrantedAmount > totalHouseExpenses ? `La hipoteca concedida (${formatCurrency(mortgageGrantedAmount)}) supera el coste total de la casa (${formatCurrency(totalHouseExpenses)})` : undefined}
+                  error={params.baseCost > 0 && mortgageGrantedAmount > totalHouseExpenses ? `La hipoteca concedida (${formatCurrency(mortgageGrantedAmount)}) supera el coste total de la casa (${formatCurrency(totalHouseExpenses)})` : debtExceedsContribution}
                 />
                 <InputField
                   label="TAE Hipoteca (%)"
@@ -552,6 +588,7 @@ export default function SavingsSimulator() {
                   value={params.familyLoanAmount}
                   onChange={(v) => handleInputChange('familyLoanAmount', v)}
                   hint="0% interés"
+                  error={hasFamilyLoan && familyLoanMonthlyPayment > 0 ? debtExceedsContribution : undefined}
                 />
                 <InputField
                   label="Duración Préstamo (años)"
@@ -566,6 +603,7 @@ export default function SavingsSimulator() {
                   value={params.monthlyContribution}
                   onChange={(v) => handleInputChange('monthlyContribution', v)}
                   hint={`${params.baseCost > 0 ? `${params.monthlyMortgagePayment} € hipoteca ` : ''}${hasFamilyLoan && familyLoanMonthlyPayment ? `| ${familyLoanMonthlyPayment.toFixed(2)} € préstamo familiar ` : ''}| ${(params.monthlyContribution - (params.baseCost > 0 ? params.monthlyMortgagePayment : 0) - (familyLoanMonthlyPayment ?? 0)).toFixed(2)} € inversiones`}
+                  error={debtExceedsContribution}
                 />
                 <InputField
                   label="Rentabilidad Cuenta (%)"
@@ -774,6 +812,8 @@ export default function SavingsSimulator() {
                                 <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Cuenta</th>
                                 <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Inversiones</th>
                                 <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Total</th>
+                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">A cuenta</th>
+                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">A inversiones</th>
                                 <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Impuestos</th>
                               </tr>
                             </thead>
@@ -786,6 +826,8 @@ export default function SavingsSimulator() {
                                     <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
                                     <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.investments)}</td>
                                     <td className="px-6 sm:px-8 py-2.5 text-right text-sm font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
+                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-600">{entry.yearlyToAccount > 0 ? formatCurrency(entry.yearlyToAccount) : '—'}</td>
+                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-600">{entry.yearlyToInvestment > 0 ? formatCurrency(entry.yearlyToInvestment) : '—'}</td>
                                     <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-red-600">{entry.yearlyGainsTaxPaid > 0 ? formatCurrency(entry.yearlyGainsTaxPaid) : '—'}</td>
                                   </tr>
                                 ))}
