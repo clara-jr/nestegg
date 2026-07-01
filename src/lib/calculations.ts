@@ -304,3 +304,29 @@ export function formatCurrency(value: number): string {
     currency: 'EUR',
   }).format(value);
 }
+
+export function calculateNetSalary(annualGross: number): number {
+  if (annualGross <= 0) return 0;
+  let tax = 0;
+  let remaining = annualGross;
+
+  const brackets: [number, number][] = [
+    [12450, 0.19],
+    [20200, 0.24],
+    [35200, 0.30],
+    [60000, 0.37],
+    [300000, 0.45],
+  ];
+
+  let prevLimit = 0;
+  for (const [limit, rate] of brackets) {
+    const bracketAmount = Math.min(Math.max(0, remaining), limit - prevLimit);
+    tax += bracketAmount * rate;
+    remaining -= bracketAmount;
+    prevLimit = limit;
+  }
+
+  tax += Math.max(0, remaining) * 0.47;
+
+  return Math.round((annualGross - tax) * 100) / 100;
+}

@@ -826,9 +826,9 @@ export default function SavingsSimulator() {
                                     <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.savingsAccount)}</td>
                                     <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">{formatCurrency(entry.investments)}</td>
                                     <td className="px-6 sm:px-8 py-2.5 text-right text-sm font-semibold text-gray-900">{formatCurrency(entry.savingsAccount + entry.investments)}</td>
-                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-600">{entry.yearlyToAccount > 0 ? formatCurrency(entry.yearlyToAccount) : '—'}</td>
-                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-600">{entry.yearlyToInvestment > 0 ? formatCurrency(entry.yearlyToInvestment) : '—'}</td>
-                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-red-600">{entry.yearlyGainsTaxPaid > 0 ? formatCurrency(entry.yearlyGainsTaxPaid) : '—'}</td>
+                                    <td className={`px-6 sm:px-8 py-2.5 text-right text-sm ${entry.yearlyToAccount < 0 ? 'text-red-600' : entry.yearlyToAccount > 0 ? 'text-gray-600' : 'text-gray-400'}`}>{entry.yearlyToAccount > 0 ? formatCurrency(entry.yearlyToAccount) : formatCurrency(0)}</td>
+                                    <td className={`px-6 sm:px-8 py-2.5 text-right text-sm ${entry.yearlyToInvestment < 0 ? 'text-red-600' : entry.yearlyToInvestment > 0 ? 'text-gray-600' : 'text-gray-400'}`}>{entry.yearlyToInvestment > 0 ? formatCurrency(entry.yearlyToInvestment) : formatCurrency(0)}</td>
+                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-red-600">{entry.yearlyGainsTaxPaid > 0 ? formatCurrency(entry.yearlyGainsTaxPaid) : '-'}</td>
                                   </tr>
                                 ))}
                             </tbody>
