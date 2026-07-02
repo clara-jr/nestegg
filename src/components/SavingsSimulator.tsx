@@ -745,11 +745,14 @@ export default function SavingsSimulator() {
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Aporte Mensual</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(params.monthlyContribution)}</p>
                       </article>
-                      {params.baseCost > 0 && (<>
+                      {params.baseCost > 0 && (
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Coste Casa</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.totalHouseExpenses)}</p>
                       </article>
+                      )}
+                      {(params.monthlyMortgagePayment > 0 || hasFamilyLoan) && (<>
+                      {params.monthlyMortgagePayment > 0 ? (<>
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Hipotecario</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.mortgageGrantedAmount)}</p>
@@ -762,8 +765,13 @@ export default function SavingsSimulator() {
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Duración Hipoteca</p>
                         <p className="text-base font-bold text-gray-900">{params.mortgageDurationYears} años</p>
                       </article>
-                      </>)}
-                      {hasFamilyLoan && (<>
+                      </>) : (
+                        <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Hipotecario</p>
+                          <p className="text-base font-bold text-gray-900">Inactivo</p>
+                        </article>
+                      )}
+                      {hasFamilyLoan ? (<>
                         <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Cuota Préstamo Familiar</p>
                           <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(familyLoanMonthlyPayment)}</p>
@@ -772,13 +780,13 @@ export default function SavingsSimulator() {
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Duración Préstamo Familiar</p>
                           <p className="text-base font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
                         </article>
-                      </>)}
-                      {params.baseCost > 0 && !hasFamilyLoan && (
+                      </>) : (
                         <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                           <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Familiar</p>
                           <p className="text-base font-bold text-gray-900">Inactivo</p>
                         </article>
                       )}
+                      </>)}
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Horizonte</p>
                         <p className="text-base font-bold text-gray-900">{params.timeHorizonYears} años</p>

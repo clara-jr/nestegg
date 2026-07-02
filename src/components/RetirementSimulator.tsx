@@ -676,7 +676,7 @@ export default function RetirementSimulator() {
                           </button>
                         )}
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         <InputField
                           label="Edad Actual"
                           value={member.currentAge}
@@ -686,6 +686,7 @@ export default function RetirementSimulator() {
                           label="Salario Bruto Anual (€)"
                           value={member.currentSalary}
                           onChange={(v) => handleMemberChange(i, 'currentSalary', v)}
+                          hint="Con este dato y el aporte mensual del Simulador de Ahorros se deducen los gastos fijos mensuales"
                         />
                         <InputField
                           label="Años Cotizados"
@@ -869,29 +870,41 @@ export default function RetirementSimulator() {
                         <p className="text-lg font-bold text-gray-900">{params.lifeExpectancy} años</p>
                       </article>
                       <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos Fijos Mensuales</p>
+                        <p className="text-lg font-bold text-gray-900">{formatCurrency(params.monthlyExpensesPreResidency)}/mes</p>
+                      </article>
+                      {(params.monthlyMortgagePayment > 0 || params.familyLoanMonthlyPayment > 0) && (<>
+                      {params.monthlyMortgagePayment > 0 ? (<>
+                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Hipoteca</p>
-                        <p className="text-lg font-bold text-gray-900">
-                          {params.monthlyMortgagePayment > 0 ? `${formatCurrency(params.monthlyMortgagePayment)}/mes` : 'Sin hipoteca'}
-                        </p>
+                        <p className="text-lg font-bold text-gray-900">{formatCurrency(params.monthlyMortgagePayment)}/mes</p>
                       </article>
                       <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Edad fin Hipoteca</p>
-                        <p className="text-lg font-bold text-gray-900">
-                          {params.mortgageEndAge > 0 ? `${params.mortgageEndAge} años` : '—'}
-                        </p>
+                        <p className="text-lg font-bold text-gray-900">{params.mortgageEndAge} años</p>
                       </article>
+                      </>) : (
+                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Hipoteca</p>
+                        <p className="text-lg font-bold text-gray-900">Inactiva</p>
+                      </article>
+                      )}
+                      {params.familyLoanMonthlyPayment > 0 ? (<>
                       <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Familiar</p>
-                        <p className="text-lg font-bold text-gray-900">
-                          {params.familyLoanMonthlyPayment > 0 ? `${formatCurrency(params.familyLoanMonthlyPayment)}/mes` : 'Sin préstamo'}
-                        </p>
+                        <p className="text-lg font-bold text-gray-900">{formatCurrency(params.familyLoanMonthlyPayment)}/mes</p>
                       </article>
                       <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Edad fin Préstamo Familiar</p>
-                        <p className="text-lg font-bold text-gray-900">
-                          {params.familyLoanEndAge > 0 ? `${params.familyLoanEndAge} años` : '—'}
-                        </p>
+                        <p className="text-lg font-bold text-gray-900">{params.familyLoanEndAge} años</p>
                       </article>
+                      </>) : (
+                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Familiar</p>
+                        <p className="text-lg font-bold text-gray-900">Inactivo</p>
+                      </article>
+                      )}
+                      </>)}
                       <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Edad de Residencia</p>
                         <p className="text-lg font-bold text-gray-900">{params.residencyAge} años</p>
