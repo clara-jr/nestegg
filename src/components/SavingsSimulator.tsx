@@ -508,25 +508,6 @@ export default function SavingsSimulator() {
   return (
     <div className="min-h-screen py-6 px-3 sm:px-4 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        {/* Header */}
-        <header className="mb-6 flex flex-col items-center gap-4">
-          {/*<svg width="56" height="56" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M20 4C16 4 10 8 10 16C10 18 11 22 14 26L12 34C12 35 13 36 14 36H26C27 36 28 35 28 34L26 26C29 22 30 18 30 16C30 8 24 4 20 4Z" fill="#e5e7eb" stroke="#6b7280" strokeWidth="1.5"/>
-            <ellipse cx="20" cy="16" rx="6" ry="7" fill="#d1d5db" stroke="#6b7280" strokeWidth="1.2"/>
-            <path d="M20 12C21 12 22 13 22 14" stroke="#6b7280" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
-          </svg>*/}
-          <div className="text-center">
-            {/*<h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-              NestEgg
-            </h1>*/}
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight mt-3">
-              Simulador de Ahorros
-            </h1>
-            <p className="text-sm text-gray-500 mt-3">Simula el estado de tus ahorros en un intervalo de tiempo determinado.</p>
-            <p className="text-sm text-gray-500 mt-1 mb-2">Proyecta tu patrimonio, hipoteca e inversiones al detalle.</p>
-          </div>
-        </header>
-
         {/* Main Layout */}
         <div className="flex flex-col gap-6 md:gap-8">
           {/* Form Section */}

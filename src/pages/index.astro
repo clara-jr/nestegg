@@ -17,45 +17,56 @@ const description = 'Simula el estado de tus ahorros en un intervalo de tiempo d
     <title>{title}</title>
   </head>
   <body class="bg-gradient-to-br from-white via-gray-50 to-white min-h-screen">
-    <nav class="flex justify-center pt-6 pb-2 px-3 sm:px-4 lg:px-8">
+    <nav class="flex justify-center px-3 sm:px-4 lg:px-8 pt-10 pb-2">
       <div class="mx-auto max-w-6xl w-full flex items-center justify-center">
-        <div class="relative" id="nav-dropdown">
-          <button
-            id="nav-trigger"
-            class="group flex items-center gap-2.5 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-gray-300 transition-all text-sm font-semibold text-gray-900 cursor-pointer"
-          >
-            <span id="nav-label">Simulador de Ahorros</span>
-            <svg id="nav-arrow" class="w-4 h-4 text-gray-400 transition-transform duration-200 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="relative w-full max-w-xl" id="nav-container">
+          <!-- Mobile trigger -->
+          <button id="nav-mobile-trigger" class="cursor-pointer flex sm:hidden items-center gap-2.5 w-full px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-900 cursor-pointer">
+            <span id="nav-mobile-label">Simulador de Ahorros</span>
+            <svg id="nav-mobile-arrow" class="w-4 h-4 text-gray-400 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          <div
-            id="nav-menu"
-            class="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 sm:w-80 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden opacity-0 invisible transition-all duration-200 z-50"
-          >
-            <button class="flex items-start gap-3.5 w-full px-5 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0" data-tab="savings">
-              <svg class="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div id="nav-mobile-menu" class="hidden sm:hidden absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+            <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="savings">
+              <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-gray-900">Simulador de Ahorros</p>
-                <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">Proyecta tu patrimonio, hipoteca e inversiones al detalle.</p>
+              <div class="text-left">
+                <p class="text-sm font-semibold">Simulador de Ahorros</p>
+                <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Proyecta tu patrimonio, hipoteca e inversiones al detalle.</p>
               </div>
-              <svg class="nav-check w-4 h-4 text-gray-900 mt-1 flex-shrink-0 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4.5 12.75l6 6 9-13.5" />
-              </svg>
             </button>
-            <button class="flex items-start gap-3.5 w-full px-5 py-4 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0" data-tab="retirement">
-              <svg class="w-5 h-5 text-gray-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="border-t border-gray-100"></div>
+            <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="retirement">
+              <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
               </svg>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold text-gray-900">Calculadora de Jubilación</p>
-                <p class="text-xs text-gray-500 mt-0.5 leading-relaxed">Planifica cuándo jubilarte gestionando bien tus ahorros.</p>
+              <div class="text-left">
+                <p class="text-sm font-semibold">Calculadora de Jubilación</p>
+                <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Planifica cuándo jubilarte gestionando tus ahorros.</p>
               </div>
-              <svg class="nav-check w-4 h-4 text-gray-900 mt-1 flex-shrink-0 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4.5 12.75l6 6 9-13.5" />
+            </button>
+          </div>
+          <!-- Desktop tabs -->
+          <div class="hidden sm:flex bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden divide-x divide-gray-200">
+            <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="savings">
+              <svg class="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
+              <div>
+                <p class="text-sm font-semibold">Simulador de Ahorros</p>
+                <p class="text-xs mt-0.5 leading-relaxed">Proyecta tu patrimonio, hipoteca e inversiones al detalle.</p>
+              </div>
+            </button>
+            <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="retirement">
+              <svg class="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+              <div>
+                <p class="text-sm font-semibold">Calculadora de Jubilación</p>
+                <p class="text-xs mt-0.5 leading-relaxed">Planifica cuándo jubilarte gestionando tus ahorros.</p>
+              </div>
             </button>
           </div>
         </div>
@@ -68,57 +79,71 @@ const description = 'Simula el estado de tus ahorros en un intervalo de tiempo d
       <RetirementSimulator client:load />
     </div>
     <script>
-      const trigger = document.getElementById('nav-trigger');
-      const menu = document.getElementById('nav-menu');
-      const navArrow = document.getElementById('nav-arrow');
-      const navLabel = document.getElementById('nav-label');
-      const dropdownItems = menu.querySelectorAll('button[data-tab]');
-      const navChecks = document.querySelectorAll('.nav-check');
       const contents = {
         savings: document.getElementById('tab-savings'),
         retirement: document.getElementById('tab-retirement'),
       };
-      let isOpen = false;
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      const mobileTrigger = document.getElementById('nav-mobile-trigger');
+      const mobileMenu = document.getElementById('nav-mobile-menu');
+      const mobileLabel = document.getElementById('nav-mobile-label');
+      const mobileArrow = document.getElementById('nav-mobile-arrow');
+      let mobileOpen = false;
 
-      function closeMenu() {
-        isOpen = false;
-        menu.classList.add('opacity-0', 'invisible');
-        navArrow.classList.remove('rotate-180');
-      }
-
-      function openMenu() {
-        isOpen = true;
-        menu.classList.remove('opacity-0', 'invisible');
-        navArrow.classList.add('rotate-180');
+      function closeMobile() {
+        mobileOpen = false;
+        mobileMenu.classList.add('hidden');
+        mobileArrow.classList.remove('rotate-180');
       }
 
       function switchTab(tab) {
-        const activeItem = menu.querySelector(`button[data-tab="${tab}"]`);
-        navLabel.textContent = activeItem.querySelector('p:first-child').textContent;
-        navChecks.forEach(c => c.classList.add('hidden'));
-        activeItem.querySelector('.nav-check')?.classList.remove('hidden');
+        tabBtns.forEach(btn => {
+          const isActive = btn.dataset.tab === tab;
+          btn.classList.toggle('bg-gray-900', isActive);
+          btn.classList.toggle('hover:bg-gray-800', isActive);
+          btn.classList.toggle('hover:bg-gray-50', !isActive);
+          btn.classList.toggle('text-white', isActive);
+          btn.classList.toggle('text-gray-900', !isActive && !btn.closest('#nav-mobile-menu'));
+          const title = btn.querySelector('p:first-child');
+          const desc = btn.querySelector('p:last-child');
+          if (btn.closest('#nav-mobile-menu')) {
+            btn.classList.toggle('bg-gray-50', isActive);
+            btn.classList.toggle('text-gray-900', true);
+          } else {
+            if (isActive) {
+              desc.classList.add('text-white/70');
+              desc.classList.remove('text-gray-500');
+            } else {
+              desc.classList.remove('text-white/70');
+              desc.classList.add('text-gray-500');
+            }
+          }
+        });
+        mobileLabel.textContent = document.querySelector(`.tab-btn[data-tab="${tab}"]:not(#nav-mobile-menu .tab-btn) p:first-child`)?.textContent ?? '';
         Object.entries(contents).forEach(([key, el]) => {
           el?.classList.toggle('hidden', key !== tab);
         });
+        closeMobile();
       }
 
-      trigger.addEventListener('click', (e) => {
-        e.stopPropagation();
-        isOpen ? closeMenu() : openMenu();
+      tabBtns.forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
       });
 
-      document.addEventListener('click', closeMenu);
-
-      dropdownItems.forEach(btn => {
-        btn.addEventListener('click', (e) => {
+      if (mobileTrigger) {
+        mobileTrigger.addEventListener('click', (e) => {
           e.stopPropagation();
-          const tab = btn.dataset.tab;
-          switchTab(tab);
-          closeMenu();
+          mobileOpen = !mobileOpen;
+          mobileMenu.classList.toggle('hidden', !mobileOpen);
+          mobileArrow.classList.toggle('rotate-180', mobileOpen);
         });
-      });
+        document.addEventListener('click', (e) => {
+          if (!document.getElementById('nav-container')?.contains(e.target)) {
+            closeMobile();
+          }
+        });
+      }
 
-      // Initialise
       switchTab('savings');
     </script>
   </body>

@@ -637,18 +637,6 @@ export default function RetirementSimulator() {
   return (
     <div className="min-h-screen py-6 px-3 sm:px-4 lg:px-8">
       <div className="mx-auto max-w-6xl">
-        <header className="mb-6 flex flex-col items-center gap-4">
-          <div className="text-center">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight mt-3">
-              Calculadora de Jubilación
-            </h1>
-            <p className="text-sm text-gray-500 mt-3">
-              Lleva el simulador de ahorros un paso más allá.
-            </p>
-            <p className="text-sm text-gray-500 mt-1 mb-2">Calcula cuándo jubilarte gestionando bien tus ahorros.</p>
-          </div>
-        </header>
-
         <div className="flex flex-col gap-6 md:gap-8">
           <section className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
             <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); setResults(calculateAllRetirementAges(params)); }}>
