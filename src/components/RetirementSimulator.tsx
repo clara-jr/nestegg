@@ -742,7 +742,7 @@ export default function RetirementSimulator() {
                     onChange={(e) => handleInputChange('withdrawalPct', Number(e.target.value))}
                     className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-700"
                   />
-                  <p className="text-xs text-gray-500">De dónde sacar el dinero en etapas sin ingresos suficientes (desde la prejubilación hasta la esperanza de vida o en época de residencia)</p>
+                  <p className="text-xs text-gray-500">De dónde rescatar el dinero en etapas de ingresos insuficientes (p.ej. mientras no se percibe pensión o en época de residencia)</p>
                   <p className="text-xs text-gray-500">Cuenta ← → Inversiones</p>
                 </div>
               </FormSection>
@@ -1163,7 +1163,7 @@ export default function RetirementSimulator() {
                         <p className="text-xs text-amber-800 leading-relaxed">
                           <strong>⚠️ Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
                           Los intereses de la cuenta remunerada ya están descontados anualmente.
-                          Las plusvalías de las inversiones solo tributan al vender; en la columna <strong>Impuestos</strong> se reflejan tanto el impuesto anual sobre intereses como el impuesto sobre plusvalías al retirar durante la jubilación.
+                          Las plusvalías de las inversiones solo tributan al vender; en la columna <strong>Impuestos</strong> se refleja tanto el impuesto anual sobre intereses como el impuesto sobre plusvalías al retirar durante la jubilación.
                         </p>
                       </div>
                       </>

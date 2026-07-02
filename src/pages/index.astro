@@ -22,6 +22,7 @@ const description = 'Simula el estado de tus ahorros en un intervalo de tiempo d
         <div class="relative w-full max-w-xl" id="nav-container">
           <!-- Mobile trigger -->
           <button id="nav-mobile-trigger" class="cursor-pointer flex sm:hidden items-center gap-2.5 w-full px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-900 cursor-pointer">
+            <span id="nav-mobile-icon" class="text-lg flex-shrink-0">💰</span>
             <span id="nav-mobile-label">Simulador de Ahorros</span>
             <svg id="nav-mobile-arrow" class="w-4 h-4 text-gray-400 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
@@ -111,7 +112,10 @@ const description = 'Simula el estado de tus ahorros en un intervalo de tiempo d
             }
           }
         });
-        mobileLabel.textContent = document.querySelector(`.tab-btn[data-tab="${tab}"]:not(#nav-mobile-menu .tab-btn) p:first-child`)?.textContent ?? '';
+        const activeDesktopBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]:not(#nav-mobile-menu .tab-btn)`);
+        mobileLabel.textContent = activeDesktopBtn?.querySelector('p:first-child')?.textContent ?? '';
+        const iconSrc = activeDesktopBtn?.querySelector('.flex-shrink-0');
+        if (iconSrc) document.getElementById('nav-mobile-icon')!.innerHTML = iconSrc.innerHTML;
         Object.entries(contents).forEach(([key, el]) => {
           el?.classList.toggle('hidden', key !== tab);
         });
