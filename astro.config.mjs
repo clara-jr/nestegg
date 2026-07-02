@@ -6,8 +6,9 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
+  site: 'https://clara-jr.github.io/',
+  base: '/nestegg',
   integrations: [react()],
-
   vite: {
     plugins: [tailwindcss()]
   }
