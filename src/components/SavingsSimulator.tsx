@@ -18,10 +18,11 @@ interface InputFieldProps {
   step?: string;
   hint?: string;
   disabled?: boolean;
+  disabledTitle?: string;
   error?: string;
 }
 
-function InputField({ label, value, onChange, type = 'number', step, hint, disabled, error }: Readonly<InputFieldProps>) {
+function InputField({ label, value, onChange, type = 'number', step, hint, disabled, disabledTitle, error }: Readonly<InputFieldProps>) {
   const [raw, setRaw] = useState(() => String(value ?? ''));
   const isFocused = useRef(false);
 
@@ -39,26 +40,73 @@ function InputField({ label, value, onChange, type = 'number', step, hint, disab
   return (
     <div className="flex flex-col gap-1.5">
       <label className={`text-xs font-semibold uppercase tracking-wider ${disabled ? 'text-gray-400' : error ? 'text-red-700' : 'text-gray-600'}`}>{label}</label>
-      <input
-        type={type}
-        value={raw}
-        onChange={handleChange}
-        onFocus={() => { isFocused.current = true; }}
-        onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
-        step={step}
-        disabled={disabled}
-        title={disabled ? 'Introduce un coste base de casa para activar la hipoteca' : undefined}
-        className={`px-3.5 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all text-sm ${
-          disabled
-            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-            : error
-              ? 'bg-white border-red-400 text-gray-900 focus:ring-red-400'
-              : 'bg-white border-gray-300 text-gray-900 focus:ring-gray-500 focus:border-transparent'
-        }`}
-      />
+      {disabled && disabledTitle ? (
+        <InfoTip text={disabledTitle}>
+          <input
+            type={type}
+            value={raw}
+            onChange={handleChange}
+            onFocus={() => { isFocused.current = true; }}
+            onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
+            step={step}
+            disabled
+            className={`px-3.5 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all text-sm bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed w-full disabled:pointer-events-none`}
+          />
+        </InfoTip>
+      ) : (
+        <input
+          type={type}
+          value={raw}
+          onChange={handleChange}
+          onFocus={() => { isFocused.current = true; }}
+          onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
+          step={step}
+          disabled={disabled}
+          className={`px-3.5 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all text-sm ${
+            disabled
+              ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+              : error
+                ? 'bg-white border-red-400 text-gray-900 focus:ring-red-400'
+                : 'bg-white border-gray-300 text-gray-900 focus:ring-gray-500 focus:border-transparent'
+          }`}
+        />
+      )}
       {error && <p className="text-xs text-red-600">{error}</p>}
-      {!error && hint && <p className={`text-xs ${disabled ? 'text-gray-300' : 'text-gray-500'}`}>{hint}</p>}
+      {!error && hint && <p className={`text-xs ${disabled ? 'text-gray-400' : 'text-gray-500'}`}>{hint}</p>}
     </div>
+  );
+}
+
+function InfoTip({ text, children }: { text: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [open]);
+
+  return (
+    <span
+      ref={ref}
+      onClick={() => setOpen(!open)}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      className="relative inline-flex items-center cursor-pointer"
+    >
+      {children}
+      {open && (
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs leading-tight whitespace-nowrap shadow-lg z-50 pointer-events-none normal-case tracking-normal font-normal text-left">
+          {text}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -175,46 +223,41 @@ function parseInitialAllocation(value: string, availableAmount: number): ParsedI
 
 export default function SavingsSimulator() {
   const [params, setParams] = useState<SavingsParams>({
-    initialTotalSavings: 440000,
-    initialSavingsAccount: 30000,
+    initialTotalSavings: 0,
+    initialSavingsAccount: 0,
     initialInvestments: 0,
-    baseCost: 450000,
+    baseCost: 0,
     realEstatePercentage: 2.5,
     isNewBuild: false,
-    reformCosts: 76500,
-    furnitureCosts: 25500,
-    monthlyMortgagePayment: 1500,
+    reformCosts: 0,
+    furnitureCosts: 0,
+    monthlyMortgagePayment: 0,
     mortgageAnnualRate: 2.9,
     mortgageDurationYears: 30,
     familyLoanAmount: 0,
     familyLoanDurationYears: 0,
-    monthlyContribution: 2119,
+    monthlyContribution: 0,
     savingsAccountRate: 2,
     investmentRate: 7,
     timeHorizonYears: 30,
     distributionPeriods: [50, 0, 0],
   });
 
-  const [initialAllocationInputs, setInitialAllocationInputs] = useState(() => {
-    const defaultTotalHouseExpenses = calculateTotalHouseExpenses({
-      baseCost: 450000,
-      realEstatePercentage: 2.5,
-      isNewBuild: false,
-      reformCosts: 76500,
-      furnitureCosts: 25500,
-    });
-    const defaultMortgageGranted = calculateMortgageGrantedAmount(1500, 2.9, 30);
-    const defaultAvailable = 440000 - defaultTotalHouseExpenses + defaultMortgageGranted;
-    const savingsDefault = 30000;
-    const investmentsDefault = Math.max(0, Math.round((defaultAvailable - savingsDefault) * 100) / 100);
-    return {
-      savingsAccount: String(savingsDefault),
-      investments: String(investmentsDefault),
-    };
-  });
+  const [initialAllocationInputs, setInitialAllocationInputs] = useState(() => ({
+    savingsAccount: '0',
+    investments: '0',
+  }));
   const [result, setResult] = useState<SavingsResult | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [sameDistributionForAll, setSameDistributionForAll] = useState(false);
+  const [includeHousePurchase, setIncludeHousePurchase] = useState(false);
+
+  const handleToggleHousePurchase = (include: boolean) => {
+    setIncludeHousePurchase(include);
+    if (!include) {
+      setParams(prev => ({ ...prev, baseCost: 0 }));
+    }
+  };
 
   // Sync distributionPeriods length when timeHorizonYears changes
   React.useEffect(() => {
@@ -283,6 +326,12 @@ export default function SavingsSimulator() {
   const effectiveFamilyLoan =
     params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0 ? params.familyLoanAmount : 0;
   const initialAvailableForInvestment = params.initialTotalSavings - totalHouseExpenses + mortgageGrantedAmount + effectiveFamilyLoan;
+
+  useEffect(() => {
+    if (initialAvailableForInvestment <= 0) {
+      setInitialAllocationInputs({ savingsAccount: '0', investments: '0' });
+    }
+  }, [initialAvailableForInvestment]);
 
   const parsedInitialSavingsAccount = useMemo(
     () => parseInitialAllocation(initialAllocationInputs.savingsAccount, initialAvailableForInvestment),
@@ -398,7 +447,6 @@ export default function SavingsSimulator() {
       initialSavingsAccount: parsedInitialSavingsAccount.amount,
       initialInvestments: parsedInitialInvestments.amount,
       monthlyMortgagePayment: params.baseCost > 0 ? params.monthlyMortgagePayment : 0,
-      mortgageAnnualRate: params.baseCost > 0 ? params.mortgageAnnualRate : 0,
       mortgageDurationYears: params.baseCost > 0 ? params.mortgageDurationYears : 0,
     };
 
@@ -518,8 +566,8 @@ export default function SavingsSimulator() {
                   label="Ahorros Totales Iniciales (€)"
                   value={params.initialTotalSavings}
                   onChange={(v) => handleInputChange('initialTotalSavings', v)}
-                  hint="Antes de comprar la vivienda"
                 />
+                {(params.baseCost > 0 || hasFamilyLoan || mortgageGrantedAmount > 0 || params.reformCosts > 0 || params.furnitureCosts > 0) && (
                 <article className={`rounded-lg px-4 py-3 border ${initialAvailableForInvestment >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
                   <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${initialAvailableForInvestment >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>Disponible para Invertir</p>
                   <p className={`text-xl font-bold ${initialAvailableForInvestment >= 0 ? 'text-emerald-700' : 'text-red-700'}`}>
@@ -529,100 +577,29 @@ export default function SavingsSimulator() {
                     Ahorros totales − gastos finales + hipoteca concedida + préstamo familiar
                   </p>
                 </article>
+                )}
+                <div className="md:col-span-2 space-y-3">
+                  {/*<h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Reparto de los ahorros iniciales:</h4>*/}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <InputField
                   label="Cuenta Remunerada Inicial (% o €)"
                   value={initialAllocationInputs.savingsAccount}
                   onChange={(v) => handleAllocationChange('savingsAccount', v)}
                   type="text"
-                  hint="Ej: 40% o 25000"
+                  hint={initialAvailableForInvestment <= 0 ? `${params.initialTotalSavings <= 0 ? 'Introduce ahorros totales' : 'No hay ahorros disponibles'} para invertir · Ej: 40% o 25000` : "Ej: 40% o 25000"}
                   error={savingsError}
+                  disabled={initialAvailableForInvestment <= 0}
+                  disabledTitle="No hay disponible para invertir"
                 />
                 <InputField
                   label="Inversiones Iniciales (% o €)"
                   value={initialAllocationInputs.investments}
                   onChange={(v) => handleAllocationChange('investments', v)}
                   type="text"
-                  hint="Ej: 60% o 37500"
+                  hint={initialAvailableForInvestment <= 0 ? `${params.initialTotalSavings <= 0 ? 'Introduce ahorros totales' : 'No hay ahorros disponibles'} para invertir · Ej: 60% o 37500` : "Ej: 60% o 37500"}
                   error={investmentsError}
-                />
-              </FormSection>
-
-              <FormSection title="Costes de Casa" cols="double">
-                <InputField
-                  label="Coste Base (€)"
-                  value={params.baseCost}
-                  onChange={(v) => handleInputChange('baseCost', v)}
-                />
-                <InputField
-                  label="Comisión Inmobiliaria (%)"
-                  value={params.realEstatePercentage}
-                  onChange={(v) => handleInputChange('realEstatePercentage', v)}
-                  step="0.1"
-                />
-                <HouseTypeField
-                  isNewBuild={params.isNewBuild}
-                  onChange={(v) => handleInputChange('isNewBuild', v)}
-                />
-                <InputField
-                  label="Reforma y Muebles (€)"
-                  value={params.reformCosts + params.furnitureCosts}
-                  onChange={(v) => handleReformaMueblesChange(v)}
-                />
-                <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 flex flex-col justify-center">
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos Finales de la Casa</p>
-                  <p className="text-xl font-bold text-gray-900">{formatCurrency(totalHouseExpenses)}</p>
-                </article>
-              </FormSection>
-
-              <FormSection title="Financiación" cols="triple">
-                <InputField
-                  label="Cuota Hipoteca Mensual (€)"
-                  value={params.monthlyMortgagePayment}
-                  onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
-                  disabled={params.baseCost === 0}
-                  error={params.baseCost > 0 && mortgageGrantedAmount > totalHouseExpenses ? `La hipoteca concedida (${formatCurrency(mortgageGrantedAmount)}) supera el coste total de la casa (${formatCurrency(totalHouseExpenses)})` : debtExceedsContribution}
-                />
-                <InputField
-                  label="TAE Hipoteca (%)"
-                  value={params.mortgageAnnualRate}
-                  onChange={(v) => handleInputChange('mortgageAnnualRate', v)}
-                  step="0.1"
-                  disabled={params.baseCost === 0}
-                />
-                <InputField
-                  label="Duración Hipoteca (años)"
-                  value={params.mortgageDurationYears}
-                  onChange={(v) => handleInputChange('mortgageDurationYears', v)}
-                  disabled={params.baseCost === 0}
-                />
-                <div className={`flex flex-col gap-1.5 ${params.baseCost === 0 ? '' : ''}`}>
-                <article className={`rounded-lg px-4 py-3 border flex flex-col justify-center ${params.baseCost === 0 ? 'bg-gray-100 border-gray-200' : 'bg-gray-50 border-gray-200'}`}>
-                  <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Hipotecario Estimado</p>
-                  <p className={`text-xl font-bold ${params.baseCost === 0 ? 'text-gray-400' : 'text-gray-900'}`}>{formatCurrency(mortgageGrantedAmount)}</p>
-                </article>
-                {params.baseCost === 0 && <p className="text-xs text-gray-400">Introduce un coste base de casa para configurar la hipoteca</p>}
-                </div>
-                <InputField
-                  label="Préstamo Familiar (€)"
-                  value={params.familyLoanAmount}
-                  onChange={(v) => handleInputChange('familyLoanAmount', v)}
-                  hint="0% interés"
-                  error={hasFamilyLoan && familyLoanMonthlyPayment > 0 ? debtExceedsContribution : undefined}
-                />
-                <InputField
-                  label="Duración Préstamo (años)"
-                  value={params.familyLoanDurationYears}
-                  onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
-                />
-              </FormSection>
-
-              <FormSection title="Ahorros Mensuales" cols="triple">
-                <InputField
-                  label="Aporte Total Mensual (€)"
-                  value={params.monthlyContribution}
-                  onChange={(v) => handleInputChange('monthlyContribution', v)}
-                  hint={`${params.baseCost > 0 ? `${params.monthlyMortgagePayment} € hipoteca ` : ''}${hasFamilyLoan && familyLoanMonthlyPayment ? `| ${familyLoanMonthlyPayment.toFixed(2)} € préstamo familiar ` : ''}| ${(params.monthlyContribution - (params.baseCost > 0 ? params.monthlyMortgagePayment : 0) - (familyLoanMonthlyPayment ?? 0)).toFixed(2)} € inversiones`}
-                  error={debtExceedsContribution}
+                  disabled={initialAvailableForInvestment <= 0}
+                  disabledTitle="No hay disponible para invertir"
                 />
                 <InputField
                   label="Rentabilidad Cuenta (%)"
@@ -635,6 +612,18 @@ export default function SavingsSimulator() {
                   value={params.investmentRate}
                   onChange={(v) => handleInputChange('investmentRate', v)}
                   step="0.1"
+                />
+                  </div>
+                </div>
+              </FormSection>
+
+              <FormSection title="Ahorros Mensuales" cols="triple">
+                <InputField
+                  label="Aporte Total Mensual (€)"
+                  value={params.monthlyContribution}
+                  onChange={(v) => handleInputChange('monthlyContribution', v)}
+                  hint={`${params.baseCost > 0 ? `${params.monthlyMortgagePayment} € hipoteca |` : ''} ${hasFamilyLoan && familyLoanMonthlyPayment ? `${familyLoanMonthlyPayment.toFixed(2)} € préstamo familiar |` : ''} ${(params.monthlyContribution - (params.baseCost > 0 ? params.monthlyMortgagePayment : 0) - (familyLoanMonthlyPayment ?? 0)).toFixed(2)} € inversiones`}
+                  error={debtExceedsContribution}
                 />
                   
                 <div className="md:col-span-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
@@ -686,6 +675,100 @@ export default function SavingsSimulator() {
                   <p className="text-xs text-gray-500">Cuenta ← → Inversiones</p>
                 </div>
               </FormSection>
+
+              <section className="-mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5">
+                <button
+                  type="button"
+                  onClick={() => handleToggleHousePurchase(!includeHousePurchase)}
+                  className="flex items-center gap-2 w-full text-left font-['Signika',_sans-serif]"
+                >
+                  <span className="text-base font-bold text-gray-900 uppercase tracking-wider">
+                    Incluir Compra de Casa 🏡
+                  </span>
+                  <svg
+                    className={`w-4 h-4 text-gray-500 transition-transform ${includeHousePurchase ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </section>
+
+              {includeHousePurchase && (
+                <>
+                  <FormSection title="Costes de la Casa" cols="double">
+                    <InputField
+                      label="Coste Base (€)"
+                      value={params.baseCost}
+                      onChange={(v) => handleInputChange('baseCost', v)}
+                    />
+                    <InputField
+                      label="Comisión Inmobiliaria (%)"
+                      value={params.realEstatePercentage}
+                      onChange={(v) => handleInputChange('realEstatePercentage', v)}
+                      step="0.1"
+                    />
+                    <HouseTypeField
+                      isNewBuild={params.isNewBuild}
+                      onChange={(v) => handleInputChange('isNewBuild', v)}
+                    />
+                    <InputField
+                      label="Reforma y Muebles (€)"
+                      value={params.reformCosts + params.furnitureCosts}
+                      onChange={(v) => handleReformaMueblesChange(v)}
+                    />
+                    <article className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 flex flex-col justify-center">
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos Finales de la Casa</p>
+                      <p className="text-xl font-bold text-gray-900">{formatCurrency(totalHouseExpenses)}</p>
+                    </article>
+                  </FormSection>
+
+                  <FormSection title="Financiación" cols="triple">
+                    <InputField
+                      label="Cuota Hipoteca Mensual (€)"
+                      value={params.monthlyMortgagePayment}
+                      onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
+                      disabled={params.baseCost === 0}
+                      error={params.baseCost > 0 && mortgageGrantedAmount > totalHouseExpenses ? `La hipoteca concedida (${formatCurrency(mortgageGrantedAmount)}) supera el coste total de la casa (${formatCurrency(totalHouseExpenses)})` : debtExceedsContribution}
+                      hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : undefined}
+                    />
+                    <InputField
+                      label="TAE Hipoteca (%)"
+                      value={params.mortgageAnnualRate}
+                      onChange={(v) => handleInputChange('mortgageAnnualRate', v)}
+                      step="0.1"
+                      disabled={params.baseCost === 0}
+                      hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : undefined}
+                    />
+                    <InputField
+                      label="Duración Hipoteca (años)"
+                      value={params.mortgageDurationYears}
+                      onChange={(v) => handleInputChange('mortgageDurationYears', v)}
+                      disabled={params.baseCost === 0}
+                      hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : undefined}
+                    />
+                    <div className="flex flex-col gap-1.5">
+                    <article className={`rounded-lg px-4 py-3 border flex flex-col justify-center ${params.baseCost === 0 ? 'bg-gray-100 border-gray-200' : 'bg-gray-50 border-gray-200'}`}>
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Hipotecario Estimado</p>
+                      <p className={`text-xl font-bold ${params.baseCost === 0 ? 'text-gray-400' : 'text-gray-900'}`}>{formatCurrency(mortgageGrantedAmount)}</p>
+                    </article>
+                    {params.baseCost === 0 && <p className="text-xs text-gray-400">Introduce un coste de casa para activar la hipoteca</p>}
+                    </div>
+                    <InputField
+                      label="Préstamo Familiar (€)"
+                      value={params.familyLoanAmount}
+                      onChange={(v) => handleInputChange('familyLoanAmount', v)}
+                      hint="0% interés"
+                      error={hasFamilyLoan && familyLoanMonthlyPayment > 0 ? debtExceedsContribution : undefined}
+                    />
+                    <InputField
+                      label="Duración Préstamo (años)"
+                      value={params.familyLoanDurationYears}
+                      onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
+                    />
+                  </FormSection>
+                </>
+              )}
 
               <FormSection title="Horizonte" cols="single">
                 <InputField
@@ -780,7 +863,7 @@ export default function SavingsSimulator() {
                   </section>
 
                   <section className="space-y-3 -mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 first:border-t-0 first:pt-0 mb-5">
-                    <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-3">Resultados de la proyección</h3>
+                    <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-3">Resultados</h3>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <ResultCard label="Total Ahorrado" value={formatCurrency(result.totalSavings)} icon="💰" />
@@ -790,6 +873,7 @@ export default function SavingsSimulator() {
                   </section>
 
                 {/* Breakdown Table */}
+                  {(params.baseCost > 0 || params.monthlyContribution > 0 || params.initialSavingsAccount > 0 || params.initialInvestments > 0) && (
                   <section className="-mx-6 sm:-mx-8 border-t border-gray-200 first:border-t-0 first:pt-0">
                     <button
                       onClick={() => setShowDetail(!showDetail)}
@@ -875,6 +959,7 @@ export default function SavingsSimulator() {
                       </>
                     )}
                   </section>
+                  )}
                 </section>
               </div>
             )}
