@@ -254,9 +254,6 @@ export default function SavingsSimulator() {
 
   const handleToggleHousePurchase = (include: boolean) => {
     setIncludeHousePurchase(include);
-    if (!include) {
-      setParams(prev => ({ ...prev, baseCost: 0 }));
-    }
   };
 
   // Sync distributionPeriods length when timeHorizonYears changes
@@ -326,12 +323,6 @@ export default function SavingsSimulator() {
   const effectiveFamilyLoan =
     params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0 ? params.familyLoanAmount : 0;
   const initialAvailableForInvestment = params.initialTotalSavings - totalHouseExpenses + mortgageGrantedAmount + effectiveFamilyLoan;
-
-  useEffect(() => {
-    if (initialAvailableForInvestment <= 0) {
-      setInitialAllocationInputs({ savingsAccount: '0', investments: '0' });
-    }
-  }, [initialAvailableForInvestment]);
 
   const parsedInitialSavingsAccount = useMemo(
     () => parseInitialAllocation(initialAllocationInputs.savingsAccount, initialAvailableForInvestment),
@@ -490,11 +481,20 @@ export default function SavingsSimulator() {
     const normalizedSavings = initialAllocationInputs.savingsAccount.trim().replace(',', '.');
     if (normalizedSavings.endsWith('%')) return;
 
+    if (newAvailable === 0) {
+      setInitialAllocationInputs({ savingsAccount: '0', investments: '0' });
+      return;
+    }
+
     const parsedSavings = parseInitialAllocation(initialAllocationInputs.savingsAccount, newAvailable);
     if (!parsedSavings.isValid) return;
 
-    const investmentsAmount = Math.max(0, Math.round((newAvailable - parsedSavings.amount) * 100) / 100);
-    setInitialAllocationInputs(prev => ({ ...prev, investments: String(investmentsAmount) }));
+    if (parsedSavings.amount > newAvailable) {
+      setInitialAllocationInputs({ savingsAccount: String(Math.round(newAvailable * 100) / 100), investments: '0' });
+    } else {
+      const investmentsAmount = Math.round((newAvailable - parsedSavings.amount) * 100) / 100;
+      setInitialAllocationInputs(prev => ({ ...prev, investments: String(investmentsAmount) }));
+    }
   };
 
   const handleInputChange = (field: keyof SavingsParams, value: any) => {
@@ -505,6 +505,13 @@ export default function SavingsSimulator() {
         ...prev,
         [field]: numericValue,
       };
+      if (field === 'baseCost' && numericValue === 0) {
+        updated.monthlyMortgagePayment = 0;
+        updated.mortgageDurationYears = 0;
+      }
+      if (field === 'familyLoanAmount' && numericValue === 0) {
+        updated.familyLoanDurationYears = 0;
+      }
       return updated;
     });
 
@@ -542,11 +549,20 @@ export default function SavingsSimulator() {
     const normalizedSavings = initialAllocationInputs.savingsAccount.trim().replace(',', '.');
     if (normalizedSavings.endsWith('%')) return;
 
+    if (newAvailable === 0) {
+      setInitialAllocationInputs({ savingsAccount: '0', investments: '0' });
+      return;
+    }
+
     const parsedSavings = parseInitialAllocation(initialAllocationInputs.savingsAccount, newAvailable);
     if (!parsedSavings.isValid) return;
 
-    const investmentsAmount = Math.max(0, Math.round((newAvailable - parsedSavings.amount) * 100) / 100);
-    setInitialAllocationInputs(prev => ({ ...prev, investments: String(investmentsAmount) }));
+    if (parsedSavings.amount > newAvailable) {
+      setInitialAllocationInputs({ savingsAccount: String(Math.round(newAvailable * 100) / 100), investments: '0' });
+    } else {
+      const investmentsAmount = Math.round((newAvailable - parsedSavings.amount) * 100) / 100;
+      setInitialAllocationInputs(prev => ({ ...prev, investments: String(investmentsAmount) }));
+    }
   };
 
   React.useEffect(() => {
