@@ -16,7 +16,7 @@ import {
   type YearDetail,
   type MemberConfig,
 } from '../lib/retirement';
-import { getSimulatorData, subscribe, type SimulatorData } from '../lib/sharedStore';
+import { getSimulatorData, subscribe, useLocalStorage, type SimulatorData } from '../lib/sharedStore';
 
 interface InputFieldProps {
   label: string;
@@ -175,7 +175,7 @@ export default function RetirementSimulator() {
     yearsContributed: 10,
   };
 
-  const [params, setParams] = useState<RetirementParams>(() => {
+  const [params, setParams] = useLocalStorage<RetirementParams>('retirement-params', () => {
     const sd = getSimulatorData();
     const lifeExpectancy = 95;
     const hasMtg = sd.baseCost > 0;

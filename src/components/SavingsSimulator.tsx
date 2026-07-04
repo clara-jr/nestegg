@@ -8,7 +8,7 @@ import {
   type SavingsParams,
   type SavingsResult,
 } from '../lib/calculations';
-import { setSimulatorData } from '../lib/sharedStore';
+import { setSimulatorData, useLocalStorage } from '../lib/sharedStore';
 
 interface InputFieldProps {
   label: string;
@@ -222,7 +222,7 @@ function parseInitialAllocation(value: string, availableAmount: number): ParsedI
 }
 
 export default function SavingsSimulator() {
-  const [params, setParams] = useState<SavingsParams>({
+  const [params, setParams] = useLocalStorage<SavingsParams>('savings-params', {
     initialTotalSavings: 0,
     initialSavingsAccount: 0,
     initialInvestments: 0,
@@ -243,10 +243,10 @@ export default function SavingsSimulator() {
     distributionPeriods: [50, 0, 0],
   });
 
-  const [initialAllocationInputs, setInitialAllocationInputs] = useState(() => ({
+  const [initialAllocationInputs, setInitialAllocationInputs] = useLocalStorage('savings-initial-inputs', {
     savingsAccount: '0',
     investments: '0',
-  }));
+  });
   const [result, setResult] = useState<SavingsResult | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [sameDistributionForAll, setSameDistributionForAll] = useState(false);
