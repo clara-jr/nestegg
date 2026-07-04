@@ -8,7 +8,7 @@ import {
   type SavingsParams,
   type SavingsResult,
 } from '../lib/calculations';
-import { setSimulatorData, useLocalStorage } from '../lib/sharedStore';
+import { getSimulatorData, setSimulatorData, subscribe, useLocalStorage } from '../lib/sharedStore';
 
 interface InputFieldProps {
   label: string;
@@ -268,26 +268,8 @@ export default function SavingsSimulator() {
   }, [params.timeHorizonYears]);
 
   useEffect(() => {
-    setSimulatorData({
-      monthlyMortgagePayment: params.monthlyMortgagePayment,
-      mortgageDurationYears: params.mortgageDurationYears,
-      baseCost: params.baseCost,
-      familyLoanAmount: params.familyLoanAmount,
-      familyLoanDurationYears: params.familyLoanDurationYears,
-      savingsAccountRate: params.savingsAccountRate,
-      investmentRate: params.investmentRate,
-      totalSavings: params.initialTotalSavings,
-      monthlyContribution: params.monthlyContribution,
-      timeHorizonYears: params.timeHorizonYears,
-      distributionPeriods: params.distributionPeriods,
-    });
-  }, [
-    params.monthlyMortgagePayment, params.mortgageDurationYears, params.baseCost,
-    params.familyLoanAmount, params.familyLoanDurationYears,
-    params.savingsAccountRate, params.investmentRate,
-    params.initialTotalSavings, params.monthlyContribution, params.timeHorizonYears,
-    params.distributionPeriods,
-  ]);
+    setSimulatorData({ monthlyContribution: params.monthlyContribution });
+  }, [params.monthlyContribution]);
 
   useEffect(() => {
     if (!result) return;
@@ -296,6 +278,21 @@ export default function SavingsSimulator() {
       initialInvestments: result.initialInvestments,
     });
   }, [result?.initialSavingsAccount, result?.initialInvestments]);
+
+  useEffect(() => {
+    const unsub = subscribe(() => {
+      const sd = getSimulatorData();
+      setParams(prev => {
+        const updates: Partial<SavingsParams> = {};
+        if (prev.mortgageAnnualRate !== sd.mortgageAPR && sd.mortgageAPR > 0) updates.mortgageAnnualRate = sd.mortgageAPR;
+        if (prev.realEstatePercentage !== sd.realEstatePercentage && sd.realEstatePercentage > 0) updates.realEstatePercentage = sd.realEstatePercentage;
+        if (prev.initialTotalSavings !== sd.initialSavings && sd.initialSavings >= 0) updates.initialTotalSavings = sd.initialSavings;
+        if (Object.keys(updates).length === 0) return prev;
+        return { ...prev, ...updates };
+      });
+    });
+    return unsub;
+  }, []);
 
   const hasFamilyLoan = params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0;
 

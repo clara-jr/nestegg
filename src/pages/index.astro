@@ -1,6 +1,7 @@
 ---
 import SavingsSimulator from '../components/SavingsSimulator';
 import RetirementSimulator from '../components/RetirementSimulator';
+import AffordabilitySimulator from '../components/AffordabilitySimulator';
 import '../styles/global.css';
 
 const title = 'NestEgg';
@@ -44,6 +45,14 @@ const description = 'Simula el estado de tus ahorros en un intervalo de tiempo d
                 <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Planifica cuándo jubilarte gestionando tus ahorros.</p>
               </div>
             </button>
+            <div class="border-t border-gray-100"></div>
+            <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="affordability">
+              <span class="text-lg flex-shrink-0">🏡</span>
+              <div class="text-left">
+                <p class="text-sm font-semibold">Calculadora de Hogar</p>
+                <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Descubre qué casa te puedes permitir.</p>
+              </div>
+            </button>
           </div>
           <!-- Desktop tabs -->
           <div class="hidden sm:flex bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden divide-x divide-gray-200">
@@ -61,6 +70,13 @@ const description = 'Simula el estado de tus ahorros en un intervalo de tiempo d
                 <p class="text-xs mt-0.5 leading-relaxed">Planifica cuándo jubilarte gestionando tus ahorros.</p>
               </div>
             </button>
+            <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="affordability">
+              <span class="text-lg mt-0.5 flex-shrink-0">🏡</span>
+              <div>
+                <p class="text-sm font-semibold">Calculadora de Hogar</p>
+                <p class="text-xs mt-0.5 leading-relaxed">Descubre qué casa te puedes permitir.</p>
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -71,10 +87,14 @@ const description = 'Simula el estado de tus ahorros en un intervalo de tiempo d
     <div id="tab-retirement" class="tab-content hidden">
       <RetirementSimulator client:load />
     </div>
+    <div id="tab-affordability" class="tab-content hidden">
+      <AffordabilitySimulator client:load />
+    </div>
     <script>
       const contents = {
         savings: document.getElementById('tab-savings'),
         retirement: document.getElementById('tab-retirement'),
+        affordability: document.getElementById('tab-affordability'),
       };
       const tabBtns = document.querySelectorAll('.tab-btn');
       const mobileTrigger = document.getElementById('nav-mobile-trigger');
