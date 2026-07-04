@@ -321,6 +321,9 @@ export default function SavingsSimulator() {
         : 0,
     [params.baseCost, params.monthlyMortgagePayment, params.mortgageAnnualRate, params.mortgageDurationYears],
   );
+  const mortgageExceedsBase = params.baseCost > 0 && mortgageGrantedAmount > params.baseCost
+    ? `El préstamo hipotecario (${formatCurrency(mortgageGrantedAmount)}) supera el coste base (${formatCurrency(params.baseCost)})`
+    : undefined;
   const effectiveFamilyLoan =
     params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0 ? params.familyLoanAmount : 0;
   const initialAvailableForInvestment = params.initialTotalSavings - totalHouseExpenses + mortgageGrantedAmount + effectiveFamilyLoan;
@@ -741,12 +744,12 @@ export default function SavingsSimulator() {
                   </FormSection>
 
                   <FormSection title="Financiación" cols="triple">
-                    <InputField
+                      <InputField
                       label="Cuota Hipoteca Mensual (€)"
                       value={params.monthlyMortgagePayment}
                       onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
                       disabled={params.baseCost === 0}
-                      error={params.baseCost > 0 && mortgageGrantedAmount > totalHouseExpenses ? `La hipoteca concedida (${formatCurrency(mortgageGrantedAmount)}) supera el coste total de la casa (${formatCurrency(totalHouseExpenses)})` : debtExceedsContribution}
+                      error={mortgageExceedsBase || debtExceedsContribution}
                       hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : undefined}
                     />
                     <InputField
@@ -762,12 +765,13 @@ export default function SavingsSimulator() {
                       value={params.mortgageDurationYears}
                       onChange={(v) => handleInputChange('mortgageDurationYears', v)}
                       disabled={params.baseCost === 0}
+                      error={mortgageExceedsBase || undefined}
                       hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : undefined}
                     />
                     <div className="flex flex-col gap-1.5">
                     <article className={`rounded-lg px-4 py-3 border flex flex-col justify-center ${params.baseCost === 0 ? 'bg-gray-100 border-gray-200' : 'bg-gray-50 border-gray-200'}`}>
                       <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Hipotecario Estimado</p>
-                      <p className={`text-xl font-bold ${params.baseCost === 0 ? 'text-gray-400' : 'text-gray-900'}`}>{formatCurrency(mortgageGrantedAmount)}</p>
+                      <p className={`text-xl font-bold ${params.baseCost === 0 ? 'text-gray-400' : 'text-gray-900'}`}>{formatCurrency(mortgageGrantedAmount)}{params.baseCost > 0 && <span className="text-sm font-normal text-gray-500"> ({Math.round(mortgageGrantedAmount / params.baseCost * 100)}%)</span>}</p>
                     </article>
                     {params.baseCost === 0 && <p className="text-xs text-gray-400">Introduce un coste de casa para activar la hipoteca</p>}
                     </div>
