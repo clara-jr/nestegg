@@ -170,7 +170,7 @@ export default function RetirementSimulator() {
   }, []);
 
   const defaultMember: MemberConfig = {
-    currentAge: 32,
+    currentAge: 30,
     currentSalary: 0,
     yearsContributed: 10,
   };
@@ -228,43 +228,23 @@ export default function RetirementSimulator() {
   useEffect(() => {
     setParams(prev => {
       const sd = getSimulatorData();
-      const hasMtg = sd.baseCost > 0;
-      const hasLoan = sd.familyLoanAmount > 0 && sd.familyLoanDurationYears > 0;
-      const famPay = hasLoan ? sd.familyLoanAmount / (sd.familyLoanDurationYears * 12) : 0;
-      const newMortEnd = hasMtg ? prev.members[0].currentAge + sd.mortgageDurationYears : 0;
-      const newFamEnd = hasLoan ? prev.members[0].currentAge + sd.familyLoanDurationYears : 0;
-      const numPeriods = Math.ceil(prev.lifeExpectancy / 10);
-      const sdPeriods = sd.distributionPeriods.length > 0
-        ? [...sd.distributionPeriods].reverse()
-        : prev.distributionPeriods;
-      while (sdPeriods.length < numPeriods) sdPeriods.push(50);
-      const trimmedPeriods = sdPeriods.slice(0, numPeriods);
-      for (let i = 0; i < Math.min(2, numPeriods); i++) trimmedPeriods[i] = 100;
-      if (
-        prev.monthlyMortgagePayment === (hasMtg ? sd.monthlyMortgagePayment : 0)
-        && prev.mortgageEndAge === newMortEnd
-        && prev.familyLoanMonthlyPayment === famPay
-        && prev.familyLoanEndAge === newFamEnd
-        && prev.monthlyContribution === sd.monthlyContribution
+
+      const salariesChanged = sd.memberSalaries.length > 0
+        && sd.memberSalaries.some((s, i) => s !== (prev.members[i]?.currentSalary ?? -1));
+      const members = salariesChanged
+        ? sd.memberSalaries.map((s, i) => {
+            if (i < prev.members.length) {
+              return { ...prev.members[i], currentSalary: s };
+            }
+            return { currentAge: prev.members[0].currentAge, currentSalary: s, yearsContributed: prev.members[0].yearsContributed };
+          })
+        : prev.members;
+
+      if (prev.monthlyContribution === sd.monthlyContribution
         && prev.initialSavingsAccount === sd.initialSavingsAccount
         && prev.initialInvestments === sd.initialInvestments
-        && prev.savingsAccountRate === sd.savingsAccountRate
-        && prev.investmentRate === sd.investmentRate
-        && JSON.stringify(prev.distributionPeriods) === JSON.stringify(trimmedPeriods)
-      ) return prev;
-      return {
-        ...prev,
-        initialSavingsAccount: sd.initialSavingsAccount,
-        initialInvestments: sd.initialInvestments,
-        monthlyContribution: sd.monthlyContribution,
-        savingsAccountRate: sd.savingsAccountRate,
-        investmentRate: sd.investmentRate,
-        monthlyMortgagePayment: hasMtg ? sd.monthlyMortgagePayment : 0,
-        mortgageEndAge: newMortEnd,
-        familyLoanMonthlyPayment: famPay,
-        familyLoanEndAge: newFamEnd,
-        distributionPeriods: trimmedPeriods,
-      };
+        && !salariesChanged) return prev;
+      return { ...prev, members, monthlyContribution: sd.monthlyContribution, initialSavingsAccount: sd.initialSavingsAccount, initialInvestments: sd.initialInvestments };
     });
   }, [simData]);
 
@@ -887,7 +867,10 @@ export default function RetirementSimulator() {
                     <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">Datos del escenario</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                       <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Ahorros Actuales</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 inline-flex items-center gap-1">
+                          Ahorros Actuales
+                          <InfoTip text="Valor obtenido del Simulador de Ahorros.">ℹ️</InfoTip>
+                        </p>
                         <p className="text-xl font-bold text-gray-900">{formatCurrency(params.initialSavingsAccount + params.initialInvestments)}</p>
                       </article>
                       <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">

@@ -18,22 +18,40 @@ export interface SimulatorData {
   initialSavingsAccount: number;
   initialInvestments: number;
   distributionPeriods: number[];
+
+  mortgageAPR: number;
+  isNewBuild: boolean;
+  reformCosts: number;
+  furnitureCosts: number;
+  realEstatePercentage: number;
+  cushion: number;
+  initialSavings: number;
+  memberSalaries: number[];
 }
 
 let data: SimulatorData = {
-  monthlyMortgagePayment: 1500,
-  mortgageDurationYears: 30,
-  baseCost: 450000,
+  monthlyMortgagePayment: 0,
+  mortgageDurationYears: 0,
+  baseCost: 0,
   familyLoanAmount: 0,
   familyLoanDurationYears: 0,
   savingsAccountRate: 2,
   investmentRate: 7,
-  totalSavings: 440000,
-  monthlyContribution: 2119,
+  totalSavings: 0,
+  monthlyContribution: 0,
   timeHorizonYears: 30,
   initialSavingsAccount: 0,
   initialInvestments: 0,
   distributionPeriods: [],
+
+  mortgageAPR: 2.9,
+  isNewBuild: false,
+  reformCosts: 0,
+  furnitureCosts: 0,
+  realEstatePercentage: 2.5,
+  cushion: 0,
+  initialSavings: 0,
+  memberSalaries: [0],
 };
 
 export function getSimulatorData(): SimulatorData {
