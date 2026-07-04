@@ -5,16 +5,27 @@ import AffordabilitySimulator from '../components/AffordabilitySimulator';
 import '../styles/global.css';
 
 const title = 'NestEgg';
-const description = 'Simula el estado de tus ahorros en un intervalo de tiempo determinado. Proyecta tu patrimonio, hipoteca e inversiones al detalle.';
+const description = 'Planifica tus finanzas personales: simula la evolución de tus ahorros e inversiones, calcula cuándo jubilarte y descubre qué casa puedes permitirte.';
 ---
 
 <!doctype html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
+    <meta name="title" content={title} />
     <meta name="description" content={description} />
     <meta name="viewport" content="width=device-width" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content="https://clara-jr.github.io/nestegg/thumbnail.png" />
+    <meta property="og:type" content="website" />
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:site" content="@clear_is_me" />
+    <meta property="twitter:creator" content="@clear_is_me" />
+    <meta property="twitter:title" content={title} />
+    <meta property="twitter:description" content={description} />
+    <meta property="twitter:image" content="https://clara-jr.github.io/nestegg/thumbnail.png" />
+    <link rel="icon" type="image/svg+xml" href="/nestegg/favicon.svg" />
     <title>{title}</title>
   </head>
   <body class="bg-gradient-to-br from-white via-gray-50 to-white min-h-screen">
