@@ -256,6 +256,19 @@ export default function RetirementSimulator() {
         if (prev.mortgageDurationYears !== sd.mortgageDurationYears) updates.mortgageDurationYears = sd.mortgageDurationYears;
         if (prev.familyLoanMonthlyPayment !== sd.familyLoanMonthlyPayment) updates.familyLoanMonthlyPayment = sd.familyLoanMonthlyPayment;
         if (prev.familyLoanDurationYears !== sd.familyLoanDurationYears) updates.familyLoanDurationYears = sd.familyLoanDurationYears;
+        if (sd.memberSalaries.length > 0) {
+          const hasDiff = sd.memberSalaries.some(
+            (s, i) => s !== (prev.members[i]?.currentSalary ?? -1)
+          ) || sd.memberSalaries.length !== prev.members.length;
+          if (hasDiff) {
+            const ref = prev.members[0];
+            updates.members = sd.memberSalaries.map(s => ({
+              currentAge: ref.currentAge,
+              currentSalary: s,
+              yearsContributed: ref.yearsContributed,
+            }));
+          }
+        }
         if (Object.keys(updates).length === 0) return prev;
         return { ...prev, ...updates };
       });
@@ -485,7 +498,7 @@ export default function RetirementSimulator() {
     let prevYearGains = savingsGainsThisYear;
 
     let firstAchievableAge: number | null = null;
-    for (let age = startAge; age <= endAge; age++) {
+    for (let age = startAge + 1; age <= endAge; age++) {
       const result = resultByAge.get(age);
       const savingsBeforeAge = Math.round((sa + inv) * 100) / 100;
       const isBeforeRetirement = age <= earliestResult.retirementAge;
@@ -776,6 +789,7 @@ export default function RetirementSimulator() {
                   label="Aporte Total Mensual (€)"
                   value={params.monthlyContribution}
                   onChange={(v) => handleInputChange('monthlyContribution', v)}
+                  hint={`${params.monthlyMortgagePayment > 0 ? `${params.monthlyMortgagePayment.toFixed(2)} € hipoteca |` : ''} ${params.familyLoanMonthlyPayment > 0 ? `${params.familyLoanMonthlyPayment.toFixed(2)} € préstamo familiar |` : ''} ${(params.monthlyContribution - params.monthlyMortgagePayment - params.familyLoanMonthlyPayment).toFixed(2)} € inversiones`}
                 />
                 <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
                   <div className="flex items-center justify-between">
@@ -888,19 +902,6 @@ export default function RetirementSimulator() {
                 </div>
               </FormSection>
 
-              <div className="flex justify-center">
-                {salaryError ? (
-                  <InfoTip text={salaryError}>
-                    <button type="submit" disabled className="py-2.5 px-8 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed disabled:pointer-events-none text-white font-semibold rounded-lg transition-all text-sm uppercase tracking-wider">
-                      Calcular Proyección
-                    </button>
-                  </InfoTip>
-                ) : (
-                  <button type="submit" className="cursor-pointer py-2.5 px-8 bg-gray-900 hover:bg-gray-800 text-white font-semibold rounded-lg transition-all text-sm uppercase tracking-wider">
-                    Calcular Proyección
-                  </button>
-                )}
-              </div>
             </form>
           </section>
 

@@ -247,7 +247,6 @@ export default function SavingsSimulator() {
     savingsAccount: '0',
     investments: '0',
   });
-  const [result, setResult] = useState<SavingsResult | null>(null);
   const [showDetail, setShowDetail] = useState(false);
   const [sameDistributionForAll, setSameDistributionForAll] = useState(false);
   const [includeHousePurchase, setIncludeHousePurchase] = useState(false);
@@ -274,14 +273,6 @@ export default function SavingsSimulator() {
   useEffect(() => {
     setSimulatorData({ initialSavings: params.initialTotalSavings });
   }, [params.initialTotalSavings]);
-
-  useEffect(() => {
-    if (!result) return;
-    setSimulatorData({
-      initialSavingsAccount: result.initialSavingsAccount,
-      initialInvestments: result.initialInvestments,
-    });
-  }, [result?.initialSavingsAccount, result?.initialInvestments]);
 
   useEffect(() => {
     const unsub = subscribe(() => {
@@ -367,6 +358,27 @@ export default function SavingsSimulator() {
     && parsedInitialInvestments.isValid
     && Math.abs(allocationDifference) <= 0.01;
 
+  const paramsForCalculation = useMemo<SavingsParams>(() => ({
+    ...params,
+    initialSavingsAccount: hasValidInitialAllocation ? parsedInitialSavingsAccount.amount : 0,
+    initialInvestments: hasValidInitialAllocation ? parsedInitialInvestments.amount : 0,
+    monthlyMortgagePayment: params.baseCost > 0 ? params.monthlyMortgagePayment : 0,
+    mortgageDurationYears: params.baseCost > 0 ? params.mortgageDurationYears : 0,
+  }), [params, parsedInitialSavingsAccount.amount, parsedInitialInvestments.amount, hasValidInitialAllocation]);
+
+  const result = useMemo<SavingsResult | null>(() => {
+    if (!hasValidInitialAllocation || debtExceedsContribution) return null;
+    return calculateSavings(paramsForCalculation);
+  }, [paramsForCalculation, hasValidInitialAllocation, debtExceedsContribution]);
+
+  useEffect(() => {
+    if (!result) return;
+    setSimulatorData({
+      initialSavingsAccount: result.initialSavingsAccount,
+      initialInvestments: result.initialInvestments,
+    });
+  }, [result?.initialSavingsAccount, result?.initialInvestments]);
+
   function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { year: number; contributed: number; total: number } }> }) {
     if (!active || !payload?.[0]) return null;
     const { year, contributed, total } = payload[0].payload;
@@ -436,24 +448,6 @@ export default function SavingsSimulator() {
         return { ...prev, distributionPeriods: updated };
       });
     }
-  };
-
-  const handleCalculate = () => {
-    if (!hasValidInitialAllocation || debtExceedsContribution) {
-      return;
-    }
-
-    const paramsWithInitialAllocation: SavingsParams = {
-      ...params,
-      initialSavingsAccount: parsedInitialSavingsAccount.amount,
-      initialInvestments: parsedInitialInvestments.amount,
-      monthlyMortgagePayment: params.baseCost > 0 ? params.monthlyMortgagePayment : 0,
-      mortgageDurationYears: params.baseCost > 0 ? params.mortgageDurationYears : 0,
-    };
-
-    const newResult = calculateSavings(paramsWithInitialAllocation);
-    setParams(paramsWithInitialAllocation);
-    setResult(newResult);
   };
 
   const handleReformaMueblesChange = (value: string) => {
@@ -575,9 +569,6 @@ export default function SavingsSimulator() {
     }
   };
 
-  React.useEffect(() => {
-    handleCalculate();
-  }, []);
 
   return (
     <div className="min-h-screen py-6 px-3 sm:px-4 lg:px-8">
@@ -586,7 +577,7 @@ export default function SavingsSimulator() {
         <div className="flex flex-col gap-6 md:gap-8">
           {/* Form Section */}
           <section className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
-            <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); handleCalculate(); }}>
+            <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); }}>
               <FormSection title="Ahorros Iniciales" cols="double">
                 <InputField
                   label="Ahorros Totales Iniciales (€)"
@@ -804,15 +795,6 @@ export default function SavingsSimulator() {
                 />
               </FormSection>
 
-              <div className="flex justify-center">
-                <button
-                  type="submit"
-                  disabled={!hasValidInitialAllocation}
-                   className="cursor-pointer py-2.5 px-8 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-all text-sm uppercase tracking-wider"
-                >
-                  Calcular Proyección
-                </button>
-              </div>
             </form>
           </section>
 
