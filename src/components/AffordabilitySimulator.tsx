@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { formatCurrency } from '../lib/calculations';
 import { calculateAffordability, type AffordabilityParams, type AffordabilityResult, type MemberIncome } from '../lib/affordability';
-import { setSimulatorData, useLocalStorage } from '../lib/sharedStore';
+import { getSimulatorData, setSimulatorData, subscribe, useLocalStorage } from '../lib/sharedStore';
 
 interface InputFieldProps {
   label: string;
@@ -186,6 +186,29 @@ export default function AffordabilitySimulator() {
       realEstatePercentage: params.realEstatePercentage,
     });
   }, [params.initialSavings, params.members, params.mortgageAPR, params.realEstatePercentage]);
+
+  useEffect(() => {
+    const unsub = subscribe(() => {
+      const sd = getSimulatorData();
+      setParams(prev => {
+        const updates: Partial<AffordabilityParams> = {};
+        if (sd.initialSavings > 0 && prev.initialSavings !== sd.initialSavings) {
+          updates.initialSavings = sd.initialSavings;
+        }
+        if (sd.memberSalaries.length > 0) {
+          const hasDiff = sd.memberSalaries.some(
+            (s, i) => s !== (prev.members[i]?.annualGrossSalary ?? -1)
+          ) || sd.memberSalaries.length !== prev.members.length;
+          if (hasDiff) {
+            updates.members = sd.memberSalaries.map(s => ({ annualGrossSalary: s }));
+          }
+        }
+        if (Object.keys(updates).length === 0) return prev;
+        return { ...prev, ...updates };
+      });
+    });
+    return unsub;
+  }, []);
 
   const handleMemberChange = (index: number, value: string) => {
     const numericValue = Number.parseFloat(value) || 0;
@@ -394,7 +417,7 @@ export default function AffordabilitySimulator() {
 
                 <section className="-mx-6 sm:-mx-8 px-6 sm:px-8 pt-5 border-t border-gray-200">
                   <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-4">Resultados</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                     <ResultCard label="Precio Máximo de la Casa" value={formatCurrency(result.maxBaseHousePrice)} icon="🏠" />
                     <article className="bg-white border border-gray-200 rounded-lg p-4 transition-all hover:shadow-sm hover:border-gray-300">
                       <div className="flex items-center gap-2 mb-1">
@@ -404,8 +427,6 @@ export default function AffordabilitySimulator() {
                       </div>
                       <p className="text-xl font-bold text-gray-900 break-words">{formatCurrency(result.maxMortgageAmount)}</p>
                     </article>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-3">
                     <ResultCard label="Entrada Total" value={formatCurrency(result.totalDownPayment)} icon="🔑" />
                     <ResultCard label="Cuota Mensual Máxima" value={`${formatCurrency(result.maxMonthlyMortgagePayment)}/mes`} icon="💳" />
                   </div>

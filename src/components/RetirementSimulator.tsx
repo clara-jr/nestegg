@@ -16,7 +16,7 @@ import {
   type YearDetail,
   type MemberConfig,
 } from '../lib/retirement';
-import { getSimulatorData, subscribe, useLocalStorage, type SimulatorData } from '../lib/sharedStore';
+import { getSimulatorData, setSimulatorData, subscribe, useLocalStorage } from '../lib/sharedStore';
 
 interface InputFieldProps {
   label: string;
@@ -160,15 +160,6 @@ function ResultCard({ label, value, icon }: Readonly<ResultCardProps>) {
 type ViewMode = 'sin-pension' | 'con-pension';
 
 export default function RetirementSimulator() {
-  const [simData, setSimData] = useState<SimulatorData>(getSimulatorData);
-
-  useEffect(() => {
-    const unsub = subscribe(() => {
-      setSimData(getSimulatorData());
-    });
-    return unsub;
-  }, []);
-
   const defaultMember: MemberConfig = {
     currentAge: 30,
     currentSalary: 0,
@@ -176,35 +167,25 @@ export default function RetirementSimulator() {
   };
 
   const [params, setParams] = useLocalStorage<RetirementParams>('retirement-params', () => {
-    const sd = getSimulatorData();
     const lifeExpectancy = 95;
-    const hasMtg = sd.baseCost > 0;
-    const hasLoan = sd.familyLoanAmount > 0 && sd.familyLoanDurationYears > 0;
-    const famPay = hasLoan ? sd.familyLoanAmount / (sd.familyLoanDurationYears * 12) : 0;
     return {
       members: [defaultMember],
       monthlyExpensesPreResidency: 0,
       monthlyExpensesInResidency: 0,
       residencyAge: 85,
       lifeExpectancy,
-      initialSavingsAccount: sd.initialSavingsAccount,
-      initialInvestments: sd.initialInvestments,
-      monthlyContribution: sd.monthlyContribution,
-      savingsAccountRate: sd.savingsAccountRate,
-      investmentRate: sd.investmentRate,
-      monthlyMortgagePayment: hasMtg ? sd.monthlyMortgagePayment : 0,
-      mortgageEndAge: hasMtg ? defaultMember.currentAge + sd.mortgageDurationYears : 0,
-      familyLoanMonthlyPayment: famPay,
-      familyLoanEndAge: hasLoan ? defaultMember.currentAge + sd.familyLoanDurationYears : 0,
-      distributionPeriods: sd.distributionPeriods.length > 0
-        ? (() => {
-            const p = [...sd.distributionPeriods].reverse();
-            const numP = Math.ceil(lifeExpectancy / 10);
-            while (p.length < numP) p.push(50);
-            for (let i = 0; i < Math.min(2, numP); i++) p[i] = 100;
-            return p.slice(0, numP);
-          })()
-        : generateDefaultPeriods(lifeExpectancy),
+      initialSavingsAccount: 0,
+      initialInvestments: 0,
+      monthlyContribution: 0,
+      savingsAccountRate: 2,
+      investmentRate: 7,
+      monthlyMortgagePayment: 0,
+      mortgageEndAge: 0,
+      mortgageDurationYears: 0,
+      familyLoanMonthlyPayment: 0,
+      familyLoanEndAge: 0,
+      familyLoanDurationYears: 0,
+      distributionPeriods: generateDefaultPeriods(lifeExpectancy),
       withdrawalPct: 10,
     };
   });
@@ -212,6 +193,17 @@ export default function RetirementSimulator() {
   const [sameDistributionForAll, setSameDistributionForAll] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('con-pension');
   const [showDetail, setShowDetail] = useState(false);
+
+  // Migrate stored params if they lack new fields
+  useEffect(() => {
+    setParams(prev => {
+      let changed = false;
+      const next = { ...prev };
+      if (next.mortgageDurationYears === undefined) { next.mortgageDurationYears = 0; changed = true; }
+      if (next.familyLoanDurationYears === undefined) { next.familyLoanDurationYears = 0; changed = true; }
+      return changed ? next : prev;
+    });
+  }, []);
 
   useEffect(() => {
     const numPeriods = Math.ceil(params.lifeExpectancy / 10);
@@ -226,29 +218,6 @@ export default function RetirementSimulator() {
   }, [params.lifeExpectancy]);
 
   useEffect(() => {
-    setParams(prev => {
-      const sd = getSimulatorData();
-
-      const salariesChanged = sd.memberSalaries.length > 0
-        && sd.memberSalaries.some((s, i) => s !== (prev.members[i]?.currentSalary ?? -1));
-      const members = salariesChanged
-        ? sd.memberSalaries.map((s, i) => {
-            if (i < prev.members.length) {
-              return { ...prev.members[i], currentSalary: s };
-            }
-            return { currentAge: prev.members[0].currentAge, currentSalary: s, yearsContributed: prev.members[0].yearsContributed };
-          })
-        : prev.members;
-
-      if (prev.monthlyContribution === sd.monthlyContribution
-        && prev.initialSavingsAccount === sd.initialSavingsAccount
-        && prev.initialInvestments === sd.initialInvestments
-        && !salariesChanged) return prev;
-      return { ...prev, members, monthlyContribution: sd.monthlyContribution, initialSavingsAccount: sd.initialSavingsAccount, initialInvestments: sd.initialInvestments };
-    });
-  }, [simData]);
-
-  useEffect(() => {
     const totalNetSalary = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
     const derived = Math.max(0, Math.round(totalNetSalary / 12 - params.monthlyContribution));
     setParams(prev => {
@@ -256,6 +225,43 @@ export default function RetirementSimulator() {
       return { ...prev, monthlyExpensesPreResidency: derived };
     });
   }, [params.members, params.monthlyContribution]);
+
+  useEffect(() => {
+    const refAge = params.members[0].currentAge;
+    setParams(prev => {
+      const newEndAge = prev.mortgageDurationYears > 0 ? refAge + prev.mortgageDurationYears : 0;
+      const newLoanEndAge = prev.familyLoanDurationYears > 0 ? refAge + prev.familyLoanDurationYears : 0;
+      if (prev.mortgageEndAge === newEndAge && prev.familyLoanEndAge === newLoanEndAge) return prev;
+      return { ...prev, mortgageEndAge: newEndAge, familyLoanEndAge: newLoanEndAge };
+    });
+  }, [params.members, params.mortgageDurationYears, params.familyLoanDurationYears]);
+
+  // Sync members and salaries to shared store
+  useEffect(() => {
+    const salaries = params.members.map(m => m.currentSalary);
+    setSimulatorData({ memberSalaries: salaries });
+  }, [params.members]);
+
+  // Sync initial savings and monthly params from Savings Simulator
+  useEffect(() => {
+    const unsub = subscribe(() => {
+      const sd = getSimulatorData();
+      setParams(prev => {
+        const refAge = prev.members[0].currentAge;
+        const updates: Partial<RetirementParams> = {};
+        if (prev.initialSavingsAccount !== sd.initialSavingsAccount) updates.initialSavingsAccount = sd.initialSavingsAccount;
+        if (prev.initialInvestments !== sd.initialInvestments) updates.initialInvestments = sd.initialInvestments;
+        if (prev.monthlyContribution !== sd.monthlyContribution) updates.monthlyContribution = sd.monthlyContribution;
+        if (prev.monthlyMortgagePayment !== sd.monthlyMortgagePayment) updates.monthlyMortgagePayment = sd.monthlyMortgagePayment;
+        if (prev.mortgageDurationYears !== sd.mortgageDurationYears) updates.mortgageDurationYears = sd.mortgageDurationYears;
+        if (prev.familyLoanMonthlyPayment !== sd.familyLoanMonthlyPayment) updates.familyLoanMonthlyPayment = sd.familyLoanMonthlyPayment;
+        if (prev.familyLoanDurationYears !== sd.familyLoanDurationYears) updates.familyLoanDurationYears = sd.familyLoanDurationYears;
+        if (Object.keys(updates).length === 0) return prev;
+        return { ...prev, ...updates };
+      });
+    });
+    return unsub;
+  }, []);
 
   const handleInputChange = (field: keyof RetirementParams, value: any) => {
     const numericValue = typeof value === 'string' ? Number.parseFloat(value) || 0 : value;
@@ -270,15 +276,7 @@ export default function RetirementSimulator() {
     setParams(prev => {
       const members = [...prev.members];
       members[index] = { ...members[index], [field]: numericValue };
-      const updated = { ...prev, members };
-      if (field === 'currentAge') {
-        const sd = getSimulatorData();
-        if (sd.baseCost > 0) updated.mortgageEndAge = numericValue + sd.mortgageDurationYears;
-        if (sd.familyLoanAmount > 0 && sd.familyLoanDurationYears > 0) {
-          updated.familyLoanEndAge = numericValue + sd.familyLoanDurationYears;
-        }
-      }
-      return updated;
+      return { ...prev, members };
     });
   };
 
@@ -320,19 +318,19 @@ export default function RetirementSimulator() {
 
   const visiblePeriods = useMemo(() => {
     const refAge = params.members[0].currentAge;
-    const horizonEndAge = refAge + simData.timeHorizonYears;
-    const minAge = Math.max(30, horizonEndAge);
     return params.distributionPeriods
       .map((pct, i) => {
         const range = getPeriodAgeRange(i, params.lifeExpectancy);
-        return { ...range, pct, index: i };
+        if (range.endAge < refAge) return null;
+        return {
+          ...range,
+          startAge: Math.max(refAge, range.startAge),
+          pct,
+          index: i,
+        };
       })
-      .filter(p => p.endAge >= minAge)
-      .map(p => ({
-        ...p,
-        startAge: p.startAge < minAge ? minAge : p.startAge,
-      }));
-  }, [params.distributionPeriods, params.lifeExpectancy, params.members, simData.timeHorizonYears]);
+      .filter((p): p is NonNullable<typeof p> => p !== null);
+  }, [params.distributionPeriods, params.lifeExpectancy, params.members]);
 
   const earliestWithoutPension = useMemo(() => {
     const achievable = results.filter(r => r.achievableWithoutPension);
@@ -382,11 +380,7 @@ export default function RetirementSimulator() {
     if (!earliestResult) return [];
     const refMember = params.members[0];
 
-    const timeHorizonYears = getSimulatorData().timeHorizonYears;
-    const startAge = Math.max(
-      refMember.currentAge,
-      Math.min(earliestResult.retirementAge - 5, refMember.currentAge + timeHorizonYears)
-    );
+    const startAge = refMember.currentAge;
     const endAge = params.lifeExpectancy;
     if (startAge >= endAge) return [];
 
@@ -417,6 +411,7 @@ export default function RetirementSimulator() {
       aInversiones: number;
       impuestos: number;
       pensionUsada: number;
+      gastosMensuales: number;
       esJubilacion: boolean;
       finHipoteca: boolean;
       finPrestamo: boolean;
@@ -630,6 +625,22 @@ export default function RetirementSimulator() {
         firstAchievableAge = age;
       }
 
+      const numM = params.members.length;
+      const refCA = params.members[0].currentAge;
+      const rawExpenses = params.members.reduce((sum, m) => {
+        const ma = m.currentAge + (age - refCA);
+        return sum + (ma >= params.residencyAge
+          ? params.monthlyExpensesInResidency / numM
+          : params.monthlyExpensesPreResidency / numM);
+      }, 0);
+      let gastosMensuales = Math.round(rawExpenses * 100) / 100;
+      if (age < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
+        gastosMensuales += params.monthlyMortgagePayment;
+      }
+      if (age < params.familyLoanEndAge && params.familyLoanMonthlyPayment > 0) {
+        gastosMensuales += params.familyLoanMonthlyPayment;
+      }
+
       output.push({
         age,
         memberAges: memberAgesAtAge(age),
@@ -642,6 +653,7 @@ export default function RetirementSimulator() {
         aInversiones: age === startAge ? Math.round(preContribInv * 100) / 100 : Math.round(yearInvestmentContrib * 100) / 100,
         impuestos: age === startAge ? Math.round(preTaxes * 100) / 100 : Math.round(yearTaxes * 100) / 100,
         pensionUsada: viewMode === 'con-pension' ? currentPensionsForAge(age) : 0,
+        gastosMensuales,
         esJubilacion: age === firstAchievableAge + 1,
         finHipoteca: age === params.mortgageEndAge + 1 && params.mortgageEndAge > 0,
         finPrestamo: age === params.familyLoanEndAge + 1 && params.familyLoanEndAge > 0,
@@ -707,7 +719,7 @@ export default function RetirementSimulator() {
                           label="Salario Bruto Anual (€)"
                           value={member.currentSalary}
                           onChange={(v) => handleMemberChange(i, 'currentSalary', v)}
-                          hint="Con este dato y el aporte mensual del Simulador de Ahorros se deducen los gastos fijos mensuales"
+                          hint="Con este dato y el aporte mensual se deducen los gastos fijos mensuales"
                         />
                         <InputField
                           label="Años Cotizados"
@@ -731,6 +743,113 @@ export default function RetirementSimulator() {
                   value={params.lifeExpectancy}
                   onChange={(v) => handleInputChange('lifeExpectancy', v)}
                   error={params.residencyAge > params.lifeExpectancy ? 'La edad de residencia no puede ser mayor que la esperanza de vida' : undefined}
+                />
+              </FormSection>
+
+              <FormSection title="Ahorros Iniciales" cols="double">
+                <InputField
+                  label="Cuenta Remunerada Inicial (€)"
+                  value={params.initialSavingsAccount}
+                  onChange={(v) => handleInputChange('initialSavingsAccount', v)}
+                />
+                <InputField
+                  label="Inversiones Iniciales (€)"
+                  value={params.initialInvestments}
+                  onChange={(v) => handleInputChange('initialInvestments', v)}
+                />
+                <InputField
+                  label="Rentabilidad Cuenta (%)"
+                  value={params.savingsAccountRate}
+                  onChange={(v) => handleInputChange('savingsAccountRate', v)}
+                  step="0.1"
+                />
+                <InputField
+                  label="Rentabilidad Inversiones (%)"
+                  value={params.investmentRate}
+                  onChange={(v) => handleInputChange('investmentRate', v)}
+                  step="0.1"
+                />
+              </FormSection>
+
+              <FormSection title="Ahorros Mensuales" cols="single">
+                <InputField
+                  label="Aporte Total Mensual (€)"
+                  value={params.monthlyContribution}
+                  onChange={(v) => handleInputChange('monthlyContribution', v)}
+                />
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Distribución por Tramos
+                    </p>
+                    {visiblePeriods.length > 1 && (
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={sameDistributionForAll}
+                          onChange={(e) => {
+                            setSameDistributionForAll(e.target.checked);
+                            if (e.target.checked) {
+                              const first = params.distributionPeriods[0] ?? 50;
+                              setParams(prev => ({ ...prev, distributionPeriods: prev.distributionPeriods.map(() => first) }));
+                            }
+                          }}
+                          className="w-3.5 h-3.5 text-gray-600 border-gray-300 rounded cursor-pointer"
+                        />
+                        <span className="text-xs font-medium text-gray-700">Igual en todos</span>
+                      </label>
+                    )}
+                  </div>
+                  {(sameDistributionForAll ? [visiblePeriods[0]].filter(Boolean) : visiblePeriods).map((period) => {
+                    const periodKey = sameDistributionForAll ? 'all' : `period-${period.startAge}-${period.endAge}`;
+                    return (
+                      <div key={periodKey} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-medium text-gray-700">
+                            {sameDistributionForAll ? 'Todos los tramos' : `${period.startAge}–${period.endAge} años`}
+                          </p>
+                          <span className="text-xs font-semibold text-gray-700">
+                            {period.pct}% cuenta | {100 - period.pct}% inversiones
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={sameDistributionForAll ? (params.distributionPeriods[0] ?? 50) : period.pct}
+                          onChange={(e) => handleDistributionChange(period.index, Number(e.target.value))}
+                          className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-700"
+                        />
+                      </div>
+                    );
+                  })}
+                  <p className="text-xs text-gray-500">Cuenta ← → Inversiones</p>
+                </div>
+              </FormSection>
+
+              <FormSection title="Hipoteca y Préstamo" cols="double">
+                <InputField
+                  label="Cuota Hipoteca Mensual (€)"
+                  value={params.monthlyMortgagePayment}
+                  onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
+                />
+                <InputField
+                  label="Duración Hipoteca (años)"
+                  value={params.mortgageDurationYears}
+                  onChange={(v) => handleInputChange('mortgageDurationYears', v)}
+                  hint={params.mortgageDurationYears > 0 && params.members.length > 0 ? `Fin a los ${params.members[0].currentAge + params.mortgageDurationYears} años` : undefined}
+                />
+                <InputField
+                  label="Préstamo Familiar Mensual (€)"
+                  value={params.familyLoanMonthlyPayment}
+                  onChange={(v) => handleInputChange('familyLoanMonthlyPayment', v)}
+                  hint="0% interés"
+                />
+                <InputField
+                  label="Duración Préstamo (años)"
+                  value={params.familyLoanDurationYears}
+                  onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
+                  hint={params.familyLoanDurationYears > 0 && params.members.length > 0 ? `Fin a los ${params.members[0].currentAge + params.familyLoanDurationYears} años` : undefined}
                 />
               </FormSection>
 
@@ -769,79 +888,6 @@ export default function RetirementSimulator() {
                 </div>
               </FormSection>
 
-              {(() => {
-                const refAge = params.members[0].currentAge;
-                const horizonEndAge = refAge + simData.timeHorizonYears;
-                const fullyDefined = horizonEndAge >= params.lifeExpectancy;
-                return (
-                  <FormSection title="Ahorros Mensuales" cols="single">
-                    {fullyDefined ? (
-                      <div className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
-                        <p className="text-xs text-gray-800 leading-relaxed">
-                          Los ahorros para la jubilación están completamente definidos en el simulador de ahorros.
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
-                          <p className="text-xs text-gray-500 leading-relaxed">
-                            Los primeros {horizonEndAge - refAge} años de ahorro siguen lo pautado en el simulador de ahorros. En esta calculadora se añaden los tramos desde los {horizonEndAge} años hasta la edad de jubilación.
-                          </p>
-                        </div>
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                              Distribución por Tramos
-                            </p>
-                            {visiblePeriods.length > 1 && (
-                              <label className="flex items-center gap-1.5 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={sameDistributionForAll}
-                                  onChange={(e) => {
-                                    setSameDistributionForAll(e.target.checked);
-                                    if (e.target.checked) {
-                                      const first = params.distributionPeriods[0] ?? 50;
-                                      setParams(prev => ({ ...prev, distributionPeriods: prev.distributionPeriods.map(() => first) }));
-                                    }
-                                  }}
-                                  className="w-3.5 h-3.5 text-gray-600 border-gray-300 rounded cursor-pointer"
-                                />
-                                <span className="text-xs font-medium text-gray-700">Igual en todos</span>
-                              </label>
-                            )}
-                          </div>
-                          {(sameDistributionForAll ? [visiblePeriods[0]].filter(Boolean) : visiblePeriods).map((period) => {
-                            const periodKey = sameDistributionForAll ? 'all' : `period-${period.startAge}-${period.endAge}`;
-                            return (
-                              <div key={periodKey} className="space-y-1">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-xs font-medium text-gray-700">
-                                    {sameDistributionForAll ? 'Todos los tramos' : `${period.startAge}–${period.endAge} años`}
-                                  </p>
-                                  <span className="text-xs font-semibold text-gray-700">
-                                    {period.pct}% cuenta | {100 - period.pct}% inversiones
-                                  </span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="100"
-                                  value={sameDistributionForAll ? (params.distributionPeriods[0] ?? 50) : period.pct}
-                                  onChange={(e) => handleDistributionChange(period.index, Number(e.target.value))}
-                                  className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-700"
-                                />
-                              </div>
-                            );
-                          })}
-                          <p className="text-xs text-gray-500">Cuenta ← → Inversiones</p>
-                        </div>
-                      </>
-                    )}
-                  </FormSection>
-                );
-              })()}
-
               <div className="flex justify-center">
                 {salaryError ? (
                   <InfoTip text={salaryError}>
@@ -869,7 +915,6 @@ export default function RetirementSimulator() {
                       <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 inline-flex items-center gap-1">
                           Ahorros Actuales
-                          <InfoTip text="Valor obtenido del Simulador de Ahorros.">ℹ️</InfoTip>
                         </p>
                         <p className="text-xl font-bold text-gray-900">{formatCurrency(params.initialSavingsAccount + params.initialInvestments)}</p>
                       </article>
@@ -1074,6 +1119,7 @@ export default function RetirementSimulator() {
                                   <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Pensión Est.</th>
                                 )}
                                 <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Necesario</th>
+                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Gastos</th>
                                 <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Cuenta</th>
                                 <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Inversiones</th>
                                 <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Total</th>
@@ -1131,7 +1177,7 @@ export default function RetirementSimulator() {
                                     </span>
                                   </td>
                                   {viewMode === 'con-pension' && (
-                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">{formatCurrency(r.monthlyPension)}</td>
+                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700 whitespace-nowrap">{formatCurrency(r.monthlyPension).replace('€', '€/mes')}</td>
                                   )}
                                   <td className={`px-6 sm:px-8 py-2.5 text-right text-sm ${r.requiredSavings < 0 ? 'text-gray-400' : r.achievable ? 'text-emerald-600' : 'text-red-600'}`}>
                                     {r.requiredSavings > 0
@@ -1139,6 +1185,9 @@ export default function RetirementSimulator() {
                                       : r.age === params.lifeExpectancy
                                         ? <InfoTip text={`Los ahorros necesarios a los ${params.lifeExpectancy} años son nulos porque aquí termina la esperanza de vida`}>—</InfoTip>
                                         : '—'}
+                                  </td>
+                                  <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-600 whitespace-nowrap">
+                                    {formatCurrency(r.gastosMensuales).replace('€', '€/mes')}
                                   </td>
                                   <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">
                                     {formatCurrency(r.cuenta)}

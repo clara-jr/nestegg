@@ -272,6 +272,10 @@ export default function SavingsSimulator() {
   }, [params.monthlyContribution]);
 
   useEffect(() => {
+    setSimulatorData({ initialSavings: params.initialTotalSavings });
+  }, [params.initialTotalSavings]);
+
+  useEffect(() => {
     if (!result) return;
     setSimulatorData({
       initialSavingsAccount: result.initialSavingsAccount,
@@ -286,7 +290,7 @@ export default function SavingsSimulator() {
         const updates: Partial<SavingsParams> = {};
         if (prev.mortgageAnnualRate !== sd.mortgageAPR && sd.mortgageAPR > 0) updates.mortgageAnnualRate = sd.mortgageAPR;
         if (prev.realEstatePercentage !== sd.realEstatePercentage && sd.realEstatePercentage > 0) updates.realEstatePercentage = sd.realEstatePercentage;
-        if (prev.initialTotalSavings !== sd.initialSavings && sd.initialSavings >= 0) updates.initialTotalSavings = sd.initialSavings;
+        if (prev.initialTotalSavings !== sd.initialSavings && sd.initialSavings > 0) updates.initialTotalSavings = sd.initialSavings;
         if (Object.keys(updates).length === 0) return prev;
         return { ...prev, ...updates };
       });
@@ -299,6 +303,15 @@ export default function SavingsSimulator() {
   const familyLoanMonthlyPayment = hasFamilyLoan
     ? params.familyLoanAmount / (params.familyLoanDurationYears * 12)
     : 0;
+
+  useEffect(() => {
+    setSimulatorData({
+      monthlyMortgagePayment: params.monthlyMortgagePayment,
+      mortgageDurationYears: params.mortgageDurationYears,
+      familyLoanMonthlyPayment,
+      familyLoanDurationYears: params.familyLoanDurationYears,
+    });
+  }, [params.monthlyMortgagePayment, params.mortgageDurationYears, familyLoanMonthlyPayment, params.familyLoanDurationYears]);
 
   const totalMonthlyDebt = (params.baseCost > 0 ? params.monthlyMortgagePayment : 0) + familyLoanMonthlyPayment;
   const debtExceedsContribution = totalMonthlyDebt > params.monthlyContribution

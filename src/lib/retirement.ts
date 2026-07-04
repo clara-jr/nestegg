@@ -19,8 +19,10 @@ export interface RetirementParams {
   investmentRate: number;
   monthlyMortgagePayment: number;
   mortgageEndAge: number;
+  mortgageDurationYears: number;
   familyLoanMonthlyPayment: number;
   familyLoanEndAge: number;
+  familyLoanDurationYears: number;
   distributionPeriods: number[];
   withdrawalPct: number;
 }

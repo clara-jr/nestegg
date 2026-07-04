@@ -10,6 +10,7 @@ export interface SimulatorData {
   baseCost: number;
   familyLoanAmount: number;
   familyLoanDurationYears: number;
+  familyLoanMonthlyPayment: number;
   savingsAccountRate: number;
   investmentRate: number;
   totalSavings: number;
@@ -35,6 +36,7 @@ let data: SimulatorData = {
   baseCost: 0,
   familyLoanAmount: 0,
   familyLoanDurationYears: 0,
+  familyLoanMonthlyPayment: 0,
   savingsAccountRate: 2,
   investmentRate: 7,
   totalSavings: 0,
