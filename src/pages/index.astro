@@ -110,6 +110,7 @@ const description = 'Simula el estado de tus ahorros en un intervalo de tiempo d
       }
 
       function switchTab(tab) {
+        localStorage.setItem('nestegg-tab', tab);
         tabBtns.forEach(btn => {
           const isActive = btn.dataset.tab === tab;
           btn.classList.toggle('bg-gray-900', isActive);
@@ -160,7 +161,8 @@ const description = 'Simula el estado de tus ahorros en un intervalo de tiempo d
         });
       }
 
-      switchTab('savings');
+      const savedTab = localStorage.getItem('nestegg-tab') || 'savings';
+      switchTab(savedTab);
     </script>
   </body>
 </html>
