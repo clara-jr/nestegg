@@ -471,13 +471,13 @@ export function getNetMonthlyContribution(
   familyLoanEndAge: number,
 ): number {
   let net = grossMonthlyContribution;
-  if (monthlyMortgagePayment > 0 && age < mortgageEndAge) {
-    net -= monthlyMortgagePayment;
+  if (mortgageEndAge > 0 && monthlyMortgagePayment > 0 && age >= mortgageEndAge) {
+    net += monthlyMortgagePayment;
   }
-  if (familyLoanMonthlyPayment > 0 && age < familyLoanEndAge) {
-    net -= familyLoanMonthlyPayment;
+  if (familyLoanEndAge > 0 && familyLoanMonthlyPayment > 0 && age >= familyLoanEndAge) {
+    net += familyLoanMonthlyPayment;
   }
-  return Math.round(net * 100) / 100;
+  return Math.round(Math.max(0, net) * 100) / 100;
 }
 
 export function getPeriodAgeRange(

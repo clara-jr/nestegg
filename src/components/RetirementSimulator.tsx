@@ -219,12 +219,13 @@ export default function RetirementSimulator() {
 
   useEffect(() => {
     const totalNetSalary = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
-    const derived = Math.max(0, Math.round(totalNetSalary / 12 - params.monthlyContribution));
+    const totalDebt = params.monthlyMortgagePayment + params.familyLoanMonthlyPayment;
+    const derived = Math.max(0, Math.round(totalNetSalary / 12 - params.monthlyContribution - totalDebt));
     setParams(prev => {
       if (Math.abs(prev.monthlyExpensesPreResidency - derived) < 0.01) return prev;
       return { ...prev, monthlyExpensesPreResidency: derived };
     });
-  }, [params.members, params.monthlyContribution]);
+  }, [params.members, params.monthlyContribution, params.monthlyMortgagePayment, params.familyLoanMonthlyPayment]);
 
   useEffect(() => {
     const refAge = params.members[0].currentAge;
@@ -689,8 +690,9 @@ export default function RetirementSimulator() {
   }
 
   const totalNet = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
-  const salaryError = params.monthlyContribution > 0 && totalNet / 12 < params.monthlyContribution
-    ? `El salario neto mensual conjunto (${Math.round(totalNet / 12)} €) no cubre la aportación de ${params.monthlyContribution.toFixed(0)} €`
+  const totalCommitment = params.monthlyContribution + params.monthlyMortgagePayment + params.familyLoanMonthlyPayment;
+  const salaryError = params.monthlyContribution > 0 && totalNet / 12 < totalCommitment
+    ? `El salario neto mensual conjunto (${Math.round(totalNet / 12)} €) no cubre aportación + hipoteca + préstamo (${Math.round(totalCommitment)} €)`
     : '';
   return (
     <div className="min-h-screen py-6 px-3 sm:px-4 lg:px-8">
@@ -789,7 +791,7 @@ export default function RetirementSimulator() {
                   label="Aporte Total Mensual (€)"
                   value={params.monthlyContribution}
                   onChange={(v) => handleInputChange('monthlyContribution', v)}
-                  hint={`${params.monthlyMortgagePayment > 0 ? `${params.monthlyMortgagePayment.toFixed(2)} € hipoteca |` : ''} ${params.familyLoanMonthlyPayment > 0 ? `${params.familyLoanMonthlyPayment.toFixed(2)} € préstamo familiar |` : ''} ${(params.monthlyContribution - params.monthlyMortgagePayment - params.familyLoanMonthlyPayment).toFixed(2)} € inversiones`}
+                  hint="Importe destinado íntegramente a cuenta remunerada e inversiones."
                 />
                 <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
                   <div className="flex items-center justify-between">
@@ -846,24 +848,25 @@ export default function RetirementSimulator() {
                   label="Cuota Hipoteca Mensual (€)"
                   value={params.monthlyMortgagePayment}
                   onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
+                  hint="Al terminar de pagar la hipoteca, la cuota se redirige al ahorro mensual."
                 />
                 <InputField
                   label="Duración Hipoteca (años)"
                   value={params.mortgageDurationYears}
                   onChange={(v) => handleInputChange('mortgageDurationYears', v)}
-                  hint={params.mortgageDurationYears > 0 && params.members.length > 0 ? `Fin a los ${params.members[0].currentAge + params.mortgageDurationYears} años` : undefined}
+                  hint={params.mortgageDurationYears > 0 && params.members.length > 0 ? `Finaliza a los ${params.members[0].currentAge + params.mortgageDurationYears} años${params.members.length > 1 ? ' del integrante nº 1' : ''}.` : undefined}
                 />
                 <InputField
                   label="Préstamo Familiar Mensual (€)"
                   value={params.familyLoanMonthlyPayment}
                   onChange={(v) => handleInputChange('familyLoanMonthlyPayment', v)}
-                  hint="0% interés"
+                  hint="0% interés · Al terminar de pagar el préstamo, la cuota se redirige al ahorro mensual."
                 />
                 <InputField
                   label="Duración Préstamo (años)"
                   value={params.familyLoanDurationYears}
                   onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
-                  hint={params.familyLoanDurationYears > 0 && params.members.length > 0 ? `Fin a los ${params.members[0].currentAge + params.familyLoanDurationYears} años` : undefined}
+                  hint={params.familyLoanDurationYears > 0 && params.members.length > 0 ? `Finaliza a los ${params.members[0].currentAge + params.familyLoanDurationYears} años${params.members.length > 1 ? ' del integrante nº 1' : ''}.` : undefined}
                 />
               </FormSection>
 
@@ -932,7 +935,7 @@ export default function RetirementSimulator() {
                       <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
                         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 inline-flex items-center gap-1">
                           Gastos Fijos Mensuales
-                          <InfoTip text={`${formatCurrency(Math.round(totalNet / 12))}/mes de salario neto − ${formatCurrency(params.monthlyContribution)}/mes de aportación = ${formatCurrency(params.monthlyExpensesPreResidency)}/mes`}>ℹ️</InfoTip>
+                          <InfoTip text={`${formatCurrency(Math.round(totalNet / 12))}/mes salario neto − ${formatCurrency(params.monthlyContribution)}/mes aportación − ${formatCurrency(params.monthlyMortgagePayment + params.familyLoanMonthlyPayment)}/mes deuda = ${formatCurrency(params.monthlyExpensesPreResidency)}/mes`}>ℹ️</InfoTip>
                         </p>
                         <p className="text-lg font-bold text-gray-900">{formatCurrency(params.monthlyExpensesPreResidency)}/mes</p>
                       </article>

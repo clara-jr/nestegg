@@ -295,6 +295,19 @@ export default function SavingsSimulator() {
     ? params.familyLoanAmount / (params.familyLoanDurationYears * 12)
     : 0;
 
+  const monthlyHint = useMemo(() => {
+    const parts: string[] = [];
+    const total = params.monthlyContribution + params.monthlyMortgagePayment + (hasFamilyLoan ? familyLoanMonthlyPayment : 0);
+    if (params.monthlyMortgagePayment > 0) {
+      parts.push(`la hipoteca (${formatCurrency(params.monthlyMortgagePayment)}/mes)`);
+    }
+    if (hasFamilyLoan) {
+      parts.push(`el préstamo familiar (${formatCurrency(familyLoanMonthlyPayment)}/mes)`);
+    }
+    if (parts.length === 0) return undefined;
+    return `Al terminar de pagar ${parts.join(' y ')}, ese importe se redirige al ahorro mensual (${formatCurrency(total)}/mes).`;
+  }, [params.monthlyMortgagePayment, hasFamilyLoan, familyLoanMonthlyPayment]);
+
   useEffect(() => {
     setSimulatorData({
       monthlyMortgagePayment: params.monthlyMortgagePayment,
@@ -304,10 +317,6 @@ export default function SavingsSimulator() {
     });
   }, [params.monthlyMortgagePayment, params.mortgageDurationYears, familyLoanMonthlyPayment, params.familyLoanDurationYears]);
 
-  const totalMonthlyDebt = (params.baseCost > 0 ? params.monthlyMortgagePayment : 0) + familyLoanMonthlyPayment;
-  const debtExceedsContribution = totalMonthlyDebt > params.monthlyContribution
-    ? `El total de hipoteca + préstamo (${formatCurrency(totalMonthlyDebt)}) supera el aporte mensual (${formatCurrency(params.monthlyContribution)})`
-    : undefined;
 
   const totalHouseExpenses = useMemo(() => calculateTotalHouseExpenses(params), [params]);
   const mortgageGrantedAmount = useMemo(
@@ -370,9 +379,9 @@ export default function SavingsSimulator() {
   }), [params, parsedInitialSavingsAccount.amount, parsedInitialInvestments.amount, hasValidInitialAllocation]);
 
   const result = useMemo<SavingsResult | null>(() => {
-    if (!hasValidInitialAllocation || debtExceedsContribution) return null;
+    if (!hasValidInitialAllocation) return null;
     return calculateSavings(paramsForCalculation);
-  }, [paramsForCalculation, hasValidInitialAllocation, debtExceedsContribution]);
+  }, [paramsForCalculation, hasValidInitialAllocation]);
 
   useEffect(() => {
     if (!result) return;
@@ -638,13 +647,12 @@ export default function SavingsSimulator() {
               </FormSection>
 
               <FormSection title="Ahorros Mensuales" cols="triple">
-                <InputField
-                  label="Aporte Total Mensual (€)"
-                  value={params.monthlyContribution}
-                  onChange={(v) => handleInputChange('monthlyContribution', v)}
-                  hint={`${params.baseCost > 0 ? `${params.monthlyMortgagePayment} € hipoteca |` : ''} ${hasFamilyLoan && familyLoanMonthlyPayment ? `${familyLoanMonthlyPayment.toFixed(2)} € préstamo familiar |` : ''} ${(params.monthlyContribution - (params.baseCost > 0 ? params.monthlyMortgagePayment : 0) - (familyLoanMonthlyPayment ?? 0)).toFixed(2)} € inversiones`}
-                  error={debtExceedsContribution}
-                />
+                  <InputField
+                    label="Aporte Total Mensual (€)"
+                    value={params.monthlyContribution}
+                    onChange={(v) => handleInputChange('monthlyContribution', v)}
+                    hint="Importe destinado íntegramente a cuenta remunerada e inversiones."
+                  />
                   
                 <div className="md:col-span-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
                   <div className="flex items-center justify-between">
@@ -749,8 +757,8 @@ export default function SavingsSimulator() {
                       value={params.monthlyMortgagePayment}
                       onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
                       disabled={params.baseCost === 0}
-                      error={mortgageExceedsBase || debtExceedsContribution}
-                      hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : undefined}
+                      error={mortgageExceedsBase}
+                      hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : 'Al terminar de pagar la hipoteca, la cuota se redirige al ahorro mensual.'}
                     />
                     <InputField
                       label="TAE Hipoteca (%)"
@@ -779,8 +787,8 @@ export default function SavingsSimulator() {
                       label="Préstamo Familiar (€)"
                       value={params.familyLoanAmount}
                       onChange={(v) => handleInputChange('familyLoanAmount', v)}
-                      hint="0% interés"
-                      error={hasFamilyLoan && familyLoanMonthlyPayment > 0 ? debtExceedsContribution : undefined}
+                      hint="0% interés · Al terminar de pagar el préstamo, la cuota se redirige al ahorro mensual."
+                      error={undefined}
                     />
                     <InputField
                       label="Duración Préstamo (años)"
@@ -818,7 +826,7 @@ export default function SavingsSimulator() {
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(result.initialAvailableForInvestment)}</p>
                       </article>
                       <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Aporte Mensual</p>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Aporte Mensual {monthlyHint && <InfoTip text={monthlyHint}>ℹ️</InfoTip>}</p>
                         <p className="text-base font-bold text-gray-900 break-words">{formatCurrency(params.monthlyContribution)}</p>
                       </article>
                       {params.baseCost > 0 && (
