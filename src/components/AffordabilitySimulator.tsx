@@ -393,10 +393,18 @@ export default function AffordabilitySimulator() {
                     <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Impuestos ({params.isNewBuild ? '11.2' : '6.5'}%)</p>
                     <p className="text-base font-bold text-gray-900">{formatCurrency(result.estimatedTaxes)}</p>
                   </article>
+                  {params.realEstatePercentage > 0 && (
                   <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                     <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos Inmobiliaria</p>
                     <p className="text-base font-bold text-gray-900">{formatCurrency(result.estimatedRealEstateFees)}</p>
                   </article>
+                  )}
+                  {params.reformFurnitureCosts > 0 && (
+                  <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Reforma y Muebles</p>
+                    <p className="text-base font-bold text-gray-900">{formatCurrency(params.reformFurnitureCosts)}</p>
+                  </article>
+                  )}
                   <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
                     <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Capital Empleado</p>
                     <p className="text-base font-bold text-gray-900">{formatCurrency(result.availableForHouse)}</p>
