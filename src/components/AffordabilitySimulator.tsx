@@ -207,7 +207,7 @@ export default function AffordabilitySimulator() {
         return { ...prev, ...updates };
       });
     });
-    return unsub;
+    return () => { unsub(); };
   }, []);
 
   const handleMemberChange = (index: number, value: string) => {

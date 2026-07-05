@@ -211,6 +211,8 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
       savingsToInvestment: Math.round(savingsToInvestment * 100) / 100,
       gainsTaxPaid: Math.round(gainsTaxPaid * 100) / 100,
       yearlyGainsTaxPaid: 0,
+      yearlyToAccount: 0,
+      yearlyToInvestment: 0,
     });
   }
 

@@ -306,7 +306,7 @@ export default function RetirementSimulator() {
         return { ...prev, ...updates };
       });
     });
-    return unsub;
+    return () => { unsub(); };
   }, []);
 
   const handleInputChange = (field: keyof RetirementParams, value: any) => {
@@ -700,7 +700,7 @@ export default function RetirementSimulator() {
         impuestos: age === startAge ? Math.round(preTaxes * 100) / 100 : Math.round(yearTaxes * 100) / 100,
         pensionUsada: viewMode === 'con-pension' ? currentPensionsForAge(age) : 0,
         gastosMensuales,
-        esJubilacion: age === firstAchievableAge + 1,
+        esJubilacion: firstAchievableAge !== null && age === firstAchievableAge + 1,
         finHipoteca: age === params.mortgageEndAge + 1 && params.mortgageEndAge > 0,
         finPrestamo: age === params.familyLoanEndAge + 1 && params.familyLoanEndAge > 0,
         achievable: achievableNow,

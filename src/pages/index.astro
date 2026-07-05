@@ -112,9 +112,9 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
       };
       const tabBtns = document.querySelectorAll('.tab-btn');
       const mobileTrigger = document.getElementById('nav-mobile-trigger');
-      const mobileMenu = document.getElementById('nav-mobile-menu');
-      const mobileLabel = document.getElementById('nav-mobile-label');
-      const mobileArrow = document.getElementById('nav-mobile-arrow');
+      const mobileMenu = document.getElementById('nav-mobile-menu')!;
+      const mobileLabel = document.getElementById('nav-mobile-label')!;
+      const mobileArrow = document.getElementById('nav-mobile-arrow')!;
       let mobileOpen = false;
 
       function closeMobile() {
@@ -123,27 +123,26 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
         mobileArrow.classList.remove('rotate-180');
       }
 
-      function switchTab(tab) {
+      function switchTab(tab: string) {
         localStorage.setItem('nestegg-tab', tab);
         tabBtns.forEach(btn => {
-          const isActive = btn.dataset.tab === tab;
+          const isActive = (btn as HTMLElement).dataset.tab === tab;
           btn.classList.toggle('bg-gray-900', isActive);
           btn.classList.toggle('hover:bg-gray-800', isActive);
           btn.classList.toggle('hover:bg-gray-50', !isActive);
           btn.classList.toggle('text-white', isActive);
           btn.classList.toggle('text-gray-900', !isActive && !btn.closest('#nav-mobile-menu'));
-          const title = btn.querySelector('p:first-child');
           const desc = btn.querySelector('p:last-child');
           if (btn.closest('#nav-mobile-menu')) {
             btn.classList.toggle('bg-gray-50', isActive);
             btn.classList.toggle('text-gray-900', true);
           } else {
             if (isActive) {
-              desc.classList.add('text-white/70');
-              desc.classList.remove('text-gray-500');
+              desc?.classList.add('text-white/70');
+              desc?.classList.remove('text-gray-500');
             } else {
-              desc.classList.remove('text-white/70');
-              desc.classList.add('text-gray-500');
+              desc?.classList.remove('text-white/70');
+              desc?.classList.add('text-gray-500');
             }
           }
         });
@@ -158,7 +157,7 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
       }
 
       tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+        btn.addEventListener('click', () => switchTab((btn as HTMLElement).dataset.tab ?? ''));
       });
 
       if (mobileTrigger) {
@@ -169,7 +168,7 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
           mobileArrow.classList.toggle('rotate-180', mobileOpen);
         });
         document.addEventListener('click', (e) => {
-          if (!document.getElementById('nav-container')?.contains(e.target)) {
+          if (!document.getElementById('nav-container')?.contains(e.target as Node)) {
             closeMobile();
           }
         });

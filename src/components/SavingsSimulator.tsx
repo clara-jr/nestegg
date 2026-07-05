@@ -318,7 +318,7 @@ export default function SavingsSimulator() {
         return { ...prev, ...updates };
       });
     });
-    return unsub;
+    return () => { unsub(); };
   }, []);
 
   const hasFamilyLoan = params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0;
