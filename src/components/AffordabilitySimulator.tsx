@@ -332,7 +332,7 @@ export default function AffordabilitySimulator() {
                 />
               </FormSection>
 
-              <FormSection title="Financiación" cols="triple">
+              <FormSection title="Financiación" cols="double">
                 <InputField
                   label="TAE Hipoteca (%)"
                   value={params.mortgageAPR}
@@ -344,7 +344,7 @@ export default function AffordabilitySimulator() {
                   value={params.mortgageDurationYears}
                   onChange={(v) => handleInputChange('mortgageDurationYears', v)}
                 />
-                <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 flex flex-col justify-center gap-2">
+                <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-200 flex flex-col justify-center gap-2 md:col-span-2">
                   <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Ratio Esfuerzo</p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-gray-500">10%</span>
