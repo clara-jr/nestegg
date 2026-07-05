@@ -26,9 +26,11 @@ src/
   components/
     SavingsSimulator.tsx         — Savings projection form + results
     RetirementSimulator.tsx      — Retirement age calculator
+    AffordabilitySimulator.tsx   — Affordability calculator (max house price)
   lib/
     calculations.ts              — Mortgage/tax/savings pure functions
     retirement.ts                — Pension estimation, path simulation
+    affordability.ts             — Max mortgage, down payment, constraint analysis
     sharedStore.ts               — Cross-simulator state sync
   styles/global.css              — Tailwind CSS, fonts (Signika, Heebo)
 ```
@@ -44,10 +46,11 @@ src/
 
 ## Architecture
 
-- Single page (`src/pages/index.astro`) — two calculators in Spanish
-- Nav: two clickable cards (desktop side-by-side, mobile collapsed dropdown)
+- Single page (`src/pages/index.astro`) — three calculators in Spanish
+- Nav: three clickable cards (desktop side-by-side, mobile collapsed dropdown)
 - Savings simulator: house purchase + mortgage + family loan + savings distribution
 - Retirement simulator: optimal retirement age, pension estimates, residency expenses
+- Affordability simulator: max house price given income & savings, mortgage & tax estimates
 - Shared store syncs data between simulators (mortgage params, contribution, rates)
 - Locale: `es-ES`, currency: `EUR`
 - Tax: Spanish savings bracket scale (19%–26%)

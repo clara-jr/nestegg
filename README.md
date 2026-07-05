@@ -1,6 +1,6 @@
 # NestEgg
 
-Financial simulator in Spanish that projects personal wealth — savings, mortgage and investments — over time. Includes a detailed savings simulator and a retirement age calculator.
+Vibe-coded financial simulator in Spanish that projects personal wealth — savings, mortgage and investments — over time. Includes a savings simulator, a retirement age calculator and an affordability calculator.
 
 ## Stack
 
@@ -16,8 +16,10 @@ Financial simulator in Spanish that projects personal wealth — savings, mortga
 - **`src/pages/index.astro`** — single page with navigation between simulators
 - **`src/components/SavingsSimulator.tsx`** — savings simulator (house purchase, mortgage, family loan, savings distribution)
 - **`src/components/RetirementSimulator.tsx`** — retirement calculator (optimal retirement age, pension, residency expenses)
+- **`src/components/AffordabilitySimulator.tsx`** — affordability calculator (max house price given income & savings)
 - **`src/lib/calculations.ts`** — pure functions: savings projection, mortgage, taxes
 - **`src/lib/retirement.ts`** — retirement logic: pension estimation, age simulation, required savings
+- **`src/lib/affordability.ts`** — affordability logic: max mortgage, down payment, constraint analysis
 - **`src/lib/sharedStore.ts`** — simple store to share data between simulators
 - **`src/styles/global.css`** — global styles, fonts (Signika + Heebo), Tailwind setup
 
