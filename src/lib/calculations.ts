@@ -141,11 +141,16 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
     ? params.familyLoanAmount / familyLoanMonths
     : 0;
   
+  let yearlyToAccountAccum = 0;
+  let yearlyToInvestmentAccum = 0;
+  let yearlyGainsTaxPaidAccum = 0;
+
   for (let month = 1; month <= totalMonths; month++) {
     const year = Math.ceil(month / 12);
+    const monthInYear = ((month - 1) % 12) + 1;
 
     // At the start of each year, carry over previous year's gains for June taxation
-    if (month % 12 === 1 && year > 1) {
+    if (monthInYear === 1 && year > 1) {
       previousSavingsGains = savingsGainsThisYear;
       savingsGainsThisYear = 0;
     }
@@ -168,8 +173,14 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
       }
     }
 
-    // Dinero disponible despues de deuda bancaria + familiar
-    const remainingMonthly = params.monthlyContribution - mortgagePaymentThisMonth - familyLoanPaymentThisMonth;
+    // Dinero disponible para ahorrar: el aporte mensual base más lo que se libera al terminar de pagar deudas
+    let remainingMonthly = params.monthlyContribution;
+    if (month > mortgageMonths) {
+      remainingMonthly += params.monthlyMortgagePayment;
+    }
+    if (hasFamilyLoan && month > familyLoanMonths) {
+      remainingMonthly += familyLoanPayment;
+    }
 
     if (remainingMonthly > 0) {
       const periodIndex = Math.min(Math.floor((year - 1) / 10), params.distributionPeriods.length - 1);
@@ -177,6 +188,9 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
       savingsToAccount = remainingMonthly * (savingsAccountPct / 100);
       savingsToInvestment = remainingMonthly * ((100 - savingsAccountPct) / 100);
     }
+
+    yearlyToAccountAccum += savingsToAccount;
+    yearlyToInvestmentAccum += savingsToInvestment;
     
     // Aplicar intereses mensuales
     const monthlyAccountRate = params.savingsAccountRate / 12 / 100;
@@ -193,15 +207,18 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
 
     // Pay tax in June for previous year's gains on savings account interest (declaración de la renta)
     let gainsTaxPaid = 0;
-    if (month % 12 === 6 && year > 1 && previousSavingsGains > 0) {
+    if (monthInYear === 6 && year > 1 && previousSavingsGains > 0) {
       const tax = calculateTax(previousSavingsGains);
       gainsTaxPaid = tax;
       totalTaxesPaid += tax;
+      yearlyGainsTaxPaidAccum += tax;
       savingsAccount -= tax;
     }
 
+    const isLastMonthOfYear = monthInYear === 12 || month === totalMonths;
+
     monthlyBreakdown.push({
-      month: ((month - 1) % 12) + 1,
+      month: monthInYear,
       year,
       savingsAccount: Math.round(savingsAccount * 100) / 100,
       investments: Math.round(investments * 100) / 100,
@@ -210,47 +227,17 @@ export function calculateSavings(params: SavingsParams): SavingsResult {
       savingsToAccount: Math.round(savingsToAccount * 100) / 100,
       savingsToInvestment: Math.round(savingsToInvestment * 100) / 100,
       gainsTaxPaid: Math.round(gainsTaxPaid * 100) / 100,
-      yearlyGainsTaxPaid: 0,
-      yearlyToAccount: 0,
-      yearlyToInvestment: 0,
+      yearlyGainsTaxPaid: isLastMonthOfYear ? Math.round(yearlyGainsTaxPaidAccum * 100) / 100 : 0,
+      yearlyToAccount: isLastMonthOfYear ? Math.round(yearlyToAccountAccum * 100) / 100 : 0,
+      yearlyToInvestment: isLastMonthOfYear ? Math.round(yearlyToInvestmentAccum * 100) / 100 : 0,
     });
-  }
 
-  // Second pass: populate yearlyGainsTaxPaid, yearlyToAccount, yearlyToInvestment on the last month of each year
-  let taxThisYear = 0;
-  let toAccountThisYear = 0;
-  let toInvestmentThisYear = 0;
-  let lastYear_ = 1;
-  for (let i = 0; i < monthlyBreakdown.length; i++) {
-    const entry = monthlyBreakdown[i];
-    if (entry.year > lastYear_) {
-      for (let j = i - 1; j >= 0; j--) {
-        if (monthlyBreakdown[j].year === lastYear_) {
-          monthlyBreakdown[j].yearlyGainsTaxPaid = Math.round(taxThisYear * 100) / 100;
-          monthlyBreakdown[j].yearlyToAccount = Math.round(toAccountThisYear * 100) / 100;
-          monthlyBreakdown[j].yearlyToInvestment = Math.round(toInvestmentThisYear * 100) / 100;
-          break;
-        }
-      }
-      taxThisYear = entry.gainsTaxPaid;
-      toAccountThisYear = entry.savingsToAccount;
-      toInvestmentThisYear = entry.savingsToInvestment;
-      lastYear_ = entry.year;
-    } else {
-      taxThisYear += entry.gainsTaxPaid;
-      toAccountThisYear += entry.savingsToAccount;
-      toInvestmentThisYear += entry.savingsToInvestment;
+    if (isLastMonthOfYear) {
+      yearlyToAccountAccum = 0;
+      yearlyToInvestmentAccum = 0;
+      yearlyGainsTaxPaidAccum = 0;
     }
   }
-  for (let j = monthlyBreakdown.length - 1; j >= 0; j--) {
-    if (monthlyBreakdown[j].year === lastYear_) {
-      monthlyBreakdown[j].yearlyGainsTaxPaid = Math.round(taxThisYear * 100) / 100;
-      monthlyBreakdown[j].yearlyToAccount = Math.round(toAccountThisYear * 100) / 100;
-      monthlyBreakdown[j].yearlyToInvestment = Math.round(toInvestmentThisYear * 100) / 100;
-      break;
-    }
-  }
-
   const finalInvestmentsRounded = Math.round(investments * 100) / 100;
   const totalInvestmentContributionsRounded = Math.round(totalInvestmentContributions * 100) / 100;
   const investmentGain = Math.max(0, finalInvestmentsRounded - totalInvestmentContributionsRounded);
