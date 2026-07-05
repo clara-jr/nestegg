@@ -377,76 +377,70 @@ export default function AffordabilitySimulator() {
           </section>
 
           <main>
-            {hasSalary && (
-              <section className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm space-y-5">
-                <section className="-mx-6 sm:-mx-8 px-6 sm:px-8 first:pt-0 pb-5">
-                  <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-3">Datos del escenario</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <section className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm space-y-5">
+              <section className="-mx-6 sm:-mx-8 px-6 sm:px-8 first:pt-0 pb-5">
+                <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-3">Datos del escenario</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Ingreso Neto Mensual</p>
+                    <p className="text-base font-bold text-gray-900">{formatCurrency(result.totalNetMonthlyIncome)}</p>
+                  </article>
+                  <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Cuota Máxima</p>
+                    <p className="text-base font-bold text-gray-900">{formatCurrency(result.maxMonthlyMortgagePayment)}/mes</p>
+                  </article>
+                  <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Impuestos ({params.isNewBuild ? '11.2' : '6.5'}%)</p>
+                    <p className="text-base font-bold text-gray-900">{formatCurrency(result.estimatedTaxes)}</p>
+                  </article>
+                  <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos Inmobiliaria</p>
+                    <p className="text-base font-bold text-gray-900">{formatCurrency(result.estimatedRealEstateFees)}</p>
+                  </article>
+                  <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Capital Empleado</p>
+                    <p className="text-base font-bold text-gray-900">{formatCurrency(result.availableForHouse)}</p>
+                  </article>
+                  {hasFamilyLoan && (<>
                     <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Ingreso Neto Mensual</p>
-                      <p className="text-base font-bold text-gray-900">{formatCurrency(result.totalNetMonthlyIncome)}</p>
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Cuota Préstamo Familiar</p>
+                      <p className="text-base font-bold text-gray-900">{formatCurrency(familyLoanMonthlyPayment)}/mes</p>
                     </article>
                     <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Cuota Máxima</p>
-                      <p className="text-base font-bold text-gray-900">{formatCurrency(result.maxMonthlyMortgagePayment)}/mes</p>
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Duración Préstamo Familiar</p>
+                      <p className="text-base font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
                     </article>
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Impuestos ({params.isNewBuild ? '11.2' : '6.5'}%)</p>
-                      <p className="text-base font-bold text-gray-900">{formatCurrency(result.estimatedTaxes)}</p>
-                    </article>
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos Inmobiliaria</p>
-                      <p className="text-base font-bold text-gray-900">{formatCurrency(result.estimatedRealEstateFees)}</p>
-                    </article>
-                    <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Capital Empleado</p>
-                      <p className="text-base font-bold text-gray-900">{formatCurrency(result.availableForHouse)}</p>
-                    </article>
-                    {hasFamilyLoan && (<>
-                      <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Cuota Préstamo Familiar</p>
-                        <p className="text-base font-bold text-gray-900">{formatCurrency(familyLoanMonthlyPayment)}/mes</p>
-                      </article>
-                      <article className="bg-gray-50 rounded-lg px-3.5 py-3 border border-gray-200">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Duración Préstamo Familiar</p>
-                        <p className="text-base font-bold text-gray-900">{params.familyLoanDurationYears} años</p>
-                      </article>
-                    </>)}
-                  </div>
-                </section>
-
-                <section className="-mx-6 sm:-mx-8 px-6 sm:px-8 pt-5 border-t border-gray-200">
-                  <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-4">Resultados</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <ResultCard label="Precio Máximo de la Casa" value={formatCurrency(result.maxBaseHousePrice)} icon="🏠" />
-                    <article className="bg-white border border-gray-200 rounded-lg p-4 transition-all hover:shadow-sm hover:border-gray-300">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-lg">🏦</span>
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Hipoteca Máxima ({result.ltvRatio}%)</p>
-
-                      </div>
-                      <p className="text-xl font-bold text-gray-900 break-words">{formatCurrency(result.maxMortgageAmount)}</p>
-                    </article>
-                    <ResultCard label="Entrada Total" value={formatCurrency(result.totalDownPayment)} icon="🔑" />
-                    <ResultCard label="Cuota Mensual Máxima" value={`${formatCurrency(result.maxMonthlyMortgagePayment)}/mes`} icon="💳" />
-                  </div>
-                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                    <p className="text-xs text-amber-800 leading-relaxed">
-                      <strong>⚠️ Nota:</strong> {result.constraintType === 'income'
-                        ? `El límite son tus ingresos: la hipoteca máxima (${formatCurrency(result.maxMortgageByIncome)}) y todo tu capital (${formatCurrency(result.availableForHouse)}) determinan el precio máximo.`
-                        : `El límite es tu capital: los bancos prestan hasta el 80% y el ${formatCurrency(result.availableForHouse)} disponible cubre justo el 20% de entrada + impuestos (${params.isNewBuild ? '11,2%' : '6,5%'}) + comisión inmobiliaria (${params.realEstatePercentage}%) + reforma.`
-                      } El ratio de esfuerzo ({params.debtToIncomeRatio}%) se aplica sobre el ingreso neto mensual
-                      {params.members.length > 1 ? ' conjunto' : ''} de {formatCurrency(result.totalNetMonthlyIncome)}.
-                    </p>
-                  </div>
-                </section>
+                  </>)}
+                </div>
               </section>
-            )}
-            {!hasSalary && (
-              <section className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
-                <p className="text-sm text-gray-500 text-center">Introduce al menos un salario para ver los resultados.</p>
+
+              <section className="-mx-6 sm:-mx-8 px-6 sm:px-8 pt-5 border-t border-gray-200">
+                <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-4">Resultados</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <ResultCard label="Precio Máximo de la Casa" value={formatCurrency(result.maxBaseHousePrice)} icon="🏠" />
+                  <article className="bg-white border border-gray-200 rounded-lg p-4 transition-all hover:shadow-sm hover:border-gray-300">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">🏦</span>
+                      <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Hipoteca Máxima ({result.ltvRatio}%)</p>
+
+                    </div>
+                    <p className="text-xl font-bold text-gray-900 break-words">{formatCurrency(result.maxMortgageAmount)}</p>
+                  </article>
+                  <ResultCard label="Entrada Total" value={formatCurrency(result.totalDownPayment)} icon="🔑" />
+                  <ResultCard label="Cuota Mensual Máxima" value={`${formatCurrency(result.maxMonthlyMortgagePayment)}/mes`} icon="💳" />
+                </div>
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+                  <p className="text-xs text-amber-800 leading-relaxed">
+                    <strong>⚠️ Nota:</strong> {hasSalary && result.constraintType === 'income'
+                      ? `El límite son tus ingresos: la hipoteca máxima (${formatCurrency(result.maxMortgageByIncome)}) y todo tu capital (${formatCurrency(result.availableForHouse)}) determinan el precio máximo.`
+                      : hasSalary
+                        ? `El límite es tu capital: los bancos prestan hasta el 80% y el ${formatCurrency(result.availableForHouse)} disponible cubre justo el 20% de entrada + impuestos (${params.isNewBuild ? '11,2%' : '6,5%'}) + comisión inmobiliaria (${params.realEstatePercentage}%) + reforma.`
+                        : 'Introduce al menos un salario para obtener un desglose detallado.'
+                    } {hasSalary && `El ratio de esfuerzo (${params.debtToIncomeRatio}%) se aplica sobre el ingreso neto mensual${params.members.length > 1 ? ' conjunto' : ''} de ${formatCurrency(result.totalNetMonthlyIncome)}.`}
+                  </p>
+                </div>
               </section>
-            )}
+            </section>
           </main>
         </div>
       </div>

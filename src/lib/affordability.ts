@@ -42,7 +42,9 @@ export interface AffordabilityResult {
 export function calculateAffordability(params: AffordabilityParams): AffordabilityResult {
   const memberNetAnnualSalaries = params.members.map(m => calculateNetSalary(m.annualGrossSalary));
   const totalNetAnnual = memberNetAnnualSalaries.reduce((sum, s) => sum + s, 0);
+  console.log('Total net annual income:', totalNetAnnual);
   const totalNetMonthlyIncome = Math.round((totalNetAnnual / 12) * 100) / 100;
+  console.log('Total net annual income:', totalNetMonthlyIncome);
   const memberNetMonthlyIncomes = memberNetAnnualSalaries.map(s => Math.round((s / 12) * 100) / 100);
 
   const maxMonthlyMortgagePayment = Math.round((totalNetMonthlyIncome * (params.debtToIncomeRatio / 100)) * 100) / 100;
