@@ -925,7 +925,7 @@ export default function SavingsSimulator() {
                   </section>
 
                 {/* Breakdown Table */}
-                  {(params.baseCost > 0 || params.monthlyContribution > 0 || params.initialSavingsAccount > 0 || params.initialInvestments > 0) && (
+                  {(params.baseCost > 0 || params.monthlyContribution > 0 || parsedInitialSavingsAccount.amount > 0 || parsedInitialInvestments.amount > 0) && (
                   <section className="-mx-6 sm:-mx-8 border-t border-gray-200 first:border-t-0 first:pt-0">
                     <button
                       onClick={() => setShowDetail(!showDetail)}
