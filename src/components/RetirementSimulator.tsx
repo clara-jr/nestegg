@@ -11,6 +11,7 @@ import {
   getNetMonthlyContribution,
   getPeriodAgeRange,
   simulateDetailedPath,
+  simulateRetirementPath,
   type RetirementParams,
   type RetirementAgeResult,
   type YearDetail,
@@ -411,15 +412,36 @@ export default function RetirementSimulator() {
     return simulateDetailedPath(params, selectedEarliest.retirementAge, pensions);
   }, [params, selectedEarliest, viewMode]);
 
-  const chartData = useMemo(() => {
-    if (!selectedEarliest || detailedPath.length === 0) return [];
-    return detailedPath
-      .filter(d => d.age >= selectedEarliest.retirementAge)
-      .map(d => ({
-        age: d.age,
-        total: Math.round(d.total),
-      }));
-  }, [detailedPath, selectedEarliest]);
+  const minimumPath = useMemo<YearDetail[]>(() => {
+    if (!selectedEarliest) return [];
+    const required = viewMode === 'con-pension'
+      ? selectedEarliest.requiredSavingsWithPension
+      : selectedEarliest.requiredSavingsWithoutPension;
+    if (required <= 0) return [];
+
+    const pensions = viewMode === 'con-pension'
+      ? buildPensionSchedule(params.members, selectedEarliest.retirementAge)
+      : [];
+
+    const projectedTotal = selectedEarliest.projectedSavingsAtRetirement;
+    const saRatio = projectedTotal > 0 && selectedEarliest.projectedSavingsAccount > 0
+      ? selectedEarliest.projectedSavingsAccount / projectedTotal
+      : params.withdrawalPct / 100;
+
+    const projectedInvestments = selectedEarliest.projectedInvestments;
+    const cbRatio = projectedInvestments > 0 && selectedEarliest.projectedCostBasis > 0
+      ? selectedEarliest.projectedCostBasis / projectedInvestments
+      : 1;
+
+    return simulateRetirementPath(
+      required * saRatio,
+      required * (1 - saRatio),
+      required * (1 - saRatio) * cbRatio,
+      selectedEarliest.retirementAge,
+      pensions,
+      params,
+    );
+  }, [selectedEarliest, viewMode, params]);
 
   const evolvedResults = useMemo(() => {
     const earliestResult = selectedEarliest;
@@ -710,13 +732,33 @@ export default function RetirementSimulator() {
     return output;
   }, [results, viewMode, params, selectedEarliest]);
 
-  function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { age: number; total: number } }> }) {
-    if (!active || !payload?.[0]) return null;
-    const { age, total } = payload[0].payload;
+  const chartData = useMemo(() => {
+    if (!selectedEarliest || evolvedResults.length === 0) return [];
+    const retirementAge = selectedEarliest.retirementAge;
+    const required = viewMode === 'con-pension'
+      ? selectedEarliest.requiredSavingsWithPension
+      : selectedEarliest.requiredSavingsWithoutPension;
+    const minPathMap = new Map(minimumPath.map(d => [d.age, d.total]));
+    return evolvedResults
+      .filter(d => d.age >= retirementAge)
+      .map(d => ({
+        age: d.age,
+        total: d.total,
+        minimumTotal: d.age === retirementAge ? required : (minPathMap.get(d.age - 1) ?? null),
+      }));
+  }, [evolvedResults, minimumPath, selectedEarliest, viewMode]);
+
+  function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ dataKey: string; value: number; color: string; payload: Record<string, unknown> }> }) {
+    if (!active || !payload?.length) return null;
+    const age = (payload[0]?.payload?.age as number) ?? NaN;
     return (
       <div style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', fontFamily: 'Heebo, sans-serif' }}>
         <p style={{ fontWeight: 700, marginBottom: 4, color: '#111827' }}>{age} años</p>
-        <p style={{ color: '#111827' }}>Total: {formatCurrency(total)}</p>
+        {payload.map((entry, i) => (
+          <p key={i} style={{ color: entry.color, marginBottom: i < payload.length - 1 ? 2 : 0 }}>
+            {entry.dataKey === 'total' ? 'Total: ' : 'Mínimo: '}{formatCurrency(entry.value)}
+          </p>
+        ))}
       </div>
     );
   }
@@ -1138,6 +1180,9 @@ export default function RetirementSimulator() {
                             <Tooltip content={<ChartTooltip />} />
                             <Legend wrapperStyle={{ fontFamily: 'Heebo, sans-serif', fontSize: '12px' }} />
                             <Line type="monotone" dataKey="total" name="Total ahorrado" stroke="#111827" strokeWidth={2} dot={false} />
+                            {minimumPath.length > 0 && (
+                              <Line type="monotone" dataKey="minimumTotal" name="Ahorro mínimo" stroke="#9ca3af" strokeWidth={2} strokeDasharray="6 3" dot={false} />
+                            )}
                           </LineChart>
                         </ResponsiveContainer>
                       </div>

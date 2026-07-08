@@ -36,6 +36,7 @@ export interface RetirementAgeResult {
   projectedSavingsAtRetirement: number;
   projectedSavingsAccount: number;
   projectedInvestments: number;
+  projectedCostBasis: number;
   projectedBalanceAtDeathWithoutPension: number;
   projectedBalanceAtDeathWithPension: number;
   achievableWithoutPension: boolean;
@@ -444,6 +445,7 @@ export function calculateAllRetirementAges(
       projectedSavingsAtRetirement: accResult.total,
       projectedSavingsAccount: accResult.savingsAccount,
       projectedInvestments: accResult.investments,
+      projectedCostBasis: accResult.investmentCostBasis,
       projectedBalanceAtDeathWithoutPension: balanceAtDeathWithoutPension,
       projectedBalanceAtDeathWithPension: balanceAtDeathWithPension,
       achievableWithoutPension: accResult.total >= requiredWithoutPension,
@@ -499,6 +501,156 @@ export interface YearDetail {
   expenses: number;
   taxes: number;
   pensionReceived: number;
+}
+
+export function simulateRetirementPath(
+  initialSavingsAccount: number,
+  initialInvestments: number,
+  initialCostBasis: number,
+  startAge: number,
+  pensions: PensionEntry[],
+  params: RetirementParams,
+): YearDetail[] {
+  const monthlyAccountRate = params.savingsAccountRate / 12 / 100;
+  const monthlyInvestmentRate = params.investmentRate / 12 / 100;
+
+  let sa = Math.max(0, initialSavingsAccount);
+  let inv = Math.max(0, initialInvestments);
+  let investmentCostBasis = Math.max(0, initialCostBasis);
+
+  const totalMonths = Math.max(0, (params.lifeExpectancy - startAge) * 12);
+  let savingsGainsThisYear = 0;
+  let previousSavingsGains = 0;
+
+  const years: YearDetail[] = [];
+
+  let yearAccountContrib = 0;
+  let yearInvestmentContrib = 0;
+  let yearExpenses = 0;
+  let yearTaxes = 0;
+  let yearPension = 0;
+
+  years.push({
+    age: startAge,
+    total: Math.round((sa + inv) * 100) / 100,
+    savingsAccount: Math.round(sa * 100) / 100,
+    investments: Math.round(inv * 100) / 100,
+    accountContribution: 0,
+    investmentContribution: 0,
+    expenses: 0,
+    taxes: 0,
+    pensionReceived: 0,
+  });
+
+  for (let month = 1; month <= totalMonths; month++) {
+    const totalAgeInMonths = startAge * 12 + month - 1;
+    const age = Math.floor(totalAgeInMonths / 12);
+    const monthInYear = ((month - 1) % 12) + 1;
+    const yearNum = Math.ceil(month / 12);
+
+    if (monthInYear === 1 && yearNum > 1) {
+      previousSavingsGains = savingsGainsThisYear;
+      savingsGainsThisYear = 0;
+    }
+
+    const accountInterest = sa * monthlyAccountRate;
+    sa = sa * (1 + monthlyAccountRate);
+    inv = inv * (1 + monthlyInvestmentRate);
+    savingsGainsThisYear += accountInterest;
+
+    const totalPension = getTotalPensionAtAge(age, startAge, pensions);
+    let monthlyExpenses = getTotalExpenses(age, params);
+
+    if (age < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
+      monthlyExpenses += params.monthlyMortgagePayment;
+    }
+    if (age < params.familyLoanEndAge && params.familyLoanMonthlyPayment > 0) {
+      monthlyExpenses += params.familyLoanMonthlyPayment;
+    }
+
+    const netFlow = totalPension - monthlyExpenses;
+
+    yearExpenses += monthlyExpenses;
+    yearPension += totalPension;
+
+    if (netFlow >= 0) {
+      const periodIndex = getDistributionPeriodIndex(age, params.lifeExpectancy, params.distributionPeriods.length);
+      const savingsPct = params.distributionPeriods[periodIndex] ?? 50;
+      const toSavings = netFlow * (savingsPct / 100);
+      const toInvestments = netFlow * ((100 - savingsPct) / 100);
+      sa += toSavings;
+      inv += toInvestments;
+      investmentCostBasis += toInvestments;
+      yearAccountContrib += toSavings;
+      yearInvestmentContrib += toInvestments;
+    } else {
+      let remaining = -netFlow;
+      const periodIndex = getDistributionPeriodIndex(age, params.lifeExpectancy, params.distributionPeriods.length);
+      const savingsPct = params.distributionPeriods[periodIndex] ?? 50;
+      const usePct = params.withdrawalPct;
+
+      let fromSavings = Math.min(remaining * usePct / 100, Math.max(0, sa));
+      sa = Math.max(0, sa - fromSavings);
+      remaining -= fromSavings;
+      yearAccountContrib -= fromSavings;
+
+      if (remaining > 0.01 && inv > 0.01) {
+        const totalValue = inv;
+        const costBasisRatio = Math.min(1, investmentCostBasis / totalValue);
+        let sellAmount = remaining;
+        for (let iter = 0; iter < 10; iter++) {
+          const gain = sellAmount * (1 - costBasisRatio);
+          const tax = calculateTax(Math.max(0, gain));
+          sellAmount = remaining + tax;
+        }
+        sellAmount = Math.min(sellAmount, totalValue);
+        if (sellAmount > 0.01) {
+          const actualGain = sellAmount * (1 - costBasisRatio);
+          const tax = calculateTax(Math.max(0, actualGain));
+          const costBasisSold = sellAmount - actualGain;
+          investmentCostBasis = Math.max(0, investmentCostBasis - costBasisSold);
+          inv = Math.max(0, inv - sellAmount);
+          yearInvestmentContrib -= sellAmount;
+          yearTaxes += tax;
+          remaining = Math.max(0, remaining - (sellAmount - tax));
+        }
+      }
+
+      if (remaining > 0.01) {
+        const extra = Math.min(remaining, Math.max(0, sa));
+        sa = Math.max(0, sa - extra);
+        remaining -= extra;
+        yearAccountContrib -= extra;
+      }
+    }
+
+    if (monthInYear === 6 && yearNum > 1 && previousSavingsGains > 0 && sa > 0.01) {
+      const tax = calculateTax(previousSavingsGains);
+      const actualTax = Math.min(tax, Math.max(0, sa));
+      sa = Math.max(0, sa - actualTax);
+      yearTaxes += actualTax;
+    }
+
+    if (monthInYear === 12 || month === totalMonths) {
+      years.push({
+        age,
+        total: Math.round((sa + inv) * 100) / 100,
+        savingsAccount: Math.round(sa * 100) / 100,
+        investments: Math.round(inv * 100) / 100,
+        accountContribution: Math.round(yearAccountContrib * 100) / 100,
+        investmentContribution: Math.round(yearInvestmentContrib * 100) / 100,
+        expenses: Math.round(yearExpenses * 100) / 100,
+        taxes: Math.round(yearTaxes * 100) / 100,
+        pensionReceived: Math.round(yearPension * 100) / 100,
+      });
+      yearAccountContrib = 0;
+      yearInvestmentContrib = 0;
+      yearExpenses = 0;
+      yearTaxes = 0;
+      yearPension = 0;
+    }
+  }
+  return years;
 }
 
 export function simulateDetailedPath(
