@@ -1,5 +1,14 @@
 import { calculateNetSalary, calculateMortgageGrantedAmount } from './calculations';
 
+function calculateMonthlyPayment(principal: number, annualRate: number, durationYears: number): number {
+  const months = Math.max(1, Math.floor(durationYears * 12));
+  if (months === 0 || principal <= 0) return 0;
+  const monthlyRate = annualRate / 12 / 100;
+  if (monthlyRate === 0) return principal / months;
+  const factor = Math.pow(1 + monthlyRate, months);
+  return principal * (monthlyRate * factor) / (factor - 1);
+}
+
 export interface MemberIncome {
   annualGrossSalary: number;
 }
@@ -25,6 +34,8 @@ export interface AffordabilityResult {
   maxMonthlyMortgagePayment: number;
   maxMortgageByIncome: number;
   maxMortgageAmount: number;
+  maxMortgageMonthlyPayment: number;
+  monthlyPaymentToIncomePct: number;
   availableForHouse: number;
   neededEquity: number;
   totalMaxHouseExpense: number;
@@ -98,6 +109,13 @@ export function calculateAffordability(params: AffordabilityParams): Affordabili
 
   const neededEquity = Math.round(Math.max(0, totalMaxHouseExpense - maxMortgageAmount) * 100) / 100;
 
+  const maxMortgageMonthlyPayment = maxMortgageAmount > 0
+    ? Math.round(calculateMonthlyPayment(maxMortgageAmount, params.mortgageAPR, params.mortgageDurationYears) * 100) / 100
+    : 0;
+  const monthlyPaymentToIncomePct = totalNetMonthlyIncome > 0
+    ? Math.round((maxMortgageMonthlyPayment / totalNetMonthlyIncome) * 100 * 100) / 100
+    : 0;
+
   const constraintType: ConstraintType = netEquity > 0 && maxMortgageByIncome > 0 && netEquity > maxMortgageByIncome * code_totalPct / 0.8
     ? 'income'
     : 'equity';
@@ -111,6 +129,8 @@ export function calculateAffordability(params: AffordabilityParams): Affordabili
     maxMonthlyMortgagePayment,
     maxMortgageByIncome,
     maxMortgageAmount,
+    maxMortgageMonthlyPayment,
+    monthlyPaymentToIncomePct,
     availableForHouse,
     neededEquity,
     totalMaxHouseExpense,
