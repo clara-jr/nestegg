@@ -127,10 +127,9 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
         localStorage.setItem('nestegg-tab', tab);
         tabBtns.forEach(btn => {
           const isActive = (btn as HTMLElement).dataset.tab === tab;
-          btn.classList.toggle('bg-gray-900', isActive);
-          btn.classList.toggle('hover:bg-gray-800', isActive);
+          btn.classList.toggle('bg-gray-100', isActive);
+          btn.classList.toggle('hover:bg-gray-200', isActive);
           btn.classList.toggle('hover:bg-gray-50', !isActive);
-          btn.classList.toggle('text-white', isActive);
           btn.classList.toggle('text-gray-900', !isActive && !btn.closest('#nav-mobile-menu'));
           const desc = btn.querySelector('p:last-child');
           if (btn.closest('#nav-mobile-menu')) {
@@ -138,10 +137,10 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
             btn.classList.toggle('text-gray-900', true);
           } else {
             if (isActive) {
-              desc?.classList.add('text-white/70');
+              desc?.classList.add('text-gray-500');
               desc?.classList.remove('text-gray-500');
             } else {
-              desc?.classList.remove('text-white/70');
+              desc?.classList.remove('text-gray-500');
               desc?.classList.add('text-gray-500');
             }
           }
