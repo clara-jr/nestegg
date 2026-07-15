@@ -17,3 +17,38 @@
     font-family: 'Signika', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   }
 }
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-gray-300);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--color-gray-300);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-gray-900);
+  border: 2.5px solid var(--color-gray-200);
+  box-shadow: 0 0 0 2px var(--color-gray-600);
+  cursor: pointer;
+  margin-top: -5px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-gray-900);
+  border: 2.5px solid var(--color-gray-200);
+  box-shadow: 0 0 0 2px var(--color-gray-600);
+  cursor: pointer;
+}

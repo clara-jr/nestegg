@@ -727,7 +727,7 @@ export default function SavingsSimulator() {
                           max="100"
                           value={pct}
                           onChange={(e) => handleDistributionChange(i, Number(e.target.value))}
-                          className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-700"
+                          className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-gray-700"
                         />
                       </div>
                     );

@@ -357,7 +357,7 @@ export default function AffordabilitySimulator() {
                     max="50"
                     value={params.debtToIncomeRatio}
                     onChange={(e) => handleInputChange('debtToIncomeRatio', Number(e.target.value))}
-                    className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-700"
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-gray-700"
                   />
                   <p className="text-xs text-gray-500">% de ingresos netos destinado a la hipoteca</p>
                 </div>

@@ -908,7 +908,7 @@ export default function RetirementSimulator() {
                           max="100"
                           value={sameDistributionForAll ? (params.distributionPeriods[0] ?? 50) : period.pct}
                           onChange={(e) => handleDistributionChange(period.index, Number(e.target.value))}
-                          className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-700"
+                          className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-gray-700"
                         />
                       </div>
                     );
@@ -972,7 +972,7 @@ export default function RetirementSimulator() {
                     max="100"
                     value={params.withdrawalPct}
                     onChange={(e) => handleInputChange('withdrawalPct', Number(e.target.value))}
-                    className="w-full h-1.5 bg-gray-300 rounded-lg appearance-none cursor-pointer accent-gray-700"
+                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-gray-700"
                   />
                   <p className="text-xs text-gray-500">De dónde rescatar el dinero en etapas de ingresos insuficientes (p.ej. mientras no se percibe pensión o en época de residencia)</p>
                   <p className="text-xs text-gray-500">Cuenta ← → Inversiones</p>
