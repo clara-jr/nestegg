@@ -1,10 +1,9 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useEffect, useMemo, useState } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { calculateNetSalary, calculateTax, formatCurrency } from '../lib/calculations';
 import {
   buildPensionSchedule,
   calculateAllRetirementAges,
-  estimatePension,
   findRequiredSavings,
   generateDefaultPeriods,
   getDistributionPeriodIndex,
@@ -18,177 +17,27 @@ import {
   type MemberConfig,
 } from '../lib/retirement';
 import { getSimulatorData, setSimulatorData, subscribe, useLocalStorage } from '../lib/sharedStore';
-
-interface InputFieldProps {
-  label: string;
-  value: number | string;
-  onChange: (value: string) => void;
-  type?: 'number' | 'text';
-  step?: string;
-  hint?: string;
-  disabled?: boolean;
-  disabledTitle?: string;
-  error?: string;
-}
-
-function InputField({ label, value, onChange, type = 'number', step, hint, disabled, disabledTitle, error }: Readonly<InputFieldProps>) {
-  const [raw, setRaw] = useState(() => String(value ?? ''));
-  const isFocused = useRef(false);
-
-  useEffect(() => {
-    if (!isFocused.current) {
-      setRaw(String(value ?? ''));
-    }
-  }, [value]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setRaw(e.target.value);
-    onChange(e.target.value);
-  };
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className={`text-xs font-semibold uppercase tracking-wider ${disabled ? 'text-gray-400' : error ? 'text-red-700' : 'text-gray-600'}`}>{label}</label>
-      {disabled && disabledTitle ? (
-        <InfoTip text={disabledTitle}>
-          <input
-            type={type}
-            value={raw}
-            onChange={handleChange}
-            onFocus={() => { isFocused.current = true; }}
-            onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
-            step={step}
-            disabled
-            className={`px-3.5 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all text-sm bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed w-full disabled:pointer-events-none`}
-          />
-        </InfoTip>
-      ) : (
-        <input
-          type={type}
-          value={raw}
-          onChange={handleChange}
-          onFocus={() => { isFocused.current = true; }}
-          onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
-          step={step}
-          disabled={disabled}
-          className={`px-3.5 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all text-sm ${
-            disabled
-              ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-              : error
-                ? 'bg-white border-red-400 text-gray-900 focus:ring-red-400'
-                : 'bg-white border-gray-300 text-gray-900 focus:ring-gray-500 focus:border-transparent'
-          }`}
-        />
-      )}
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      {!error && hint && <p className={`text-xs ${disabled ? 'text-gray-400' : 'text-gray-500'}`}>{hint}</p>}
-    </div>
-  );
-}
-
-function InfoTip({ text, children }: { text: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLSpanElement>(null);
-  const tooltipRef = useRef<HTMLSpanElement>(null);
-  const [pos, setPos] = useState({ top: -9999, left: -9999 });
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e: MouseEvent) => {
-      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('click', handleClick, true);
-    return () => document.removeEventListener('click', handleClick, true);
-  }, [open]);
-
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current || !tooltipRef.current) return;
-    const trigger = triggerRef.current;
-    const tooltip = tooltipRef.current;
-    const triggerRect = trigger.getBoundingClientRect();
-    const tooltipWidth = tooltip.offsetWidth;
-    const tooltipHeight = tooltip.offsetHeight;
-
-    const spaceAbove = triggerRect.top;
-    const spaceBelow = window.innerHeight - triggerRect.bottom;
-    const showAbove = spaceAbove >= spaceBelow;
-
-    const top = showAbove
-      ? triggerRect.top - tooltipHeight - 8
-      : triggerRect.bottom + 8;
-
-    let left = triggerRect.left + triggerRect.width / 2 - tooltipWidth / 2;
-    left = Math.max(8, Math.min(left, window.innerWidth - tooltipWidth - 8));
-
-    setPos({ top, left });
-  }, [open]);
-
-  return (
-    <span
-      ref={triggerRef}
-      onClick={() => setOpen(!open)}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      className="relative inline-flex items-center cursor-pointer"
-    >
-      {children}
-      {open && (
-        <span
-          ref={tooltipRef}
-          style={{
-            position: 'fixed',
-            top: pos.top,
-            left: pos.left,
-          }}
-          className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs leading-tight whitespace-normal max-w-[min(36rem,calc(100vw-2rem))] break-words shadow-lg z-50 pointer-events-none normal-case tracking-normal font-normal text-left"
-        >
-          {text}
-        </span>
-      )}
-    </span>
-  );
-}
-
-interface FormSectionProps {
-  title: string;
-  children: React.ReactNode;
-  cols?: 'single' | 'double';
-}
-
-function FormSection({ title, children, cols = 'single' }: Readonly<FormSectionProps>) {
-  const colsClass = {
-    single: 'grid-cols-1',
-    double: 'grid-cols-1 md:grid-cols-2',
-    triple: 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3',
-  }[cols];
-
-  return (
-    <section className="space-y-3 -mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 first:border-t-0 first:pt-0">
-      <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">{title}</h3>
-      <div className={`grid ${colsClass} gap-3`}>{children}</div>
-    </section>
-  );
-}
-
-interface ResultCardProps {
-  label: string;
-  value: string;
-  icon: string;
-}
-
-function ResultCard({ label, value, icon }: Readonly<ResultCardProps>) {
-  return (
-    <article className="bg-white border border-gray-200 rounded-lg p-4 transition-all hover:shadow-sm hover:border-gray-300">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-lg">{icon}</span>
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">{label}</p>
-      </div>
-      <p className="text-xl font-bold text-gray-900 break-words">{value}</p>
-    </article>
-  );
-}
+import {
+  SimulatorLayout,
+  FormContainer,
+  FormSection,
+  InputField,
+  Tooltip,
+  ChartTooltip,
+  MemberCard,
+  AddMemberButton,
+  CollapsibleSection,
+  ScrollableTable,
+  NoteBanner,
+  ResultsContainer,
+  ScenarioSection,
+  ScenarioCard,
+  ResultsSection,
+  ResultsCard,
+  DistributionSlider,
+  SingleRangeSlider,
+  type DistributionPeriod,
+} from './common';
 
 type ViewMode = 'sin-pension' | 'con-pension';
 
@@ -227,7 +76,6 @@ export default function RetirementSimulator() {
   const [viewMode, setViewMode] = useState<ViewMode>('con-pension');
   const [showDetail, setShowDetail] = useState(false);
 
-  // Migrate stored params if they lack new fields
   useEffect(() => {
     setParams(prev => {
       let changed = false;
@@ -270,13 +118,11 @@ export default function RetirementSimulator() {
     });
   }, [params.members, params.mortgageDurationYears, params.familyLoanDurationYears]);
 
-  // Sync members and salaries to shared store
   useEffect(() => {
     const salaries = params.members.map(m => m.currentSalary);
     setSimulatorData({ memberSalaries: salaries });
   }, [params.members]);
 
-  // Sync initial savings and monthly params from Savings Simulator
   useEffect(() => {
     const unsub = subscribe(() => {
       const sd = getSimulatorData();
@@ -312,10 +158,7 @@ export default function RetirementSimulator() {
 
   const handleInputChange = (field: keyof RetirementParams, value: any) => {
     const numericValue = typeof value === 'string' ? Number.parseFloat(value) || 0 : value;
-    setParams(prev => {
-      const updated = { ...prev, [field]: numericValue };
-      return updated;
-    });
+    setParams(prev => ({ ...prev, [field]: numericValue }));
   };
 
   const handleMemberChange = (index: number, field: keyof MemberConfig, value: any) => {
@@ -486,7 +329,6 @@ export default function RetirementSimulator() {
       achievable: boolean;
     }> = [];
 
-    // Simulate accumulation from currentAge up to startAge
     let sa = params.initialSavingsAccount;
     let inv = params.initialInvestments;
     let costBasis = inv;
@@ -555,7 +397,6 @@ export default function RetirementSimulator() {
     let firstAchievableAge: number | null = null;
     for (let age = startAge + 1; age <= endAge; age++) {
       const result = resultByAge.get(age);
-      const savingsBeforeAge = Math.round((sa + inv) * 100) / 100;
       const isBeforeRetirement = age <= earliestResult.retirementAge;
 
       let yearAccountContrib = 0;
@@ -748,579 +589,405 @@ export default function RetirementSimulator() {
       }));
   }, [evolvedResults, minimumPath, selectedEarliest, viewMode]);
 
-  function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ dataKey: string; value: number; color: string; payload: Record<string, unknown> }> }) {
-    if (!active || !payload?.length) return null;
-    const age = (payload[0]?.payload?.age as number) ?? NaN;
-    return (
-      <div style={{ backgroundColor: 'white', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '8px 12px', fontSize: '12px', fontFamily: 'Heebo, sans-serif' }}>
-        <p style={{ fontWeight: 700, marginBottom: 4, color: '#111827' }}>{age} años</p>
-        {payload.map((entry, i) => (
-          <p key={i} style={{ color: entry.color, marginBottom: i < payload.length - 1 ? 2 : 0 }}>
-            {entry.dataKey === 'total' ? 'Total: ' : 'Mínimo: '}{formatCurrency(entry.value)}
-          </p>
-        ))}
-      </div>
-    );
-  }
-
   const totalNet = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
-  const totalCommitment = params.monthlyContribution + params.monthlyMortgagePayment + params.familyLoanMonthlyPayment;
-  const salaryError = params.monthlyContribution > 0 && totalNet / 12 < totalCommitment
-    ? `El salario neto mensual conjunto (${Math.round(totalNet / 12)} €) no cubre aportación + hipoteca + préstamo (${Math.round(totalCommitment)} €)`
-    : '';
+  const distributionSliderPeriods: DistributionPeriod[] = visiblePeriods.map(p => ({
+    label: sameDistributionForAll ? 'Todos los tramos' : `${p.startAge}–${p.endAge} años`,
+    pct: sameDistributionForAll ? (params.distributionPeriods[0] ?? 50) : p.pct,
+    index: p.index,
+  }));
+
   return (
-    <div className="min-h-screen py-6 px-3 sm:px-4 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="flex flex-col gap-6 md:gap-8">
-          <section className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8 shadow-sm">
-            <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); }}>
-              <FormSection title="Datos Personales" cols="single">
-                <div className="space-y-4">
-                  {params.members.map((member, i) => (
-                    <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
-                      {params.members.length > 1 && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                          Integrante {i + 1}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeMember(i)}
-                          className="text-red-600 hover:text-red-800 cursor-pointer"
-                          title="Eliminar integrante"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="3 6 5 6 21 6"/>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                            <line x1="10" y1="11" x2="10" y2="17"/>
-                            <line x1="14" y1="11" x2="14" y2="17"/>
-                          </svg>
-                        </button>
-                      </div>
-                      )}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <InputField
-                          label="Edad Actual"
-                          value={member.currentAge}
-                          onChange={(v) => handleMemberChange(i, 'currentAge', v)}
-                        />
-                        <InputField
-                          label="Salario Bruto Anual (€)"
-                          value={member.currentSalary}
-                          onChange={(v) => handleMemberChange(i, 'currentSalary', v)}
-                          hint="Con este dato y el aporte mensual se deducen los gastos fijos mensuales"
-                        />
-                        <InputField
-                          label="Años Cotizados"
-                          value={member.yearsContributed}
-                          onChange={(v) => handleMemberChange(i, 'yearsContributed', v)}
-                          hint="Años cotizando a la Seguridad Social"
-                        />
-                      </div>
-                    </div>
-                  ))}
+    <SimulatorLayout>
+      <FormContainer>
+        <FormSection title="Datos Personales" cols="single">
+          <div className="space-y-4">
+            {params.members.map((member, i) => (
+              <MemberCard key={i} index={i} totalMembers={params.members.length} onRemove={params.members.length > 1 ? () => removeMember(i) : undefined}>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <InputField
+                    label="Edad Actual"
+                    value={member.currentAge}
+                    onChange={(v) => handleMemberChange(i, 'currentAge', v)}
+                  />
+                  <InputField
+                    label="Salario Bruto Anual (€)"
+                    value={member.currentSalary}
+                    onChange={(v) => handleMemberChange(i, 'currentSalary', v)}
+                    hint="Con este dato y el aporte mensual se deducen los gastos fijos mensuales"
+                  />
+                  <InputField
+                    label="Años Cotizados"
+                    value={member.yearsContributed}
+                    onChange={(v) => handleMemberChange(i, 'yearsContributed', v)}
+                    hint="Años cotizando a la Seguridad Social"
+                  />
+                </div>
+              </MemberCard>
+            ))}
+            <AddMemberButton onClick={addMember} />
+          </div>
+          <InputField
+            label="Esperanza de Vida"
+            value={params.lifeExpectancy}
+            onChange={(v) => handleInputChange('lifeExpectancy', v)}
+            error={params.residencyAge > params.lifeExpectancy ? 'La edad de residencia no puede ser mayor que la esperanza de vida' : undefined}
+          />
+        </FormSection>
+
+        <FormSection title="Ahorros Iniciales" cols="double">
+          <InputField
+            label="Cuenta Remunerada Inicial (€)"
+            value={params.initialSavingsAccount}
+            onChange={(v) => handleInputChange('initialSavingsAccount', v)}
+          />
+          <InputField
+            label="Inversiones Iniciales (€)"
+            value={params.initialInvestments}
+            onChange={(v) => handleInputChange('initialInvestments', v)}
+          />
+          <InputField
+            label="Rentabilidad Cuenta (%)"
+            value={params.savingsAccountRate}
+            onChange={(v) => handleInputChange('savingsAccountRate', v)}
+            step="0.1"
+          />
+          <InputField
+            label="Rentabilidad Inversiones (%)"
+            value={params.investmentRate}
+            onChange={(v) => handleInputChange('investmentRate', v)}
+            step="0.1"
+          />
+        </FormSection>
+
+        <FormSection title="Ahorros Mensuales" cols="single">
+          <InputField
+            label="Aporte Total Mensual (€)"
+            value={params.monthlyContribution}
+            onChange={(v) => handleInputChange('monthlyContribution', v)}
+            hint="Importe destinado íntegramente a cuenta remunerada e inversiones."
+          />
+          <DistributionSlider
+            periods={distributionSliderPeriods}
+            sameForAll={sameDistributionForAll}
+            showSameForAllToggle={visiblePeriods.length > 1}
+            onToggleSameForAll={(checked) => {
+              setSameDistributionForAll(checked);
+              if (checked) {
+                const first = params.distributionPeriods[0] ?? 50;
+                setParams(prev => ({ ...prev, distributionPeriods: prev.distributionPeriods.map(() => first) }));
+              }
+            }}
+            onChange={handleDistributionChange}
+          />
+        </FormSection>
+
+        <FormSection title="Hipoteca y Préstamo" cols="double">
+          <InputField
+            label="Cuota Hipoteca Mensual (€)"
+            value={params.monthlyMortgagePayment}
+            onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
+            hint="Al terminar de pagar la hipoteca, la cuota se redirige al ahorro mensual."
+          />
+          <InputField
+            label="Duración Hipoteca (años)"
+            value={params.mortgageDurationYears}
+            onChange={(v) => handleInputChange('mortgageDurationYears', v)}
+            hint={params.mortgageDurationYears > 0 && params.members.length > 0 ? `Finaliza a los ${params.members[0].currentAge + params.mortgageDurationYears} años${params.members.length > 1 ? ' del integrante nº 1' : ''}.` : undefined}
+          />
+          <InputField
+            label="Préstamo Familiar Mensual (€)"
+            value={params.familyLoanMonthlyPayment}
+            onChange={(v) => handleInputChange('familyLoanMonthlyPayment', v)}
+            hint="0% interés · Al terminar de pagar el préstamo, la cuota se redirige al ahorro mensual."
+          />
+          <InputField
+            label="Duración Préstamo (años)"
+            value={params.familyLoanDurationYears}
+            onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
+            hint={params.familyLoanDurationYears > 0 && params.members.length > 0 ? `Finaliza a los ${params.members[0].currentAge + params.familyLoanDurationYears} años${params.members.length > 1 ? ' del integrante nº 1' : ''}.` : undefined}
+          />
+        </FormSection>
+
+        <FormSection title="Gastos en Jubilación" cols="double">
+          <InputField
+            label="Gastos Mensuales en Residencia (€)"
+            value={params.monthlyExpensesInResidency}
+            onChange={(v) => handleInputChange('monthlyExpensesInResidency', v)}
+            hint={"Gastos totales incluyendo a todos los integrantes"}
+          />
+          <InputField
+            label="Edad de Residencia"
+            value={params.residencyAge}
+            onChange={(v) => handleInputChange('residencyAge', v)}
+            error={params.residencyAge > params.lifeExpectancy ? 'La edad de residencia no puede ser mayor que la esperanza de vida' : undefined}
+          />
+          <SingleRangeSlider
+            title="Retiradas"
+            value={params.withdrawalPct}
+            min={0}
+            max={100}
+            valueLabel={`${params.withdrawalPct}% cuenta | ${100 - params.withdrawalPct}% inversiones`}
+            description="De dónde rescatar el dinero en etapas de ingresos insuficientes (p.ej. mientras no se percibe pensión o en época de residencia)"
+            footer="Cuenta ← → Inversiones"
+            fullWidth
+            onChange={(v) => handleInputChange('withdrawalPct', v)}
+          />
+        </FormSection>
+      </FormContainer>
+
+      {results.length > 0 && (
+        <ResultsContainer>
+          <ScenarioSection gridCols="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <ScenarioCard label="Ahorros Actuales" value={formatCurrency(params.initialSavingsAccount + params.initialInvestments)} />
+            <ScenarioCard label="Rentabilidades" value={`${params.savingsAccountRate}% cuenta · ${params.investmentRate}% inversiones`} />
+            <ScenarioCard label="Esperanza de Vida" value={`${params.lifeExpectancy} años`} />
+            <ScenarioCard
+              label="Gastos Fijos Mensuales"
+              value={`${formatCurrency(params.monthlyExpensesPreResidency)}/mes`}
+              hint={`${formatCurrency(Math.round(totalNet / 12))}/mes salario neto − ${formatCurrency(params.monthlyContribution)}/mes aportación − ${formatCurrency(params.monthlyMortgagePayment + params.familyLoanMonthlyPayment)}/mes deuda = ${formatCurrency(params.monthlyExpensesPreResidency)}/mes`}
+            />
+            {(params.monthlyMortgagePayment > 0 || params.familyLoanMonthlyPayment > 0) && (<>
+              {params.monthlyMortgagePayment > 0 ? (<>
+                <ScenarioCard label="Hipoteca" value={`${formatCurrency(params.monthlyMortgagePayment)}/mes`} />
+                <ScenarioCard label="Edad fin Hipoteca" value={`${params.mortgageEndAge} años`} />
+              </>) : (
+                <ScenarioCard label="Hipoteca" value="Inactiva" />
+              )}
+              {params.familyLoanMonthlyPayment > 0 ? (<>
+                <ScenarioCard label="Préstamo Familiar" value={`${formatCurrency(params.familyLoanMonthlyPayment)}/mes`} />
+                <ScenarioCard label="Edad fin Préstamo Familiar" value={`${params.familyLoanEndAge} años`} />
+              </>) : (
+                <ScenarioCard label="Préstamo Familiar" value="Inactivo" />
+              )}
+            </>)}
+            <ScenarioCard label="Edad de Residencia" value={`${params.residencyAge} años`} />
+            <ScenarioCard label="Gastos en Residencia" value={`${formatCurrency(params.monthlyExpensesInResidency)}/mes`} />
+          </ScenarioSection>
+
+          <ResultsSection>
+            <div className="space-y-4 sm:col-span-2 lg:col-span-4">
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Sin Pensión</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <ResultsCard
+                    label="Edad mínima de jubilación"
+                    value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithoutPension ? `${earliestWithoutPension.retirementAge} años` : 'No alcanzable')}
+                    icon="🧓"
+                  />
+                  {params.members.some(m => m.currentSalary > 0) && (
+                  <ResultsCard
+                    label={earliestWithoutPension ? `Ahorro necesario a los ${earliestWithoutPension.retirementAge} años` : 'Ahorro sin pensión'}
+                    value={earliestWithoutPension ? formatCurrency(earliestWithoutPension.requiredSavingsWithoutPension) : '—'}
+                    icon="💰"
+                  />
+                  )}
+                </div>
+                {earliestWithoutPension && params.members.length > 1 && (
+                  <div className="mt-2 text-xs text-gray-600">
+                    <p>Edades al jubilarse: {earliestWithoutPension.memberAges.map((age, i) => `M${i + 1}: ${age} años`).join(', ')}</p>
+                  </div>
+                )}
+              </div>
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                  Con Pensión
+                  {earliestWithPension && ` (${formatCurrency(earliestWithPension.memberPensions.reduce((a, b) => a + b, 0))}/mes${params.members.length > 1 ? ' total' : ''})`}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <ResultsCard
+                    label="Edad mínima de jubilación"
+                    value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithPension ? `${earliestWithPension.retirementAge} años` : 'No alcanzable')}
+                    icon="🧓"
+                  />
+                  {params.members.some(m => m.currentSalary > 0) && (
+                  <ResultsCard
+                    label={earliestWithPension ? `Ahorro necesario a los ${earliestWithPension.retirementAge} años` : 'Ahorro con pensión'}
+                    value={earliestWithPension ? formatCurrency(earliestWithPension.requiredSavingsWithPension) : '—'}
+                    icon="💰"
+                  />
+                  )}
+                </div>
+                {earliestWithPension && params.members.length > 1 && (
+                  <div className="mt-2 text-xs text-gray-600 space-y-1">
+                    <p>Edades al jubilarse: {earliestWithPension.memberAges.map((age, i) => `M${i + 1}: ${age} años`).join(', ')}</p>
+                    <p>Pensiones: {earliestWithPension.memberPensions.map((p, i) => `M${i + 1}: ${formatCurrency(p)}/mes`).join(', ')}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </ResultsSection>
+
+          {showDesglose && params.members.some(m => m.currentSalary > 0) && (
+            <CollapsibleSection
+              title="Desglose Anual"
+              isOpen={showDetail}
+              onToggle={() => setShowDetail(!showDetail)}
+              headerRight={bothAchievable ? (
+                <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5" onClick={(e) => e.stopPropagation()}>
                   <button
-                    type="button"
-                    onClick={addMember}
-                    className="cursor-pointer w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm font-semibold text-gray-600 hover:border-gray-400 hover:text-gray-800 transition-all"
+                    onClick={() => setViewMode('sin-pension')}
+                    className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded-md transition-all uppercase tracking-wider ${
+                      viewMode === 'sin-pension'
+                        ? 'bg-gray-900 text-white shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
                   >
-                    + Añadir integrante
+                    Sin pensión
+                  </button>
+                  <button
+                    onClick={() => setViewMode('con-pension')}
+                    className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded-md transition-all uppercase tracking-wider ${
+                      viewMode === 'con-pension'
+                        ? 'bg-gray-900 text-white shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    Con pensión
                   </button>
                 </div>
-                <InputField
-                  label="Esperanza de Vida"
-                  value={params.lifeExpectancy}
-                  onChange={(v) => handleInputChange('lifeExpectancy', v)}
-                  error={params.residencyAge > params.lifeExpectancy ? 'La edad de residencia no puede ser mayor que la esperanza de vida' : undefined}
-                />
-              </FormSection>
-
-              <FormSection title="Ahorros Iniciales" cols="double">
-                <InputField
-                  label="Cuenta Remunerada Inicial (€)"
-                  value={params.initialSavingsAccount}
-                  onChange={(v) => handleInputChange('initialSavingsAccount', v)}
-                />
-                <InputField
-                  label="Inversiones Iniciales (€)"
-                  value={params.initialInvestments}
-                  onChange={(v) => handleInputChange('initialInvestments', v)}
-                />
-                <InputField
-                  label="Rentabilidad Cuenta (%)"
-                  value={params.savingsAccountRate}
-                  onChange={(v) => handleInputChange('savingsAccountRate', v)}
-                  step="0.1"
-                />
-                <InputField
-                  label="Rentabilidad Inversiones (%)"
-                  value={params.investmentRate}
-                  onChange={(v) => handleInputChange('investmentRate', v)}
-                  step="0.1"
-                />
-              </FormSection>
-
-              <FormSection title="Ahorros Mensuales" cols="single">
-                <InputField
-                  label="Aporte Total Mensual (€)"
-                  value={params.monthlyContribution}
-                  onChange={(v) => handleInputChange('monthlyContribution', v)}
-                  hint="Importe destinado íntegramente a cuenta remunerada e inversiones."
-                />
-                <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Distribución por Tramos
-                    </p>
-                    {visiblePeriods.length > 1 && (
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={sameDistributionForAll}
-                          onChange={(e) => {
-                            setSameDistributionForAll(e.target.checked);
-                            if (e.target.checked) {
-                              const first = params.distributionPeriods[0] ?? 50;
-                              setParams(prev => ({ ...prev, distributionPeriods: prev.distributionPeriods.map(() => first) }));
-                            }
-                          }}
-                          className="w-3.5 h-3.5 text-gray-600 border-gray-300 rounded cursor-pointer"
-                        />
-                        <span className="text-xs font-medium text-gray-700">Igual en todos</span>
-                      </label>
-                    )}
-                  </div>
-                  {(sameDistributionForAll ? [visiblePeriods[0]].filter(Boolean) : visiblePeriods).map((period) => {
-                    const periodKey = sameDistributionForAll ? 'all' : `period-${period.startAge}-${period.endAge}`;
-                    return (
-                      <div key={periodKey} className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-medium text-gray-700">
-                            {sameDistributionForAll ? 'Todos los tramos' : `${period.startAge}–${period.endAge} años`}
-                          </p>
-                          <span className="text-xs font-semibold text-gray-700">
-                            {period.pct}% cuenta | {100 - period.pct}% inversiones
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          value={sameDistributionForAll ? (params.distributionPeriods[0] ?? 50) : period.pct}
-                          onChange={(e) => handleDistributionChange(period.index, Number(e.target.value))}
-                          className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-gray-700"
-                        />
-                      </div>
-                    );
-                  })}
-                  <p className="text-xs text-gray-500">Cuenta ← → Inversiones</p>
-                </div>
-              </FormSection>
-
-              <FormSection title="Hipoteca y Préstamo" cols="double">
-                <InputField
-                  label="Cuota Hipoteca Mensual (€)"
-                  value={params.monthlyMortgagePayment}
-                  onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
-                  hint="Al terminar de pagar la hipoteca, la cuota se redirige al ahorro mensual."
-                />
-                <InputField
-                  label="Duración Hipoteca (años)"
-                  value={params.mortgageDurationYears}
-                  onChange={(v) => handleInputChange('mortgageDurationYears', v)}
-                  hint={params.mortgageDurationYears > 0 && params.members.length > 0 ? `Finaliza a los ${params.members[0].currentAge + params.mortgageDurationYears} años${params.members.length > 1 ? ' del integrante nº 1' : ''}.` : undefined}
-                />
-                <InputField
-                  label="Préstamo Familiar Mensual (€)"
-                  value={params.familyLoanMonthlyPayment}
-                  onChange={(v) => handleInputChange('familyLoanMonthlyPayment', v)}
-                  hint="0% interés · Al terminar de pagar el préstamo, la cuota se redirige al ahorro mensual."
-                />
-                <InputField
-                  label="Duración Préstamo (años)"
-                  value={params.familyLoanDurationYears}
-                  onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
-                  hint={params.familyLoanDurationYears > 0 && params.members.length > 0 ? `Finaliza a los ${params.members[0].currentAge + params.familyLoanDurationYears} años${params.members.length > 1 ? ' del integrante nº 1' : ''}.` : undefined}
-                />
-              </FormSection>
-
-              <FormSection title="Gastos en Jubilación" cols="double">
-                <InputField
-                  label="Gastos Mensuales en Residencia (€)"
-                  value={params.monthlyExpensesInResidency}
-                  onChange={(v) => handleInputChange('monthlyExpensesInResidency', v)}
-                  hint={"Gastos totales incluyendo a todos los integrantes"}
-                />
-                <InputField
-                  label="Edad de Residencia"
-                  value={params.residencyAge}
-                  onChange={(v) => handleInputChange('residencyAge', v)}
-                  error={params.residencyAge > params.lifeExpectancy ? 'La edad de residencia no puede ser mayor que la esperanza de vida' : undefined}
-                />
-                <div className="md:col-span-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                      Retiradas
-                    </p>
-                    <span className="text-xs font-semibold text-gray-700">
-                      {params.withdrawalPct}% cuenta | {100 - params.withdrawalPct}% inversiones
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    value={params.withdrawalPct}
-                    onChange={(e) => handleInputChange('withdrawalPct', Number(e.target.value))}
-                    className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-gray-700"
-                  />
-                  <p className="text-xs text-gray-500">De dónde rescatar el dinero en etapas de ingresos insuficientes (p.ej. mientras no se percibe pensión o en época de residencia)</p>
-                  <p className="text-xs text-gray-500">Cuenta ← → Inversiones</p>
-                </div>
-              </FormSection>
-
-            </form>
-          </section>
-
-          <main>
-            {results.length > 0 && (
-              <div className="space-y-6 mb-4">
-                <section className="bg-white border border-gray-200 rounded-xl px-6 sm:px-8 pt-6 sm:pt-8 pb-0 shadow-sm overflow-hidden">
-                  {/* Datos del escenario */}
-                  <section className="space-y-3 -mx-6 sm:-mx-8 px-6 sm:px-8 first:pt-0 pb-5">
-                    <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">Datos del escenario</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 inline-flex items-center gap-1">
-                          Ahorros Actuales
-                        </p>
-                        <p className="text-xl font-bold text-gray-900">{formatCurrency(params.initialSavingsAccount + params.initialInvestments)}</p>
-                      </article>
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Rentabilidades</p>
-                        <p className="text-lg font-bold text-gray-900">
-                          {params.savingsAccountRate}% cuenta · {params.investmentRate}% inversiones
-                        </p>
-                      </article>
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Esperanza de Vida</p>
-                        <p className="text-lg font-bold text-gray-900">{params.lifeExpectancy} años</p>
-                      </article>
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1 inline-flex items-center gap-1">
-                          Gastos Fijos Mensuales
-                          <InfoTip text={`${formatCurrency(Math.round(totalNet / 12))}/mes salario neto − ${formatCurrency(params.monthlyContribution)}/mes aportación − ${formatCurrency(params.monthlyMortgagePayment + params.familyLoanMonthlyPayment)}/mes deuda = ${formatCurrency(params.monthlyExpensesPreResidency)}/mes`}>ℹ️</InfoTip>
-                        </p>
-                        <p className="text-lg font-bold text-gray-900">{formatCurrency(params.monthlyExpensesPreResidency)}/mes</p>
-                      </article>
-                      {(params.monthlyMortgagePayment > 0 || params.familyLoanMonthlyPayment > 0) && (<>
-                      {params.monthlyMortgagePayment > 0 ? (<>
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Hipoteca</p>
-                        <p className="text-lg font-bold text-gray-900">{formatCurrency(params.monthlyMortgagePayment)}/mes</p>
-                      </article>
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Edad fin Hipoteca</p>
-                        <p className="text-lg font-bold text-gray-900">{params.mortgageEndAge} años</p>
-                      </article>
-                      </>) : (
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Hipoteca</p>
-                        <p className="text-lg font-bold text-gray-900">Inactiva</p>
-                      </article>
+              ) : (
+                <span className="px-3 py-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  {viewMode === 'con-pension' ? 'Con pensión' : 'Sin pensión'}
+                </span>
+              )}
+            >
+              {chartData.length > 0 && selectedEarliest && (
+                <div className="px-6 sm:px-8 pt-5 pb-6 border-b border-gray-200">
+                  <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">
+                    Camino del ahorro desde los {selectedEarliest.retirementAge} años ({viewMode === 'con-pension' ? 'con pensión' : 'sin pensión'})
+                  </p>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="age"
+                        tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                        tickFormatter={(v: number) => `${v} años`}
+                        stroke="#d1d5db"
+                        type="number"
+                        domain={['dataMin', 'dataMax']}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                        tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k €`}
+                        stroke="#d1d5db"
+                      />
+                       <RechartsTooltip content={<ChartTooltip renderContent={(payload) => {
+                         const age = (payload[0]?.payload?.age as number) ?? NaN;
+                         return (<>
+                           <p style={{ fontWeight: 700, marginBottom: 4, color: '#111827' }}>{age} años</p>
+                           {payload.map((entry, i) => (
+                             <p key={i} style={{ color: entry.color, marginBottom: i < payload.length - 1 ? 2 : 0 }}>
+                               {entry.dataKey === 'total' ? 'Total: ' : 'Mínimo: '}{formatCurrency(entry.value)}
+                             </p>
+                           ))}
+                         </>);
+                       }} />} />
+                      <Legend wrapperStyle={{ fontFamily: 'Heebo, sans-serif', fontSize: '12px' }} />
+                      <Line type="monotone" dataKey="total" name="Total ahorrado" stroke="#111827" strokeWidth={2} dot={false} />
+                      {minimumPath.length > 0 && (
+                        <Line type="monotone" dataKey="minimumTotal" name="Ahorro mínimo" stroke="#9ca3af" strokeWidth={2} strokeDasharray="6 3" dot={false} />
                       )}
-                      {params.familyLoanMonthlyPayment > 0 ? (<>
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Familiar</p>
-                        <p className="text-lg font-bold text-gray-900">{formatCurrency(params.familyLoanMonthlyPayment)}/mes</p>
-                      </article>
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Edad fin Préstamo Familiar</p>
-                        <p className="text-lg font-bold text-gray-900">{params.familyLoanEndAge} años</p>
-                      </article>
-                      </>) : (
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Préstamo Familiar</p>
-                        <p className="text-lg font-bold text-gray-900">Inactivo</p>
-                      </article>
-                      )}
-                      </>)}
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Edad de Residencia</p>
-                        <p className="text-lg font-bold text-gray-900">{params.residencyAge} años</p>
-                      </article>
-                      <article className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex flex-col justify-center">
-                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1">Gastos en Residencia</p>
-                        <p className="text-lg font-bold text-gray-900">{formatCurrency(params.monthlyExpensesInResidency)}/mes</p>
-                      </article>
-                    </div>
-                  </section>
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
 
-                  {/* Resumen de resultados */}
-                  <section className="space-y-3 -mx-6 sm:-mx-8 px-6 sm:px-8 pt-5 pb-5 border-t border-gray-200">
-                    <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider mb-3">Resultados</h3>
-                    <div className="space-y-4">
-                      <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Sin Pensión</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <ResultCard
-                            label="Edad mínima de jubilación"
-                            value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithoutPension ? `${earliestWithoutPension.retirementAge} años` : 'No alcanzable')}
-                            icon="🧓"
-                          />
-                          {params.members.some(m => m.currentSalary > 0) && (
-                          <ResultCard
-                            label={earliestWithoutPension ? `Ahorro necesario a los ${earliestWithoutPension.retirementAge} años` : 'Ahorro sin pensión'}
-                            value={earliestWithoutPension ? formatCurrency(earliestWithoutPension.requiredSavingsWithoutPension) : '—'}
-                            icon="💰"
-                          />
-                          )}
-                        </div>
-                        {earliestWithoutPension && params.members.length > 1 && (
-                          <div className="mt-2 text-xs text-gray-600">
-                            <p>Edades al jubilarse: {earliestWithoutPension.memberAges.map((age, i) => `M${i + 1}: ${age} años`).join(', ')}</p>
-                          </div>
+              <ScrollableTable
+                columns={[
+                  { title: 'Edad', align: 'left' },
+                  ...(viewMode === 'con-pension' ? [{ title: 'Pensión Est.', align: 'right' as const }] : []),
+                  { title: 'Necesario', align: 'right' },
+                  { title: 'Gastos', align: 'right' },
+                  { title: 'Cuenta', align: 'right' },
+                  { title: 'Inversiones', align: 'right' },
+                  { title: 'Total', align: 'right' },
+                  { title: 'A cuenta', align: 'right', muted: true },
+                  { title: 'A inversiones', align: 'right', muted: true },
+                  { title: 'Impuestos', align: 'right' },
+                ]}
+                rows={evolvedResults.map((r) => [
+                  {
+                    content: (
+                      <span className="inline-flex items-center gap-1.5">
+                        {r.age - 1}-{r.age}
+                        {r.esJubilacion && (
+                          <Tooltip text="Comienzo jubilación">
+                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold leading-none">J</span>
+                          </Tooltip>
                         )}
-                      </div>
-                      <div>
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                          Con Pensión
-                          {earliestWithPension && ` (${formatCurrency(earliestWithPension.memberPensions.reduce((a, b) => a + b, 0))}/mes${params.members.length > 1 ? ' total' : ''})`}
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <ResultCard
-                            label="Edad mínima de jubilación"
-                            value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithPension ? `${earliestWithPension.retirementAge} años` : 'No alcanzable')}
-                            icon="🧓"
-                          />
-                          {params.members.some(m => m.currentSalary > 0) && (
-                          <ResultCard
-                            label={earliestWithPension ? `Ahorro necesario a los ${earliestWithPension.retirementAge} años` : 'Ahorro con pensión'}
-                            value={earliestWithPension ? formatCurrency(earliestWithPension.requiredSavingsWithPension) : '—'}
-                            icon="💰"
-                          />
-                          )}
-                        </div>
-                        {earliestWithPension && params.members.length > 1 && (
-                          <div className="mt-2 text-xs text-gray-600 space-y-1">
-                            <p>Edades al jubilarse: {earliestWithPension.memberAges.map((age, i) => `M${i + 1}: ${age} años`).join(', ')}</p>
-                            <p>Pensiones: {earliestWithPension.memberPensions.map((p, i) => `M${i + 1}: ${formatCurrency(p)}/mes`).join(', ')}</p>
-                          </div>
+                        {viewMode === 'con-pension' && selectedEarliest && params.members.length === 1 && r.pensionUsada > 0 && r.age > 0 && (() => { const idx = evolvedResults.indexOf(r); return idx >= 2 && evolvedResults[idx - 2].pensionUsada === 0 && evolvedResults[idx - 1].pensionUsada > 0; })() && (
+                          <Tooltip text={`Pensión: ${formatCurrency(r.monthlyPension)}/mes`}>
+                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold leading-none">P</span>
+                          </Tooltip>
                         )}
-                      </div>
-                    </div>
-                  </section>
-
-                  {/* Ahorro necesario según edad de jubilación */}
-                  {showDesglose && params.members.some(m => m.currentSalary > 0) && (
-                  <section className="-mx-6 sm:-mx-8 border-t border-gray-200">
-                    <button
-                      onClick={() => setShowDetail(!showDetail)}
-                      className="py-4 w-full px-6 sm:px-8 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-200"
-                    >
-                      <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">
-                        Desglose Anual
-                      </h3>
-                      <div className="flex items-center gap-3">
-                        {bothAchievable ? (
-                        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => setViewMode('sin-pension')}
-                            className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded-md transition-all uppercase tracking-wider ${
-                              viewMode === 'sin-pension'
-                                ? 'bg-gray-900 text-white shadow-sm'
-                                : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                          >
-                            Sin pensión
-                          </button>
-                          <button
-                            onClick={() => setViewMode('con-pension')}
-                            className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded-md transition-all uppercase tracking-wider ${
-                              viewMode === 'con-pension'
-                                ? 'bg-gray-900 text-white shadow-sm'
-                                : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                          >
-                            Con pensión
-                          </button>
-                        </div>
-                        ) : (
-                          <span className="px-3 py-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            {viewMode === 'con-pension' ? 'Con pensión' : 'Sin pensión'}
-                          </span>
+                        {viewMode === 'con-pension' && selectedEarliest && params.members.length > 1 && buildPensionSchedule(params.members, selectedEarliest.retirementAge).map((p, i) => {
+                          const startAge = selectedEarliest.retirementAge + p.startOffset;
+                          if (r.age !== startAge + 1) return null;
+                          return (
+                            <Tooltip key={`p-${i}`} text={`Pensión M${i + 1}: ${formatCurrency(p.monthlyAmount)}/mes`}>
+                              <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold leading-none">P</span>
+                            </Tooltip>
+                          );
+                        })}
+                        {r.finHipoteca && (
+                          <Tooltip text="Hipoteca pagada">
+                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold leading-none">H</span>
+                          </Tooltip>
                         )}
-                        <svg className={`cursor-pointer w-4 h-4 text-gray-600 transition-transform flex-shrink-0 ${showDetail ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-                        </svg>
-                      </div>
-                    </button>
-
-                    {showDetail && chartData.length > 0 && selectedEarliest && (
-                      <div className="px-6 sm:px-8 pt-5 pb-6 border-b border-gray-200">
-                        <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">
-                          Camino del ahorro desde los {selectedEarliest.retirementAge} años ({viewMode === 'con-pension' ? 'con pensión' : 'sin pensión'})
-                        </p>
-                        <ResponsiveContainer width="100%" height={280}>
-                          <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                            <XAxis
-                              dataKey="age"
-                              tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
-                              tickFormatter={(v: number) => `${v} años`}
-                              stroke="#d1d5db"
-                              type="number"
-                              domain={['dataMin', 'dataMax']}
-                            />
-                            <YAxis
-                              tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
-                              tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k €`}
-                              stroke="#d1d5db"
-                            />
-                            <Tooltip content={<ChartTooltip />} />
-                            <Legend wrapperStyle={{ fontFamily: 'Heebo, sans-serif', fontSize: '12px' }} />
-                            <Line type="monotone" dataKey="total" name="Total ahorrado" stroke="#111827" strokeWidth={2} dot={false} />
-                            {minimumPath.length > 0 && (
-                              <Line type="monotone" dataKey="minimumTotal" name="Ahorro mínimo" stroke="#9ca3af" strokeWidth={2} strokeDasharray="6 3" dot={false} />
-                            )}
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                    )}
-
-                    {showDetail && (
-                      <>
-                      <div className="relative">
-                        <div className="overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain">
-                          <table className="w-full min-w-full mb-3">
-                            <thead>
-                              <tr className="border-b border-gray-200 bg-gray-50">
-                                <th className="px-6 sm:px-8 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Edad</th>
-                                {viewMode === 'con-pension' && (
-                                  <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Pensión Est.</th>
-                                )}
-                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Necesario</th>
-                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Gastos</th>
-                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Cuenta</th>
-                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Inversiones</th>
-                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Total</th>
-                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">A cuenta</th>
-                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">A inversiones</th>
-                                <th className="px-6 sm:px-8 py-3 text-right text-xs font-bold text-gray-900 uppercase tracking-wider sticky top-0 bg-gray-50 z-10">Impuestos</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                              {evolvedResults.map((r) => (
-                                <tr
-                                  key={r.age}
-                                  className="hover:bg-gray-50 transition-colors"
-                                >
-                                  <td className="px-6 sm:px-8 py-2.5 text-sm text-gray-900">
-                                    <span className="inline-flex items-center gap-1.5">
-                                      {r.age - 1}-{r.age}
-                                      {r.esJubilacion && (
-                                        <InfoTip text="Comienzo jubilación">
-                                          <span className="flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold leading-none">J</span>
-                                        </InfoTip>
-                                      )}
-                                      {viewMode === 'con-pension' && selectedEarliest && params.members.length === 1 && r.pensionUsada > 0 && r.age > 0 && (() => { const idx = evolvedResults.indexOf(r); return idx >= 2 && evolvedResults[idx - 2].pensionUsada === 0 && evolvedResults[idx - 1].pensionUsada > 0; })() && (
-                                        <InfoTip text={`Pensión: ${formatCurrency(r.monthlyPension)}/mes`}>
-                                          <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold leading-none">P</span>
-                                        </InfoTip>
-                                      )}
-                                      {viewMode === 'con-pension' && selectedEarliest && params.members.length > 1 && buildPensionSchedule(params.members, selectedEarliest.retirementAge).map((p, i) => {
-                                        const startAge = selectedEarliest.retirementAge + p.startOffset;
-                                        if (r.age !== startAge + 1) return null;
-                                        return (
-                                          <InfoTip key={`p-${i}`} text={`Pensión M${i + 1}: ${formatCurrency(p.monthlyAmount)}/mes`}>
-                                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold leading-none">P</span>
-                                          </InfoTip>
-                                        );
-                                      })}
-                                      {r.finHipoteca && (
-                                        <InfoTip text="Hipoteca pagada">
-                                          <span className="flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold leading-none">H</span>
-                                        </InfoTip>
-                                      )}
-                                      {r.finPrestamo && (
-                                        <InfoTip text="Préstamo familiar pagado">
-                                          <span className="flex items-center justify-center w-4 h-4 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold leading-none">F</span>
-                                        </InfoTip>
-                                      )}
-                                      {r.memberAges.map((ma, i) => {
-                                        if (ma !== 86) return null;
-                                        return (
-                                          <InfoTip key={`r-${i}`} text={params.members.length > 1 ? `Residencia M${i + 1}` : 'Entrada en residencia'}>
-                                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold leading-none">R</span>
-                                          </InfoTip>
-                                        );
-                                      })}
-                                    </span>
-                                  </td>
-                                  {viewMode === 'con-pension' && (
-                                    <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700 whitespace-nowrap">{formatCurrency(r.monthlyPension).replace('€', '€/mes')}</td>
-                                  )}
-                                  <td className={`px-6 sm:px-8 py-2.5 text-right text-sm ${r.requiredSavings < 0 ? 'text-gray-400' : r.achievable ? 'text-emerald-600' : 'text-red-600'}`}>
-                                    {r.requiredSavings > 0
-                                      ? formatCurrency(r.requiredSavings)
-                                      : r.age === params.lifeExpectancy
-                                        ? <InfoTip text={`Los ahorros necesarios a los ${params.lifeExpectancy} años son nulos porque aquí termina la esperanza de vida`}>—</InfoTip>
-                                        : '—'}
-                                  </td>
-                                  <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-600 whitespace-nowrap">
-                                    {formatCurrency(r.gastosMensuales).replace('€', '€/mes')}
-                                  </td>
-                                  <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">
-                                    {formatCurrency(r.cuenta)}
-                                  </td>
-                                  <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-gray-700">
-                                    {formatCurrency(r.inversiones)}
-                                  </td>
-                                  <td className="px-6 sm:px-8 py-2.5 text-right text-sm font-semibold text-gray-900">
-                                    {formatCurrency(r.total)}
-                                  </td>
-                                  <td className={`px-6 sm:px-8 py-2.5 text-right text-sm ${r.aCuenta < 0 ? 'text-red-600' : r.aCuenta > 0 ? 'text-gray-600' : 'text-gray-400'}`}>
-                                    {formatCurrency(r.aCuenta)}
-                                  </td>
-                                  <td className={`px-6 sm:px-8 py-2.5 text-right text-sm ${r.aInversiones < 0 ? 'text-red-600' : r.aInversiones > 0 ? 'text-gray-600' : 'text-gray-400'}`}>
-                                    {formatCurrency(r.aInversiones)}
-                                  </td>
-                                  <td className="px-6 sm:px-8 py-2.5 text-right text-sm text-red-600">
-                                    {r.impuestos > 0 ? formatCurrency(r.impuestos) : '—'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white from-50% to-transparent pointer-events-none" />
-                      </div>
-                      <div className="px-6 sm:px-8 py-3 bg-blue-50 border-t border-blue-200">
-                        <p className="text-xs text-blue-800 leading-relaxed">
-                          ℹ️ La columna <strong>Necesario</strong> indica el ahorro necesario al <strong>final</strong> de ese año para poder jubilarse. La columna <strong>Total</strong> refleja el ahorro total al <strong>final</strong> del año, tras las aportaciones, inversiones o retiradas realizadas durante el mismo.
-                          Si el <strong>Total</strong> supera lo <strong>Necesario</strong>, significa que se puede comenzar la jubilación al completar ese año.
-                          {params.members.length > 1 && (
-                            <> La columna <strong>Edad</strong> corresponde a la edad del <strong>Integrante 1</strong>. El resto de integrantes se jubilan el mismo año con edades distintas (reflejadas en el resumen).</>
-                          )}
-                        </p>
-                      </div>
-                      <div className="px-6 sm:px-8 py-3 bg-amber-50 border-t border-amber-200">
-                        <p className="text-xs text-amber-800 leading-relaxed">
-                          <strong>⚠️ Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
-                          Los intereses de la cuenta remunerada ya están descontados anualmente.
-                          Las plusvalías de las inversiones solo tributan al vender; en la columna <strong>Impuestos</strong> se refleja tanto el impuesto anual sobre intereses como el impuesto sobre plusvalías al retirar durante la jubilación.
-                        </p>
-                      </div>
-                      </>
-                    )}
-                  </section>
-                    )}
-                </section>
-              </div>
-            )}
-          </main>
-        </div>
-      </div>
-    </div>
+                        {r.finPrestamo && (
+                          <Tooltip text="Préstamo familiar pagado">
+                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold leading-none">F</span>
+                          </Tooltip>
+                        )}
+                        {r.memberAges.map((ma, i) => {
+                          if (ma !== 86) return null;
+                          return (
+                            <Tooltip key={`r-${i}`} text={params.members.length > 1 ? `Residencia M${i + 1}` : 'Entrada en residencia'}>
+                              <span className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold leading-none">R</span>
+                            </Tooltip>
+                          );
+                        })}
+                      </span>
+                    ),
+                    className: 'text-gray-900',
+                  },
+                  ...(viewMode === 'con-pension'
+                    ? [{ content: formatCurrency(r.monthlyPension).replace('€', '€/mes'), className: 'whitespace-nowrap' }]
+                    : []),
+                  {
+                    content: r.requiredSavings > 0
+                      ? formatCurrency(r.requiredSavings)
+                      : r.age === params.lifeExpectancy
+                        ? <Tooltip text={`Los ahorros necesarios a los ${params.lifeExpectancy} años son nulos porque aquí termina la esperanza de vida`}>—</Tooltip>
+                        : '—',
+                    className: r.requiredSavings < 0 ? 'text-gray-400' : r.achievable ? 'text-emerald-600' : 'text-red-600',
+                  },
+                  { content: formatCurrency(r.gastosMensuales).replace('€', '€/mes'), className: 'text-gray-600 whitespace-nowrap' },
+                  formatCurrency(r.cuenta),
+                  formatCurrency(r.inversiones),
+                  { content: formatCurrency(r.total), className: 'font-semibold text-gray-900' },
+                  { content: formatCurrency(r.aCuenta), className: r.aCuenta < 0 ? 'text-red-600' : r.aCuenta > 0 ? 'text-gray-600' : 'text-gray-400' },
+                  { content: formatCurrency(r.aInversiones), className: r.aInversiones < 0 ? 'text-red-600' : r.aInversiones > 0 ? 'text-gray-600' : 'text-gray-400' },
+                  { content: r.impuestos > 0 ? formatCurrency(r.impuestos) : '—', className: 'text-red-600' },
+                ])}
+              />
+              <NoteBanner variant="info">
+                ℹ️ La columna <strong>Necesario</strong> indica el ahorro necesario al <strong>final</strong> de ese año para poder jubilarse. La columna <strong>Total</strong> refleja el ahorro total al <strong>final</strong> del año, tras las aportaciones, inversiones o retiradas realizadas durante el mismo.
+                Si el <strong>Total</strong> supera lo <strong>Necesario</strong>, significa que se puede comenzar la jubilación al completar ese año.
+                {params.members.length > 1 && (
+                  <> La columna <strong>Edad</strong> corresponde a la edad del <strong>Integrante 1</strong>. El resto de integrantes se jubilan el mismo año con edades distintas (reflejadas en el resumen).</>
+                )}
+              </NoteBanner>
+              <NoteBanner variant="warning">
+                <strong>⚠️ Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
+                Los intereses de la cuenta remunerada ya están descontados anualmente.
+                Las plusvalías de las inversiones solo tributan al vender; en la columna <strong>Impuestos</strong> se refleja tanto el impuesto anual sobre intereses como el impuesto sobre plusvalías al retirar durante la jubilación.
+              </NoteBanner>
+            </CollapsibleSection>
+          )}
+        </ResultsContainer>
+      )}
+    </SimulatorLayout>
   );
 }
