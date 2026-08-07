@@ -537,16 +537,16 @@ export default function RetirementSimulator() {
       const numM = params.members.length;
       const refCA = params.members[0].currentAge;
       const rawExpenses = params.members.reduce((sum, m) => {
-        const ma = m.currentAge + (age - refCA);
+        const ma = m.currentAge + (age - 1 - refCA);
         return sum + (ma >= params.residencyAge
           ? params.monthlyExpensesInResidency / numM
           : params.monthlyExpensesPreResidency / numM);
       }, 0);
       let gastosMensuales = Math.round(rawExpenses * 100) / 100;
-      if (age < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
+      if (age - 1 < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
         gastosMensuales += params.monthlyMortgagePayment;
       }
-      if (age < params.familyLoanEndAge && params.familyLoanMonthlyPayment > 0) {
+      if (age - 1 < params.familyLoanEndAge && params.familyLoanMonthlyPayment > 0) {
         gastosMensuales += params.familyLoanMonthlyPayment;
       }
 
@@ -941,7 +941,7 @@ export default function RetirementSimulator() {
                           </Tooltip>
                         )}
                         {r.memberAges.map((ma, i) => {
-                          if (ma !== 86) return null;
+                          if (ma !== params.residencyAge + 1) return null;
                           return (
                             <Tooltip key={`r-${i}`} text={params.members.length > 1 ? `Residencia M${i + 1}` : 'Entrada en residencia'}>
                               <span className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold leading-none">R</span>
