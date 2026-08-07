@@ -33,6 +33,7 @@ export default function AffordabilitySimulator() {
     familyLoanAmount: 0,
     familyLoanDurationYears: 0,
     debtToIncomeRatio: 30,
+    ltvRatio: 80,
   });
 
   const hasFamilyLoan = params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0;
@@ -167,6 +168,19 @@ export default function AffordabilitySimulator() {
         </FormSection>
 
         <FormSection title="Financiación" cols="double">
+          <SingleRangeSlider
+            title="Financiación Bancaria"
+            value={params.ltvRatio ?? 80}
+            min={10}
+            max={100}
+            minLabel="10%"
+            maxLabel="100%"
+            valueLabel={`${params.ltvRatio ?? 80}%`}
+            description="% del precio que financia el banco (habitual 80%, puede llegar al 100%)"
+            fullWidth
+            headerClassName="mb-0"
+            onChange={(v) => handleInputChange('ltvRatio', v)}
+          />
           <InputField
             label="TAE Hipoteca (%)"
             value={params.mortgageAPR}
@@ -232,9 +246,9 @@ export default function AffordabilitySimulator() {
         </ResultsSection>
         <NoteCard variant="warning">
           <strong>⚠️ Nota:</strong> {hasSalary && result.constraintType === 'income'
-            ? `El límite son tus ingresos: la hipoteca máxima (${formatCurrency(result.maxMortgageByIncome)}) y todo tu capital (${formatCurrency(result.availableForHouse)}) determinan el precio máximo.`
+            ? `La limitación está en tus ingresos: la hipoteca máxima que puedes conseguir está limitada por la cuota que eres capaz de pagar mensualmente. La hipoteca máxima (${formatCurrency(result.maxMortgageByIncome)}) y todo tu capital (${formatCurrency(result.availableForHouse)}) determinan el precio máximo de la casa.`
             : hasSalary
-              ? `El límite es tu capital: los bancos prestan hasta el 80% y los ${formatCurrency(result.availableForHouse)} disponibles cubren justo el 20% de entrada + impuestos (${params.isNewBuild ? '11,2%' : '6,5%'}) + comisión inmobiliaria (${params.realEstatePercentage}%) + reforma.`
+              ? `La limitación está en tu capital: la hipoteca máxima que puedes conseguir está limitada por los ahorros que tienes para la entrada. El banco te prestará hasta el ${params.ltvRatio ?? 80}% y los ${formatCurrency(result.availableForHouse)} disponibles cubren justo el ${100 - (params.ltvRatio ?? 80)}% de entrada + impuestos (${params.isNewBuild ? '11,2%' : '6,5%'}) + comisión inmobiliaria (${params.realEstatePercentage}%) + reforma.`
               : 'Introduce al menos un salario para obtener un desglose detallado.'
           } {hasSalary && `El ratio de esfuerzo (${params.debtToIncomeRatio}%) se aplica sobre el ingreso neto mensual${params.members.length > 1 ? ' conjunto' : ''} de ${formatCurrency(result.totalNetMonthlyIncome)}.`}
         </NoteCard>

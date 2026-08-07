@@ -25,6 +25,7 @@ export interface AffordabilityParams {
   familyLoanAmount: number;
   familyLoanDurationYears: number;
   debtToIncomeRatio: number;
+  ltvRatio: number;
 }
 
 export type ConstraintType = 'equity' | 'income';
@@ -71,7 +72,9 @@ export function calculateAffordability(params: AffordabilityParams): Affordabili
   const taxPct = params.isNewBuild ? 11.2 : 6.5;
   const taxPctDecimal = taxPct / 100;
   const realEstatePctDecimal = params.realEstatePercentage / 100;
-  const code_totalPct = 0.2 + taxPctDecimal + realEstatePctDecimal;
+  const ltv = Math.min(1, Math.max(0, (params.ltvRatio ?? 80) / 100));
+  const equityPct = 1 - ltv;
+  const code_totalPct = equityPct + taxPctDecimal + realEstatePctDecimal;
   const myPct = taxPctDecimal + realEstatePctDecimal;
 
   const netEquity = availableForHouse - params.reformFurnitureCosts;
@@ -83,23 +86,23 @@ export function calculateAffordability(params: AffordabilityParams): Affordabili
     maxBaseHousePrice = 0;
     maxMortgageAmount = 0;
   } else {
-    const transition = maxMortgageByIncome * code_totalPct / 0.8;
+    const transition = maxMortgageByIncome * code_totalPct / ltv;
 
     if (netEquity > transition) {
       // Income constrained: all equity deployed, mortgage capped by income
       maxBaseHousePrice = (maxMortgageByIncome + netEquity) / (1 + myPct);
       maxMortgageAmount = maxMortgageByIncome;
     } else {
-      // Equity (LTV) constrained: mortgage capped at 80% LTV
+      // Equity (LTV) constrained: mortgage capped at the configured LTV
       maxBaseHousePrice = netEquity / code_totalPct;
-      maxMortgageAmount = maxBaseHousePrice * 0.8;
+      maxMortgageAmount = maxBaseHousePrice * ltv;
     }
 
     maxBaseHousePrice = Math.round(maxBaseHousePrice * 100) / 100;
     maxMortgageAmount = Math.round(maxMortgageAmount * 100) / 100;
   }
 
-  const downPayment = Math.round(maxBaseHousePrice * 0.2 * 100) / 100;
+  const downPayment = Math.round(maxBaseHousePrice * equityPct * 100) / 100;
   const estimatedRealEstateFees = Math.round((maxBaseHousePrice * realEstatePctDecimal) * 100) / 100;
   const estimatedTaxes = Math.round((maxBaseHousePrice * taxPctDecimal) * 100) / 100;
   const totalDownPayment = Math.round(Math.max(0, maxBaseHousePrice - maxMortgageAmount) * 100) / 100;
@@ -116,7 +119,7 @@ export function calculateAffordability(params: AffordabilityParams): Affordabili
     ? Math.round((maxMortgageMonthlyPayment / totalNetMonthlyIncome) * 100 * 100) / 100
     : 0;
 
-  const constraintType: ConstraintType = netEquity > 0 && maxMortgageByIncome > 0 && netEquity > maxMortgageByIncome * code_totalPct / 0.8
+  const constraintType: ConstraintType = netEquity > 0 && maxMortgageByIncome > 0 && netEquity > maxMortgageByIncome * code_totalPct / ltv
     ? 'income'
     : 'equity';
 

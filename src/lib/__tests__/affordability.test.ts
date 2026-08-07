@@ -16,6 +16,7 @@ const defaultParams: AffordabilityParams = {
   familyLoanAmount: 0,
   familyLoanDurationYears: 0,
   debtToIncomeRatio: 30,
+  ltvRatio: 80,
 };
 
 describe('calculateAffordability', () => {
@@ -85,6 +86,13 @@ describe('calculateAffordability', () => {
       expect(result.ltvRatio).toBeGreaterThan(0);
       expect(result.ltvRatio).toBeLessThanOrEqual(100);
     }
+  });
+
+  it('allows configuring the bank financing percentage (LTV)', () => {
+    const ltv80 = calculateAffordability(defaultParams);
+    const ltv100 = calculateAffordability({ ...defaultParams, ltvRatio: 100 });
+    expect(ltv100.maxMortgageAmount).toBeGreaterThan(ltv80.maxMortgageAmount);
+    expect(ltv100.ltvRatio).toBeGreaterThan(ltv80.ltvRatio);
   });
 
   it('determines constraint type', () => {
