@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 type Listener = () => void;
 
@@ -71,13 +71,14 @@ export function subscribe(fn: Listener) {
 }
 
 export function useLocalStorage<T>(key: string, initial: T | (() => T)): [T, (value: T | ((prev: T) => T)) => void] {
-  const [stored, setStored] = useState<T>(() => {
+  const [stored, setStored] = useState<T>(() => (initial instanceof Function ? initial() : initial));
+
+  useEffect(() => {
     try {
       const item = localStorage.getItem(key);
-      if (item !== null) return JSON.parse(item);
+      if (item !== null) setStored(JSON.parse(item));
     } catch {}
-    return initial instanceof Function ? initial() : initial;
-  });
+  }, [key]);
 
   const setValue = (value: T | ((prev: T) => T)) => {
     setStored(prev => {
