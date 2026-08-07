@@ -164,6 +164,15 @@ export default function SavingsSimulator() {
 
 
   const totalHouseExpenses = useMemo(() => calculateTotalHouseExpenses(params), [params]);
+
+  const totalCostHint = useMemo(() => {
+    if (params.baseCost <= 0) return 'Precio de compra de la vivienda. El gasto final suma impuestos, comisión inmobiliaria y reforma y muebles.';
+    const realEstateCost = params.baseCost * (params.realEstatePercentage / 100);
+    const taxCost = params.baseCost * (params.isNewBuild ? 0.112 : 0.065);
+    const reformFurniture = params.reformCosts + params.furnitureCosts;
+    return `El gasto final incluye: precio base (${formatCurrency(params.baseCost)}) + impuestos (${formatCurrency(taxCost)}) + inmobiliaria (${formatCurrency(realEstateCost)}) + reforma y muebles (${formatCurrency(reformFurniture)}) = ${formatCurrency(totalHouseExpenses)}`;
+  }, [params.baseCost, params.realEstatePercentage, params.isNewBuild, params.reformCosts, params.furnitureCosts, totalHouseExpenses]);
+  
   const mortgageGrantedAmount = useMemo(
     () =>
       params.baseCost > 0
@@ -593,7 +602,7 @@ export default function SavingsSimulator() {
             <ScenarioCard label="Ahorro Inicial Invertible" value={formatCurrency(result.initialAvailableForInvestment)} />
             <ScenarioCard label="Aporte Mensual" value={formatCurrency(params.monthlyContribution)} hint={monthlyHint} />
             {params.baseCost > 0 && (
-              <ScenarioCard label="Coste Casa" value={formatCurrency(result.totalHouseExpenses)} />
+              <ScenarioCard label="Coste Casa" value={formatCurrency(result.totalHouseExpenses)} hint={totalCostHint} />
             )}
             {(params.monthlyMortgagePayment > 0 || hasFamilyLoan) && (<>
               {params.monthlyMortgagePayment > 0 ? (<>
