@@ -2061,28 +2061,59 @@ function CategoryBreakdown({ categories }: { categories: CategoryTotal[] }) {
   );
 }
 
+function signedExpenseFormat(value: number, suffix = ''): ReactNode {
+  if (value > 0) {
+    return (
+      <span className="text-red-600 font-semibold">
+        -{formatCurrency(value)}
+        {suffix}
+      </span>
+    );
+  }
+  if (value < 0) {
+    return (
+      <span className="text-emerald-600 font-semibold">
+        +{formatCurrency(-value)}
+        {suffix}
+      </span>
+    );
+  }
+  return (
+    <span className="text-gray-500 font-semibold">
+      {formatCurrency(0)}
+      {suffix}
+    </span>
+  );
+}
+
 function LastMonthBreakdown({ categories }: { categories: CategoryTotal[] }) {
-  const spent = categories.filter(c => c.lastMonth > 0);
-  const total = spent.reduce((sum, c) => sum + c.lastMonth, 0);
-  if (spent.length === 0) return null;
+  const rows = categories.filter(c => c.lastMonth !== 0);
+  const total = rows.reduce((sum, c) => sum + c.lastMonth, 0);
+  const gross = rows.reduce((sum, c) => sum + (c.lastMonth > 0 ? c.lastMonth : 0), 0);
+  if (rows.length === 0) return null;
   return (
     <div>
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-8">
         Este mes por categoría
       </h4>
       <ul className="space-y-2">
-        {spent.map(c => (
-          <li key={c.category} className="flex items-center justify-between text-sm">
-            <span className="font-medium text-gray-800">{c.category}</span>
-            <span className="text-gray-600">
-              <span className="text-red-600 font-semibold">{formatCurrency(c.lastMonth)}</span>
-              {total > 0 && <span className="text-gray-400 ml-2">{(c.lastMonth / total) * 100 >= 0.05 ? `${((c.lastMonth / total) * 100).toFixed(1)}%` : '<0.1%'}</span>}
-            </span>
-          </li>
-        ))}
+        {rows.map(c => {
+          const pct = c.lastMonth > 0 && gross > 0 ? (c.lastMonth / gross) * 100 : undefined;
+          return (
+            <li key={c.category} className="flex items-center justify-between text-sm">
+              <span className="font-medium text-gray-800">{c.category}</span>
+              <span className="text-gray-600">
+                {signedExpenseFormat(c.lastMonth)}
+                {pct !== undefined && (
+                  <span className="text-gray-400 ml-2">{pct >= 0.05 ? `${pct.toFixed(1)}%` : '<0.1%'}</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
         <li className="flex items-center justify-between text-sm border-t border-gray-200 pt-2">
           <span className="font-semibold text-gray-800">Total este mes</span>
-          <span className="text-red-600 font-semibold">{formatCurrency(total)}</span>
+          {signedExpenseFormat(total)}
         </li>
       </ul>
     </div>
@@ -2091,28 +2122,34 @@ function LastMonthBreakdown({ categories }: { categories: CategoryTotal[] }) {
 
 function LastYearBreakdown({ avgByCategory }: { avgByCategory: Record<string, number> }) {
   const sorted = Object.entries(avgByCategory)
-    .filter(([, avg]) => avg > 0)
+    .filter(([, avg]) => avg !== 0)
     .sort((a, b) => b[1] - a[1]);
   if (sorted.length === 0) return null;
   const total = sorted.reduce((sum, [, avg]) => sum + avg, 0);
+  const gross = sorted.reduce((sum, [, avg]) => sum + (avg > 0 ? avg : 0), 0);
   return (
     <div>
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-8">
         Último año por categoría
       </h4>
       <ul className="space-y-2">
-        {sorted.map(([category, avg]) => (
-          <li key={category} className="flex items-center justify-between text-sm">
-            <span className="font-medium text-gray-800">{category}</span>
-            <span className="text-gray-600">
-              <span className="text-red-600 font-semibold">{formatCurrency(avg)}/mes</span>
-              {total > 0 && <span className="text-gray-400 ml-2">{(avg / total) * 100 >= 0.05 ? `${((avg / total) * 100).toFixed(1)}%` : '<0.1%'}</span>}
-            </span>
-          </li>
-        ))}
+        {sorted.map(([category, avg]) => {
+          const pct = avg > 0 && gross > 0 ? (avg / gross) * 100 : undefined;
+          return (
+            <li key={category} className="flex items-center justify-between text-sm">
+              <span className="font-medium text-gray-800">{category}</span>
+              <span className="text-gray-600">
+                {signedExpenseFormat(avg, '/mes')}
+                {pct !== undefined && (
+                  <span className="text-gray-400 ml-2">{pct >= 0.05 ? `${pct.toFixed(1)}%` : '<0.1%'}</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
         <li className="flex items-center justify-between text-sm border-t border-gray-200 pt-2">
           <span className="font-semibold text-gray-800">Total último año</span>
-          <span className="text-red-600 font-semibold">{formatCurrency(total)}/mes</span>
+          {signedExpenseFormat(total, '/mes')}
         </li>
       </ul>
     </div>
