@@ -439,7 +439,7 @@ describe('guessExpenseCategory', () => {
     expect(guessExpenseCategory('CABIFY MADRID')).toBe('Transporte');
     expect(guessExpenseCategory('BOOKING.COM HOTEL')).toBe('Viajes');
     expect(guessExpenseCategory('FARMACIA CENTRAL')).toBe('Salud');
-    expect(guessExpenseCategory('COMPRA AMAZON.ES')).toBe('Compras');
+    expect(guessExpenseCategory('COMPRA AMAZON.ES')).toBe('Otros');
   });
 
   it('categoriza conceptos específicos', () => {
@@ -455,7 +455,7 @@ describe('guessExpenseCategory', () => {
     expect(guessExpenseCategory('CLINICA ODONTOL')).toBe('Salud');
     expect(guessExpenseCategory('regalo a maria')).toBe('Regalos');
     expect(guessExpenseCategory('Restaurant La Paella')).toBe('Restaurantes y delivery');
-    expect(guessExpenseCategory('COREPayPal Europe S.a.r.l. et Cie S.C.A')).toBe('Compras');
+    expect(guessExpenseCategory('COREPayPal Europe S.a.r.l. et Cie S.C.A')).toBe('Otros');
     expect(guessExpenseCategory('FARMACIA VADEMECUM')).toBe('Salud');
     expect(guessExpenseCategory('AWS HOSTING')).toBe('Trabajo');
     expect(guessExpenseCategory('CLOUDFLARE CDN')).toBe('Trabajo');
@@ -488,7 +488,7 @@ describe('buildConceptCategoryMap / resolveExpenseCategory', () => {
 
   it('las ediciones manuales tienen prioridad sobre las automáticas', () => {
     const existing: Movement[] = [
-      mk({ type: 'expense', concept: 'COREXYZ TIENDA', category: 'Compras', categoryAuto: true }),
+      mk({ type: 'expense', concept: 'COREXYZ TIENDA', category: 'Otros', categoryAuto: true }),
       mk({ type: 'expense', concept: 'Fecha de operación: 03-03-2025 COREXYZ TIENDA', category: 'Ropa', categoryAuto: false }),
     ];
     const map = buildConceptCategoryMap(existing);

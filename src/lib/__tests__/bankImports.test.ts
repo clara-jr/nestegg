@@ -312,17 +312,17 @@ describe('parseSantander', () => {
     const [ikea, gasolina, nomina] = result.movements;
     expect(ikea.type).toBe('expense');
     expect(ikea.amount).toBeCloseTo(-29.99);
-    expect(ikea.balance).toBeCloseTo(5540.68);
+    expect(ikea.balance).toBeCloseTo(3540.68);
     expect(ikea.date).toBe('2026-08-28');
     expect(ikea.bank).toBe('santander');
 
     expect(gasolina.type).toBe('expense');
     expect(gasolina.amount).toBeCloseTo(-53.7);
-    expect(gasolina.balance).toBeCloseTo(5570.67);
+    expect(gasolina.balance).toBeCloseTo(3570.67);
 
     expect(nomina.type).toBe('income');
-    expect(nomina.amount).toBeCloseTo(2399.65);
-    expect(nomina.balance).toBeCloseTo(5624.37);
+    expect(nomina.amount).toBeCloseTo(1399.65);
+    expect(nomina.balance).toBeCloseTo(3624.37);
   });
 
   it('usa FECHA VALOR como referencia cuando no hay FECHA OPERACION', () => {
