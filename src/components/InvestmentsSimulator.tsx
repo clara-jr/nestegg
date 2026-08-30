@@ -1593,16 +1593,24 @@ function IncomeSection({
   const savingsAvg = income.averageMonthly - expAvg;
   const savingsCurrent = income.currentMonth - expCurrent;
   const savingsPrev = income.previousMonth - expPrev;
-  const chartData = monthlyChartData(monthlyExpenseSlice(income.monthly));
+  const expByMonth = useMemo(() => new Map(expMonthly.map(p => [p.month, p.total])), [expMonthly]);
+  const chartData = useMemo(
+    () =>
+      monthlyChartData(monthlyExpenseSlice(income.monthly)).map(p => ({
+        ...p,
+        expenses: expByMonth.get(p.month) ?? 0,
+        savings: p.total - (expByMonth.get(p.month) ?? 0),
+      })),
+    [income.monthly, expByMonth]
+  );
 
   const { incomeMedian, savingsMedian } = useMemo(() => {
-    const expByMonth = new Map(expMonthly.map(p => [p.month, p.total]));
     const savingsByMonth = income.monthly.map(p => p.total - (expByMonth.get(p.month) ?? 0));
     return {
       incomeMedian: median(income.monthly.map(p => p.total)),
       savingsMedian: median(savingsByMonth),
     };
-  }, [income.monthly, expMonthly]);
+  }, [income.monthly, expByMonth]);
 
   const sorted = useMemo(
     () => [...movements].sort((a, b) => b.date.localeCompare(a.date)),
@@ -1661,8 +1669,8 @@ function IncomeSection({
             <CartesianGrid stroke="#f3f4f6" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} interval="preserveStartEnd" />
             <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={70} tickFormatter={v => `${v} €`} />
-            {monthTooltipRecharts()}
-            <Bar dataKey="total" fill="#059669" radius={[3, 3, 0, 0]} name="Ingresos" />
+            {incomeTooltipRecharts()}
+              <Bar dataKey="total" fill="#059669" radius={[3, 3, 0, 0]} name="Ingresos" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -2534,6 +2542,35 @@ function monthTooltipRecharts() {
               <p className="text-gray-700">{formatCurrency(Number(payload[0]?.value ?? 0))}</p>
             </>
           )}
+        />
+      }
+    />
+  );
+}
+
+function incomeTooltipRecharts() {
+  return (
+    <RechartsTooltip
+      cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+      content={
+        <ChartTooltip
+          renderContent={payload => {
+            const p = payload[0]?.payload;
+            const incomeTotal = Number(p?.total ?? 0);
+            const expenses = Number(p?.expenses ?? 0);
+            const savings = Number(p?.savings ?? 0);
+            return (
+              <>
+                <p className="font-semibold text-gray-900">{String(p?.label ?? '')}</p>
+                <p className="text-emerald-700">Ingresos: +{formatCurrency(incomeTotal)}</p>
+                <p className="text-red-600">Gastos: -{formatCurrency(expenses)}</p>
+                <p className={`font-semibold ${savings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  Capacidad de ahorro: {savings >= 0 ? '+' : ''}
+                  {formatCurrency(savings)}
+                </p>
+              </>
+            );
+          }}
         />
       }
     />
