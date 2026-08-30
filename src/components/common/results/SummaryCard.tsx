@@ -3,7 +3,7 @@ import React from 'react';
 export interface SummaryCardProps {
   label: string;
   value: React.ReactNode;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   variant?: 'positive' | 'negative' | 'neutral' | 'info';
   className?: string;
 }

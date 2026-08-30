@@ -27,11 +27,15 @@ src/
     SavingsSimulator.tsx         — Savings projection form + results
     RetirementSimulator.tsx      — Retirement age calculator
     AffordabilitySimulator.tsx   — Affordability calculator (max house price)
+    InvestmentsSimulator.tsx     — Bank statement import (CSV/XLS) + portfolio/interest/expenses
   lib/
     calculations.ts              — Mortgage/tax/savings pure functions
     retirement.ts                — Pension estimation, path simulation
     affordability.ts             — Max mortgage, down payment, constraint analysis
-    sharedStore.ts               — Cross-simulator state sync
+    sharedStore.ts               — Cross-simulator state sync + useLocalStorage hook
+    bankImports.ts               — Bank CSV/XLS parsers (Trade Republic, MyInvestor, CaixaBank)
+    investments.ts               — Portfolio P&L, interest & expense aggregation/categories
+    prices.ts                    — Current price fetch (Yahoo via CORS proxies)
   styles/global.css              — Tailwind CSS, fonts (Signika, Heebo)
 ```
 

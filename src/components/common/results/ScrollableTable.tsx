@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface ScrollableTableColumn {
-  title: string;
+  title: React.ReactNode;
   align?: 'left' | 'right';
   muted?: boolean;
 }

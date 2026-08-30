@@ -2,10 +2,12 @@
 import SavingsSimulator from '../components/SavingsSimulator';
 import RetirementSimulator from '../components/RetirementSimulator';
 import AffordabilitySimulator from '../components/AffordabilitySimulator';
+import InvestmentsSimulator from '../components/InvestmentsSimulator';
+import BackupRestore from '../components/BackupRestore';
 import '../styles/global.css';
 
 const title = 'NestEgg';
-const description = 'Planifica tus finanzas personales: simula la evolución de tus ahorros e inversiones, calcula cuándo jubilarte y descubre qué casa puedes permitirte.';
+const description = 'Planifica tus finanzas personales: simula tus ahorros e inversiones, calcula tu jubilación, descubre qué casa puedes permitirte y analiza tus extractos bancarios (cartera, intereses y gastos).';
 ---
 
 <!doctype html>
@@ -34,7 +36,7 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
   <body class="bg-gradient-to-br from-white via-gray-50 to-white min-h-screen">
     <nav class="flex justify-center px-3 sm:px-4 lg:px-8 pt-10 pb-2">
       <div class="mx-auto max-w-6xl w-full flex items-center justify-center">
-        <div class="relative w-full max-w-xl sm:max-w-3xl" id="nav-container">
+        <div class="relative w-full max-w-xl sm:max-w-3xl lg:max-w-5xl" id="nav-container">
           <!-- Mobile trigger -->
           <button id="nav-mobile-trigger" class="cursor-pointer flex sm:hidden items-center gap-2.5 w-full px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-900 cursor-pointer">
             <span id="nav-mobile-icon" class="text-lg flex-shrink-0">💰</span>
@@ -67,6 +69,14 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
                 <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Descubre qué casa te puedes permitir.</p>
               </div>
             </button>
+            <div class="border-t border-gray-100"></div>
+            <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="investments">
+              <span class="text-lg flex-shrink-0">📈</span>
+              <div class="text-left">
+                <p class="text-sm font-semibold">Inversiones y Gastos</p>
+                <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Importa extractos y analiza cartera, intereses y gastos.</p>
+              </div>
+            </button>
           </div>
           <!-- Desktop tabs -->
           <div class="hidden sm:flex bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden divide-x divide-gray-200">
@@ -91,6 +101,13 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
                 <p class="text-xs mt-0.5 leading-relaxed">Descubre qué casa te puedes permitir.</p>
               </div>
             </button>
+            <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="investments">
+              <span class="text-lg mt-0.5 flex-shrink-0">📈</span>
+              <div>
+                <p class="text-sm font-semibold">Inversiones y Gastos</p>
+                <p class="text-xs mt-0.5 leading-relaxed">Importa extractos y analiza tu cartera.</p>
+              </div>
+            </button>
           </div>
         </div>
       </div>
@@ -104,11 +121,16 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
     <div id="tab-affordability" class="tab-content hidden">
       <AffordabilitySimulator client:load />
     </div>
+    <div id="tab-investments" class="tab-content hidden">
+      <InvestmentsSimulator client:load />
+    </div>
+    <BackupRestore client:load />
     <script>
       const contents = {
         savings: document.getElementById('tab-savings'),
         retirement: document.getElementById('tab-retirement'),
         affordability: document.getElementById('tab-affordability'),
+        investments: document.getElementById('tab-investments'),
       };
       const tabBtns = document.querySelectorAll('.tab-btn');
       const mobileTrigger = document.getElementById('nav-mobile-trigger');

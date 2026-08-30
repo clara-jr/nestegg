@@ -23,3 +23,5 @@ export { NoteBanner, type NoteBannerProps } from './info/NoteBanner';
 export { NoteCard, type NoteCardProps } from './info/NoteCard';
 
 export { SimulatorLayout } from './layout/SimulatorLayout';
+
+export { Modal } from './modal/Modal';
