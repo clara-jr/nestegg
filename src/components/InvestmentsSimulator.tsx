@@ -161,6 +161,7 @@ export default function InvestmentsSimulator() {
     concept: string;
   } | null>(null);
   const [pendingClearAll, setPendingClearAll] = useState(false);
+  const [showFileHistory, setShowFileHistory] = useState(false);
 
   const priceOf = (key: string, ticker?: string, isin?: string): number | undefined => {
     if (!key) return undefined;
@@ -640,9 +641,28 @@ export default function InvestmentsSimulator() {
           {store.files.length > 0 && (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-3">
-                <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => setShowFileHistory(v => !v)}
+                  aria-expanded={showFileHistory}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer hover:text-gray-900 transition-colors"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`transition-transform duration-150 ${showFileHistory ? 'rotate-90' : ''}`}
+                  >
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
                   Histórico de ficheros ({store.files.length})
-                </h4>
+                </button>
                 <button
                   type="button"
                   onClick={() => setPendingClearAll(true)}
@@ -657,28 +677,30 @@ export default function InvestmentsSimulator() {
                   Vaciar todo
                 </button>
               </div>
-              <ul className="flex flex-wrap gap-2">
-                {store.files.map(f => (
-                  <li
-                    key={f.id}
-                    className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-gray-50 border border-gray-200 text-xs text-gray-700 max-w-full"
-                  >
-                    <span className="font-semibold">{BANK_LABELS[f.bank]}</span>
-                    <span className="truncate max-w-[180px]">{f.name}</span>
-                    <span className="text-gray-400">{f.count} mov.</span>
-                    <Tooltip text="Eliminar fichero y sus movimientos">
-                      <button
-                        type="button"
-                        onClick={() => deleteFile(f.id)}
-                        aria-label="Eliminar fichero y sus movimientos"
-                        className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
-                      >
-                        ✕
-                      </button>
-                    </Tooltip>
-                  </li>
-                ))}
-              </ul>
+              {showFileHistory && (
+                <ul className="flex flex-wrap gap-2">
+                  {store.files.map(f => (
+                    <li
+                      key={f.id}
+                      className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-gray-50 border border-gray-200 text-xs text-gray-700 max-w-full"
+                    >
+                      <span className="font-semibold">{BANK_LABELS[f.bank]}</span>
+                      <span className="truncate max-w-[180px]">{f.name}</span>
+                      <span className="text-gray-400">{f.count} mov.</span>
+                      <Tooltip text="Eliminar fichero y sus movimientos">
+                        <button
+                          type="button"
+                          onClick={() => deleteFile(f.id)}
+                          aria-label="Eliminar fichero y sus movimientos"
+                          className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </Tooltip>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </FormSection>
