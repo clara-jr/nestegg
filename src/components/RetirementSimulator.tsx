@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { calculateNetSalary, calculateTax, formatCurrency } from '../lib/calculations';
 import {
@@ -48,7 +48,7 @@ export default function RetirementSimulator() {
     yearsContributed: 10,
   };
 
-  const [params, setParams] = useLocalStorage<RetirementParams>('retirement-params', () => {
+  const [params, setParams, storageReady] = useLocalStorage<RetirementParams>('retirement-params', () => {
     const lifeExpectancy = 95;
     return {
       members: [defaultMember],
@@ -76,7 +76,11 @@ export default function RetirementSimulator() {
   const [viewMode, setViewMode] = useState<ViewMode>('con-pension');
   const [showDetail, setShowDetail] = useState(false);
 
+  const storageReadyRef = useRef(storageReady);
+  useEffect(() => { storageReadyRef.current = storageReady; });
+
   useEffect(() => {
+    if (!storageReady) return;
     setParams(prev => {
       let changed = false;
       const next = { ...prev };
@@ -84,9 +88,10 @@ export default function RetirementSimulator() {
       if (next.familyLoanDurationYears === undefined) { next.familyLoanDurationYears = 0; changed = true; }
       return changed ? next : prev;
     });
-  }, []);
+  }, [storageReady]);
 
   useEffect(() => {
+    if (!storageReady) return;
     const numPeriods = Math.ceil(params.lifeExpectancy / 10);
     setParams(prev => {
       if (prev.distributionPeriods.length === numPeriods) return prev;
@@ -96,9 +101,10 @@ export default function RetirementSimulator() {
       for (let i = 0; i < Math.min(2, numPeriods); i++) trimmed[i] = 100;
       return { ...prev, distributionPeriods: trimmed };
     });
-  }, [params.lifeExpectancy]);
+  }, [params.lifeExpectancy, storageReady]);
 
   useEffect(() => {
+    if (!storageReady) return;
     const totalNetSalary = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
     const totalDebt = params.monthlyMortgagePayment + params.familyLoanMonthlyPayment;
     const derived = Math.max(0, Math.round(totalNetSalary / 12 - params.monthlyContribution - totalDebt));
@@ -106,9 +112,10 @@ export default function RetirementSimulator() {
       if (Math.abs(prev.monthlyExpensesPreResidency - derived) < 0.01) return prev;
       return { ...prev, monthlyExpensesPreResidency: derived };
     });
-  }, [params.members, params.monthlyContribution, params.monthlyMortgagePayment, params.familyLoanMonthlyPayment]);
+  }, [params.members, params.monthlyContribution, params.monthlyMortgagePayment, params.familyLoanMonthlyPayment, storageReady]);
 
   useEffect(() => {
+    if (!storageReady) return;
     const refAge = params.members[0].currentAge;
     setParams(prev => {
       const newEndAge = prev.mortgageDurationYears > 0 ? refAge + prev.mortgageDurationYears : 0;
@@ -116,15 +123,17 @@ export default function RetirementSimulator() {
       if (prev.mortgageEndAge === newEndAge && prev.familyLoanEndAge === newLoanEndAge) return prev;
       return { ...prev, mortgageEndAge: newEndAge, familyLoanEndAge: newLoanEndAge };
     });
-  }, [params.members, params.mortgageDurationYears, params.familyLoanDurationYears]);
+  }, [params.members, params.mortgageDurationYears, params.familyLoanDurationYears, storageReady]);
 
   useEffect(() => {
+    if (!storageReady) return;
     const salaries = params.members.map(m => m.currentSalary);
     setSimulatorData({ memberSalaries: salaries });
-  }, [params.members]);
+  }, [params.members, storageReady]);
 
   useEffect(() => {
     const unsub = subscribe(() => {
+      if (!storageReadyRef.current) return;
       const sd = getSimulatorData();
       setParams(prev => {
         const refAge = prev.members[0].currentAge;

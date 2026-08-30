@@ -67,7 +67,7 @@ function parseInitialAllocation(value: string, availableAmount: number): ParsedI
 }
 
 export default function SavingsSimulator() {
-  const [params, setParams] = useLocalStorage<SavingsParams>('savings-params', {
+  const [params, setParams, storageReady] = useLocalStorage<SavingsParams>('savings-params', {
     initialTotalSavings: 0,
     initialSavingsAccount: 0,
     initialInvestments: 0,
@@ -96,12 +96,16 @@ export default function SavingsSimulator() {
   const [sameDistributionForAll, setSameDistributionForAll] = useState(false);
   const [includeHousePurchase, setIncludeHousePurchase] = useState(false);
 
+  const storageReadyRef = React.useRef(storageReady);
+  React.useEffect(() => { storageReadyRef.current = storageReady; });
+
   const handleToggleHousePurchase = (include: boolean) => {
     setIncludeHousePurchase(include);
   };
 
   // Sync distributionPeriods length when timeHorizonYears changes
   React.useEffect(() => {
+    if (!storageReady) return;
     const numPeriods = Math.max(1, Math.ceil(params.timeHorizonYears / 10));
     setParams(prev => {
       if (prev.distributionPeriods.length === numPeriods) return prev;
@@ -109,18 +113,21 @@ export default function SavingsSimulator() {
       while (updated.length < numPeriods) updated.push(0);
       return { ...prev, distributionPeriods: updated.slice(0, numPeriods) };
     });
-  }, [params.timeHorizonYears]);
+  }, [params.timeHorizonYears, storageReady]);
 
-  useEffect(() => {
+  React.useEffect(() => {
+    if (!storageReady) return;
     setSimulatorData({ monthlyContribution: params.monthlyContribution });
-  }, [params.monthlyContribution]);
+  }, [params.monthlyContribution, storageReady]);
 
-  useEffect(() => {
+  React.useEffect(() => {
+    if (!storageReady) return;
     setSimulatorData({ initialSavings: params.initialTotalSavings });
-  }, [params.initialTotalSavings]);
+  }, [params.initialTotalSavings, storageReady]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     const unsub = subscribe(() => {
+      if (!storageReadyRef.current) return;
       const sd = getSimulatorData();
       setParams(prev => {
         const updates: Partial<SavingsParams> = {};
@@ -153,14 +160,15 @@ export default function SavingsSimulator() {
     return `Al terminar de pagar ${parts.join(' y ')}, ese importe se redirige al ahorro mensual (${formatCurrency(total)}/mes).`;
   }, [params.monthlyMortgagePayment, hasFamilyLoan, familyLoanMonthlyPayment]);
 
-  useEffect(() => {
+  React.useEffect(() => {
+    if (!storageReady) return;
     setSimulatorData({
       monthlyMortgagePayment: params.monthlyMortgagePayment,
       mortgageDurationYears: params.mortgageDurationYears,
       familyLoanMonthlyPayment,
       familyLoanDurationYears: params.familyLoanDurationYears,
     });
-  }, [params.monthlyMortgagePayment, params.mortgageDurationYears, familyLoanMonthlyPayment, params.familyLoanDurationYears]);
+  }, [params.monthlyMortgagePayment, params.mortgageDurationYears, familyLoanMonthlyPayment, params.familyLoanDurationYears, storageReady]);
 
 
   const totalHouseExpenses = useMemo(() => calculateTotalHouseExpenses(params), [params]);
@@ -238,12 +246,12 @@ export default function SavingsSimulator() {
   }, [paramsForCalculation, hasValidInitialAllocation]);
 
   useEffect(() => {
-    if (!result) return;
+    if (!storageReady || !result) return;
     setSimulatorData({
       initialSavingsAccount: result.initialSavingsAccount,
       initialInvestments: result.initialInvestments,
     });
-  }, [result?.initialSavingsAccount, result?.initialInvestments]);
+  }, [storageReady, result?.initialSavingsAccount, result?.initialInvestments]);
 
   const chartData = useMemo(() => {
     if (!result) return [];

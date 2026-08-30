@@ -70,14 +70,21 @@ export function subscribe(fn: Listener) {
   return () => listeners.delete(fn);
 }
 
-export function useLocalStorage<T>(key: string, initial: T | (() => T)): [T, (value: T | ((prev: T) => T)) => void] {
+export function useLocalStorage<T>(
+  key: string,
+  initial: T | (() => T),
+): [T, (value: T | ((prev: T) => T)) => void, boolean] {
   const [stored, setStored] = useState<T>(() => (initial instanceof Function ? initial() : initial));
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    let active = true;
     try {
       const item = localStorage.getItem(key);
-      if (item !== null) setStored(JSON.parse(item));
+      if (item !== null && active) setStored(JSON.parse(item));
     } catch {}
+    if (active) setHydrated(true);
+    return () => { active = false; };
   }, [key]);
 
   const setValue = (value: T | ((prev: T) => T)) => {
@@ -90,5 +97,5 @@ export function useLocalStorage<T>(key: string, initial: T | (() => T)): [T, (va
     });
   };
 
-  return [stored, setValue];
+  return [stored, setValue, hydrated];
 }

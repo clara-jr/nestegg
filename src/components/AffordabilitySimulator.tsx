@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { formatCurrency } from '../lib/calculations';
 import { calculateAffordability, type AffordabilityParams, type AffordabilityResult } from '../lib/affordability';
 import { getSimulatorData, setSimulatorData, subscribe, useLocalStorage } from '../lib/sharedStore';
@@ -21,7 +21,7 @@ import {
 } from './common';
 
 export default function AffordabilitySimulator() {
-  const [params, setParams] = useLocalStorage<AffordabilityParams>('affordability-params', {
+  const [params, setParams, storageReady] = useLocalStorage<AffordabilityParams>('affordability-params', {
     members: [{ annualGrossSalary: 0 }],
     initialSavings: 0,
     cushion: 0,
@@ -43,17 +43,22 @@ export default function AffordabilitySimulator() {
 
   const result = useMemo<AffordabilityResult>(() => calculateAffordability(params), [params]);
 
+  const storageReadyRef = useRef(storageReady);
+  useEffect(() => { storageReadyRef.current = storageReady; });
+
   useEffect(() => {
+    if (!storageReady) return;
     setSimulatorData({
       initialSavings: params.initialSavings,
       memberSalaries: params.members.map(m => m.annualGrossSalary),
       mortgageAPR: params.mortgageAPR,
       realEstatePercentage: params.realEstatePercentage,
     });
-  }, [params.initialSavings, params.members, params.mortgageAPR, params.realEstatePercentage]);
+  }, [params.initialSavings, params.members, params.mortgageAPR, params.realEstatePercentage, storageReady]);
 
   useEffect(() => {
     const unsub = subscribe(() => {
+      if (!storageReadyRef.current) return;
       const sd = getSimulatorData();
       setParams(prev => {
         const updates: Partial<AffordabilityParams> = {};
