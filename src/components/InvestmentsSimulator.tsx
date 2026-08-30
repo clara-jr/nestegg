@@ -160,6 +160,7 @@ export default function InvestmentsSimulator() {
     ids: string[];
     concept: string;
   } | null>(null);
+  const [pendingClearAll, setPendingClearAll] = useState(false);
 
   const priceOf = (key: string, ticker?: string, isin?: string): number | undefined => {
     if (!key) return undefined;
@@ -188,6 +189,7 @@ export default function InvestmentsSimulator() {
     () => computeIncome(store.movements.filter(m => m.type === 'income')),
     [store.movements]
   );
+  const savingsAvg = income.averageMonthly - expenses.averageMonthly;
 
   const hasData = store.movements.length > 0;
 
@@ -337,10 +339,10 @@ export default function InvestmentsSimulator() {
   };
 
   const clearAll = () => {
-    if (!window.confirm('¿Vaciar todos los movimientos e histórico de ficheros importados?')) return;
     setStore({ files: [], movements: [] });
     setPriceStatus(null);
     setFeedback(null);
+    setPendingClearAll(false);
   };
 
   const applyCategory = (movementIds: string[], category: string) => {
@@ -551,28 +553,38 @@ export default function InvestmentsSimulator() {
   // Orden por defecto por % Anual: solo se recalcula cuando cambia la
   // composición de la cartera (entra o sale un producto), nunca al editar los
   // precios o valores actuales, para que la tabla no se reordene bajo el cursor.
-  const holdingsCompositionKey = portfolio.holdings.map(h => h.key).join('|');
+  // La clave usa los keys ordenados alfabéticamente: portfolio.holdings llega
+  // ordenado por valor, así que su orden cambiaría al editar un precio.
+  // IMPORTANTE: solo se memoiza la disposición (orden de keys); los objetos
+  // holding se toman en cada render de portfolio.holdings, que sí se recalcula
+  // al cambiar los precios, para que Latente/Valor/Total se actualicen.
+  const holdingsCompositionKey = portfolio.holdings.map(h => h.key).sort().join('|');
   const orderedHoldings = useMemo(() => {
     const sortValue = (h: Holding) => annualizedGainRatio(h) ?? Number.NEGATIVE_INFINITY;
-    return [...portfolio.holdings].sort(
-      (a, b) =>
-        sortValue(b) - sortValue(a) || // % Anual descendente (no anualizables al final)
-        b.value - a.value ||
-        a.name.localeCompare(b.name)
-    );
+    return [...portfolio.holdings]
+      .sort(
+        (a, b) =>
+          sortValue(b) - sortValue(a) || // % Anual descendente (no anualizables al final)
+          b.value - a.value ||
+          a.name.localeCompare(b.name)
+      )
+      .map(h => h.key);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [holdingsCompositionKey]);
 
   const holdingsWithSource = useMemo(() => {
-    return orderedHoldings.map(h => ({
-      holding: h,
-      entry:
+    const byKey = new Map(portfolio.holdings.map(h => [h.key, h]));
+    return orderedHoldings.flatMap(key => {
+      const h = byKey.get(key);
+      if (!h) return [];
+      const entry: PriceEntry | null =
         priceMap[h.key] ??
-        (h.ticker && priceMap[h.ticker]) ??
-        (h.isin && priceMap[h.isin]) ??
-        null,
-    }));
-  }, [orderedHoldings, priceMap]);
+        (h.ticker ? priceMap[h.ticker] : undefined) ??
+        (h.isin ? priceMap[h.isin] : undefined) ??
+        null;
+      return [{ holding: h, entry }];
+    });
+  }, [portfolio.holdings, orderedHoldings, priceMap]);
 
   return (
     <SimulatorLayout>
@@ -633,7 +645,7 @@ export default function InvestmentsSimulator() {
                 </h4>
                 <button
                   type="button"
-                  onClick={clearAll}
+                  onClick={() => setPendingClearAll(true)}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -700,7 +712,12 @@ export default function InvestmentsSimulator() {
                 }
                 subtitle={`Cartera ${signedAmount(portfolio.summary.totalBenefit)} · Cuenta ${signedAmount(interest.total)}`}
               />
-              <SummaryCard label="Gasto Medio Mensual" value={formatCurrency(expenses.averageMonthly)} variant="info" />
+              <SummaryCard
+                label="Capacidad de Ahorro"
+                value={formatCurrency(savingsAvg)}
+                variant={savingsAvg >= 0 ? 'positive' : 'negative'}
+                subtitle={`Ingresos medios: +${formatCurrency(income.averageMonthly)} · Gastos medios: -${formatCurrency(expenses.averageMonthly)}`}
+              />
             </ScenarioSection>
 
             <div className="-mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 space-y-5">
@@ -847,6 +864,35 @@ export default function InvestmentsSimulator() {
           </button>
         </div>
       </Modal>
+
+      <Modal
+        open={pendingClearAll}
+        onClose={() => setPendingClearAll(false)}
+        title="Vaciar todos los datos"
+      >
+        <p className="text-sm text-gray-700 leading-relaxed">
+          ¿Vaciar todos los movimientos e histórico de ficheros importados?
+        </p>
+        <p className="text-sm text-gray-500 leading-relaxed mt-2">
+          Esta acción no se puede deshacer.
+        </p>
+        <div className="flex flex-wrap justify-end gap-2 pt-5">
+          <button
+            type="button"
+            onClick={() => setPendingClearAll(false)}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={clearAll}
+            className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
+          >
+            Vaciar todo
+          </button>
+        </div>
+      </Modal>
     </SimulatorLayout>
   );
 }
@@ -874,6 +920,64 @@ function PortfolioSection({
   onSetPrice: (key: string, ticker: string | undefined, raw: string) => void;
   onSetPlazoConfig: (key: string, partial: Partial<PlazoFijoConfig>) => void;
 }) {
+  type PortfolioSort = 'annual' | 'tipo' | 'latente' | 'recibido' | 'total';
+  const [portfolioSort, setPortfolioSort] = useState<PortfolioSort>('annual');
+  const [portfolioDir, setPortfolioDir] = useState<'asc' | 'desc'>('desc');
+
+  // Clave de composición estable (keys alfabéticos): solo cambia cuando entra
+  // o sale un producto, nunca al editar precios.
+  const holdingsCompositionKey = rows.map(r => r.holding.key).sort().join('|');
+
+  // Orden por % Anual: se memoiza solo la disposición (orden de keys) por
+  // composición y dirección, para que editar un precio no reordene la fila
+  // bajo el cursor pero los valores mostrados sigan siendo los actuales.
+  const annualOrder = useMemo(() => {
+    const mult = portfolioDir === 'asc' ? -1 : 1;
+    return [...rows]
+      .sort((a, b) => {
+        const sa = annualizedGainRatio(a.holding) ?? Number.NEGATIVE_INFINITY;
+        const sb = annualizedGainRatio(b.holding) ?? Number.NEGATIVE_INFINITY;
+        return (sb - sa) * mult || (b.holding.value - a.holding.value) * mult || a.holding.name.localeCompare(b.holding.name);
+      })
+      .map(r => r.holding.key);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [holdingsCompositionKey, portfolioDir]);
+
+  // El resto de columnas ordena en vivo por el valor actual de cada fila.
+  const sortedRows = useMemo(() => {
+    if (portfolioSort === 'annual') {
+      const byKey = new Map(rows.map(r => [r.holding.key, r]));
+      return annualOrder
+        .map(k => byKey.get(k))
+        .filter((r): r is { holding: Holding; entry: PriceEntry | null } => r !== undefined);
+    }
+    const mult = portfolioDir === 'asc' ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const ha = a.holding;
+      const hb = b.holding;
+      let cmp: number;
+      if (portfolioSort === 'tipo') {
+        cmp = investmentTypeLabel(ha.assetClass).localeCompare(investmentTypeLabel(hb.assetClass));
+      } else if (portfolioSort === 'latente') {
+        cmp = ha.unrealizedPnl - hb.unrealizedPnl;
+      } else if (portfolioSort === 'recibido') {
+        cmp = ha.realizedPnl - hb.realizedPnl;
+      } else {
+        cmp = ha.totalPnl - hb.totalPnl;
+      }
+      return cmp * mult || ha.name.localeCompare(hb.name);
+    });
+  }, [rows, portfolioSort, portfolioDir, annualOrder]);
+
+  const handlePortfolioSort = (key: PortfolioSort, defaultDir: 'asc' | 'desc') => {
+    if (portfolioSort === key) {
+      setPortfolioDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setPortfolioSort(key);
+      setPortfolioDir(defaultDir);
+    }
+  };
+
   if (rows.length === 0) {
     return (
       <p className="text-sm text-gray-500 py-6 text-center">
@@ -888,6 +992,18 @@ function PortfolioSection({
         <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">
           Evolución de la cartera ({rows.length} productos)
         </h3>
+        {portfolioSort !== 'annual' && (
+          <button
+            type="button"
+            onClick={() => {
+              setPortfolioSort('annual');
+              setPortfolioDir('desc');
+            }}
+            className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            ↺ Ordenar por % Anual
+          </button>
+        )}
         {/*<div className="flex items-center gap-3">
           {status && <p className="text-xs text-gray-500 max-w-[320px] text-right">{status}</p>}
           <button
@@ -912,7 +1028,17 @@ function PortfolioSection({
       <ScrollableTable
         columns={[
           { title: 'Producto', align: 'left' },
-          { title: 'Tipo', align: 'left' },
+          {
+            title: (
+              <SortableHeader
+                label="Tipo"
+                active={portfolioSort === 'tipo'}
+                dir={portfolioDir}
+                onClick={() => handlePortfolioSort('tipo', 'asc')}
+              />
+            ),
+            align: 'left',
+          },
           //{ title: 'Días' },
           { title: 'Partic.' },
           { title: 'P. medio' },
@@ -921,13 +1047,49 @@ function PortfolioSection({
           { title: 'Duración' },
           { title: 'Invertido' },
           { title: 'Valor' },
-          { title: 'Latente' },
-          { title: 'Recibido' },
+          {
+            title: (
+              <SortableHeader
+                label="Latente"
+                active={portfolioSort === 'latente'}
+                dir={portfolioDir}
+                onClick={() => handlePortfolioSort('latente', 'desc')}
+              />
+            ),
+          },
+          {
+            title: (
+              <SortableHeader
+                label="Recibido"
+                active={portfolioSort === 'recibido'}
+                dir={portfolioDir}
+                onClick={() => handlePortfolioSort('recibido', 'desc')}
+              />
+            ),
+          },
           { title: 'Dividendos' },
-          { title: 'Total' },
-          { title: '% Anual' },
+          {
+            title: (
+              <SortableHeader
+                label="Total"
+                active={portfolioSort === 'total'}
+                dir={portfolioDir}
+                onClick={() => handlePortfolioSort('total', 'desc')}
+              />
+            ),
+          },
+          {
+            title: (
+              <SortableHeader
+                label="% Anual"
+                active={portfolioSort === 'annual'}
+                dir={portfolioDir}
+                onClick={() => handlePortfolioSort('annual', 'desc')}
+              />
+            ),
+          },
         ]}
-        rows={rows.map(({ holding: h, entry }) => {
+        rows={sortedRows.map(({ holding: h, entry }) => {
           const pct = h.investedCost > 0 ? (h.totalPnl / h.investedCost) * 100 : null;
           const daysHeld = h.firstBuyDate
             ? Math.max(0, Math.floor((Date.now() - new Date(`${h.firstBuyDate}T00:00:00`).getTime()) / 86400000))

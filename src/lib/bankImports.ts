@@ -1,11 +1,12 @@
 import * as XLSX from 'xlsx';
 
-export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank';
+export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank' | 'santander';
 
 export const BANKS: ReadonlyArray<{ id: BankId; label: string; hint: string }> = [
   { id: 'trade-republic', label: 'Trade Republic', hint: 'CSV exportado por Trade Republic con datetime, type, name, shares, price, amount…' },
   { id: 'myinvestor', label: 'MyInvestor', hint: 'Movimientos de cuenta (CSV obtenido de MyInvestor) o de fondos (XLS exportado por Inversis)' },
-  { id: 'caixabank', label: 'CaixaBank', hint: 'XLS exportado por CaixaBank con fecha, concepto, importe y saldo' },
+  { id: 'caixabank', label: 'CaixaBank', hint: 'XLS exportado por CaixaBank con fecha operación, fecha valor, concepto, importe y saldo' },
+  { id: 'santander', label: 'Santander', hint: 'XLS/XLSX exportado por Santander con fecha operación, fecha valor, concepto, importe y saldo' },
 ];
 
 export type MovementType =
@@ -554,13 +555,27 @@ export function splitTradeFees(movements: Movement[]): Movement[] {
 }
 
 /**
+ * Reclasifica movimientos cuyo signo contradice su tipo: un gasto con importe
+ * positivo es en realidad una devolución (anulaciones/reversiones de tarjeta)
+ * y una devolución con importe negativo es un gasto. Garantiza que los importes
+ * positivos que entren en «Gastos» acaben siempre como «Devoluciones».
+ */
+export function reclassifySignMismatched(movements: Movement[]): Movement[] {
+  return movements.map(m => {
+    if (m.type === 'expense' && m.amount > 0) return { ...m, type: 'refund' as const };
+    if (m.type === 'refund' && m.amount < 0) return { ...m, type: 'expense' as const };
+    return m;
+  });
+}
+
+/**
  * Normalización completa de los movimientos almacenados: reclasifica perks
  * antiguos, fusiona órdenes partidas, separa las comisiones en movimientos
- * propios y elimina duplicados (p. ej. los que surgirían al reimportar un
- * fichero con tipos recalibrados).
+ * propios, corrige el signo de gastos/devoluciones y elimina duplicados
+ * (p. ej. los que surgirían al reimportar un fichero con tipos recalibrados).
  */
 export function normalizeStoredMovements(movements: Movement[]): Movement[] {
-  return dedupeMovements(splitTradeFees(mergeSplitTrades(reclassifyStockPerkIncome(movements))));
+  return dedupeMovements(splitTradeFees(mergeSplitTrades(reclassifyStockPerkIncome(reclassifySignMismatched(movements)))));
 }
 
 // ---------------------------------------------------------------------------
@@ -580,11 +595,12 @@ function classifyByKeywords(text: string, amount: number): MovementType {
   if (/COMISION|GEBUHR|(\b|_)FEE(_|\b)/.test(t)) return 'fee';
   if (/DEPOSIT|INGRESO|APORTE|EINZAHLUNG|INBOUND|INPAYMENT/.test(t)) return 'deposit';
   if (/RETIRADA|RETIRO|WITHDRAWAL|AUSZAHLUNG|OUTBOUND|OUTPAYMENT/.test(t)) return 'withdrawal';
+  // Devoluciones de compras, dinero prestado devuelto, etc.: ingresos
+  // reversiones de gastos (no son nómina ni rentabilidad). Van antes que los
+  // pagos con tarjeta para no clasificar un reembolso como gasto.
+  if (/DEVOLUCION|DEVOLUCIÓN|REEMBOLSO|REFUND|RESTITUCION|\bREST\.|\bBIZUM RECIBIDO\b/.test(t)) return 'refund';
   if (/TARJETA|(\b|_)CARD(_|\b)|KARTEN?ZAHLUNG/.test(t)) return 'expense';
   if (/TRASPASO|TRANSFER|UEBERWEISUNG|ÜBERWEISUNG/.test(t)) return 'transfer';
-  // Devoluciones de compras, dinero prestado devuelto, etc.: ingresos
-  // reversiones de gastos (no son nómina ni rentabilidad).
-  if (/DEVOLUCION|DEVOLUCIÓN|REEMBOLSO|REFUND|RESTITUCION|\bREST\.|\bBIZUM RECIBIDO\b/.test(t)) return 'refund';
   if (/SAVEBACK|CASHBACK|BONUS|PRAMIE/.test(t)) return 'income';
   if (/NOMINA|PENSION|SUELDO|SALARY/.test(t)) return 'income';
   return amount <= 0 ? 'expense' : 'income';
@@ -1194,6 +1210,94 @@ function classifyCaixaBankConcept(concept: string, amount: number): MovementType
 }
 
 // ---------------------------------------------------------------------------
+// Santander
+// ---------------------------------------------------------------------------
+
+function classifySantanderConcept(concept: string, amount: number): MovementType {
+  const t = norm(concept);
+  if (/INTERES/.test(t)) return 'interest';
+  if (/COMISION/.test(t)) return 'fee';
+  if (/DEV\.IMPUESTOS|IMPUESTO|RETENCION/.test(t)) return 'tax';
+  if (/IRPF MOD|I\.V\.A\.? MOD|TGSS/.test(t)) return 'tax';
+  if (/DEVOLUCION|DEVOLUCIÓN|BIZUM RECIBIDO|REEMBOLSO|REFUND/.test(t)) return 'refund';
+  // La nómina llega como transferencia abonada (p. ej. «TRANSFERENCIA DE …
+  // CONCEPTO ABONO NOMINA 08 2026»): el concepto de ingreso prevalece.
+  if (/NOMINA|PENSION|SUELDO|INGRESO/.test(t)) return 'income';
+  if (/TRASPASO|TRANSFERENCIA|BIZUM ENV/.test(t)) return 'transfer';
+  if (
+    /RECIBO|TARJETA|COMERCIO|DOMICILI|SEPA|TELEFON|SEGUR|LUZ|GAS\b|AGUA|HIPOTECA|PRESTAMO|TRIBUTOS|SUSCRIP|BIZUM|PAGO A PLAZOS|COMPRA CON/.test(t)
+  ) {
+    return 'expense';
+  }
+  return amount <= 0 ? 'expense' : 'income';
+}
+
+export function parseSantander(matrix: CellMatrix): ParsedBankFile {
+  // El extracto de Santander trae bloques previos (cuenta, titular, saldo) y
+  // una cabecera de sección «Movimientos» antes de la fila con las columnas
+  // reales. Se busca la fila que más coincide con los nombres de columna
+  // esperados en lugar de la primera que contenga una palabra suelta.
+  const headerKeywords = ['FECHA OPERACION', 'FECHA VALOR', 'CONCEPTO', 'IMPORTE', 'SALDO', 'DIVISA'];
+  let headerIdx = -1;
+  let bestScore = 0;
+  for (let r = 0; r < matrix.length; r++) {
+    const row = matrix[r].map(norm);
+    let score = 0;
+    for (const kw of headerKeywords) {
+      if (row.some(c => c.includes(kw))) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      headerIdx = r;
+    }
+  }
+  if (headerIdx < 0 || bestScore < 2) return { movements: [], skipped: matrix.length };
+  const header = matrix[headerIdx].map(c => norm(c));
+
+  const opDateCol = findColumn(header, c => c.includes('FECHA OPERACION'));
+  const valDateCol = findColumn(header, c => c.includes('FECHA VALOR'));
+  const dateCol = opDateCol >= 0 ? opDateCol : valDateCol >= 0 ? valDateCol : findColumn(header, c => c.startsWith('FECHA'));
+  const conceptCol = findColumn(header, c => c.includes('CONCEPTO'));
+  const amountCol = findColumn(header, c => c.includes('IMPORTE'));
+  const balanceCol = findColumn(header, c => c.includes('SALDO'));
+
+  if (dateCol < 0 || amountCol < 0) return { movements: [], skipped: matrix.length };
+
+  const movements: Movement[] = [];
+  let skipped = 0;
+
+  for (let r = headerIdx + 1; r < matrix.length; r++) {
+    const row = matrix[r];
+    if (!row.some(c => c.length > 0)) continue;
+
+    const date = dateCol >= 0 ? parseDateToISO(row[dateCol]) : undefined;
+    const amount = amountCol >= 0 ? parseNumber(row[amountCol]) : undefined;
+    if (!date || amount === undefined) {
+      skipped++;
+      continue;
+    }
+
+    const concept = (conceptCol >= 0 ? row[conceptCol] : '') || 'Movimiento Santander';
+    const type = classifySantanderConcept(concept, amount);
+    const balanceRaw = balanceCol >= 0 ? (row[balanceCol] ?? '') : '';
+    const balance = parseNumber(balanceRaw);
+
+    movements.push({
+      id: movementId('santander', date, type, concept, amount, balanceRaw),
+      fileId: '',
+      bank: 'santander',
+      date,
+      type,
+      concept,
+      amount,
+      balance: balance ?? undefined,
+    });
+  }
+
+  return { movements, skipped };
+}
+
+// ---------------------------------------------------------------------------
 // Entrada principal
 // ---------------------------------------------------------------------------
 
@@ -1211,14 +1315,25 @@ export function detectMyInvestorFormat(matrix: CellMatrix): 'funds' | 'account' 
 }
 
 export function parseBankMatrix(bank: BankId, _fileName: string, matrix: CellMatrix): ParsedBankFile {
+  let parsed: ParsedBankFile;
   switch (bank) {
     case 'trade-republic':
-      return parseTradeRepublic(matrix);
+      parsed = parseTradeRepublic(matrix);
+      break;
     case 'myinvestor':
-      return detectMyInvestorFormat(matrix) === 'funds'
+      parsed = detectMyInvestorFormat(matrix) === 'funds'
         ? parseMyInvestorFunds(matrix)
         : parseMyInvestorAccount(matrix);
+      break;
     case 'caixabank':
-      return parseCaixaBank(matrix);
+      parsed = parseCaixaBank(matrix);
+      break;
+    case 'santander':
+      parsed = parseSantander(matrix);
+      break;
   }
+  // Corrige el signo de gastos/devoluciones (p. ej. reembolsos positivos de
+  // tarjeta que el clasificador haya tipado como gasto), igual que hace la
+  // normalización del histórico, para que las firmas coincidan al reimportar.
+  return { ...parsed, movements: reclassifySignMismatched(parsed.movements) };
 }

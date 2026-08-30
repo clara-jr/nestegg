@@ -10,6 +10,7 @@ import {
   mergeSplitTrades,
   normalizeStoredMovements,
   reclassifyStockPerkIncome,
+  reclassifySignMismatched,
   splitTradeFees,
   movementSignature,
   detectMyInvestorFormat,
@@ -17,6 +18,8 @@ import {
   parseMyInvestorAccount,
   parseMyInvestorFunds,
   parseCaixaBank,
+  parseSantander,
+  parseBankMatrix,
 } from '../bankImports';
 import type { Movement } from '../bankImports';
 import { computeCashBalance, computeAccountEvolution } from '../investments';
@@ -290,6 +293,131 @@ describe('parseCaixaBank', () => {
 
   it('asigna el banco correcto', () => {
     for (const m of result.movements) expect(m.bank).toBe('caixabank');
+  });
+});
+
+describe('parseSantander', () => {
+  it('importa el ejemplo del extracto del usuario', () => {
+    const rows: string[][] = [
+      ['Fecha operación', 'Fecha valor', 'Concepto', 'Importe', 'Saldo', 'Divisa'],
+      ['28/08/2026', '28/08/2026', 'PAGO MOVIL EN IKEA ALCORCON H, ROSAL, EL ES, TARJ. :*037123', '-29,99€', '3.540,68€', 'EUR'],
+      ['28/08/2026', '28/08/2026', 'COMPRA EN ALCAMPO GASOLIN, FUENLABRADA ES, TARJ. :*037123', '-53,70€', '3.570,67€', 'EUR'],
+      ['28/08/2026', '28/08/2026', 'TRANSFERENCIA DE BIPI MOBILITY S.L., CONCEPTO ABONO NOMINA 08 2026.', '1.399,65€', '3.624,37€', 'EUR'],
+    ];
+    const result = parseSantander(rows);
+
+    expect(result.movements.length).toBe(3);
+    expect(result.skipped).toBe(0);
+
+    const [ikea, gasolina, nomina] = result.movements;
+    expect(ikea.type).toBe('expense');
+    expect(ikea.amount).toBeCloseTo(-29.99);
+    expect(ikea.balance).toBeCloseTo(5540.68);
+    expect(ikea.date).toBe('2026-08-28');
+    expect(ikea.bank).toBe('santander');
+
+    expect(gasolina.type).toBe('expense');
+    expect(gasolina.amount).toBeCloseTo(-53.7);
+    expect(gasolina.balance).toBeCloseTo(5570.67);
+
+    expect(nomina.type).toBe('income');
+    expect(nomina.amount).toBeCloseTo(2399.65);
+    expect(nomina.balance).toBeCloseTo(5624.37);
+  });
+
+  it('usa FECHA VALOR como referencia cuando no hay FECHA OPERACION', () => {
+    const rows: string[][] = [
+      ['Fecha valor', 'Concepto', 'Importe', 'Saldo'],
+      ['05/03/2024', 'RECIBO LUZ ENDESA', '-75,10', '100,00'],
+    ];
+    const result = parseSantander(rows);
+    expect(result.movements.length).toBe(1);
+    expect(result.movements[0].date).toBe('2024-03-05');
+  });
+
+  it('ignora el bloque previo del extracto (cuenta, titular, sección Movimientos)', () => {
+    // Estructura real del XLSX de Santander: metadatos y una cabecera de
+    // sección «Movimientos» antes de la fila con las columnas.
+    const rows: string[][] = [
+      ['', '', 'Cuenta', 'Fecha'],
+      ['', '', '', '30/08/2026 | 18:35:57'],
+      ['', '', 'Titular', 'Saldo'],
+      ['', '', '', '5.540,68€ EUR'],
+      [],
+      ['Movimientos'],
+      [],
+      ['Fecha operación', 'Fecha valor', 'Concepto', 'Importe', 'Saldo', 'Divisa'],
+      ['28/08/2026', '28/08/2026', 'PAGO MOVIL EN IKEA ALCORCON H, ROSAL, EL ES, TARJ. :*037682', '-29,99€', '5.540,68€', 'EUR'],
+      ['28/08/2026', '28/08/2026', 'TRANSFERENCIA DE BIPI MOBILITY S.L., CONCEPTO ABONO NOMINA 08 2026.', '2.399,65€', '5.624,37€', 'EUR'],
+    ];
+    const result = parseSantander(rows);
+    expect(result.skipped).toBe(0);
+    expect(result.movements.length).toBe(2);
+    expect(result.movements[0].type).toBe('expense');
+    expect(result.movements[0].bank).toBe('santander');
+    expect(result.movements[1].type).toBe('income');
+  });
+});
+
+describe('reclassifySignMismatched', () => {
+  const base: Movement = {
+    id: 'a',
+    fileId: 'f',
+    bank: 'santander',
+    date: '2026-08-28',
+    type: 'expense',
+    amount: 42,
+    concept: 'REEMBOLSO',
+  };
+
+  it('convierte gastos con importe positivo en devoluciones', () => {
+    const out = reclassifySignMismatched([{ ...base, type: 'expense' }]);
+    expect(out[0].type).toBe('refund');
+  });
+
+  it('convierte devoluciones con importe negativo en gastos', () => {
+    const out = reclassifySignMismatched([{ ...base, type: 'refund', amount: -42 }]);
+    expect(out[0].type).toBe('expense');
+  });
+
+  it('deja intactos los movimientos con signo coherente', () => {
+    const coherent: Movement[] = [
+      { ...base, type: 'expense', amount: -42 },
+      { ...base, type: 'refund', amount: 42 },
+      { ...base, type: 'income', amount: 42 },
+    ];
+    expect(reclassifySignMismatched(coherent).map(m => m.type)).toEqual(['expense', 'refund', 'income']);
+  });
+
+  it('normalizeStoredMovements corrige gastos positivos y deduplica', () => {
+    const positiveExpense: Movement = { ...base, type: 'expense', concept: 'CARD REFUND 123', amount: 10 };
+    const duplicated: Movement = { ...positiveExpense, id: 'b', type: 'refund' };
+    const out = normalizeStoredMovements([positiveExpense, duplicated]);
+    expect(out.length).toBe(1);
+    expect(out[0].type).toBe('refund');
+  });
+});
+
+describe('parseTradeRepublic (reembolsos de tarjeta)', () => {
+  it('clasifica un reembolso positivo de tarjeta como refund, no como gasto', () => {
+    const matrix = parseDelimited(
+      'datetime;date;account_type;category;type;asset_class;name;symbol;shares;price;amount;fee;tax;currency\n' +
+        '2024-05-03T09:00:00 UTC;2024-05-03;CASH;CARD REFUND;CARD REFUND;;CARD REFUND;;;;"45,20";"";"";'
+    );
+    const parsed = parseTradeRepublic(matrix);
+    expect(parsed.movements.length).toBe(1);
+    expect(parsed.movements[0].type).toBe('refund');
+  });
+
+  it('parseBankMatrix corrige gastos positivos que el clasificador haya tipado como expense', () => {
+    const matrix = parseDelimited(
+      'datetime;date;account_type;category;type;asset_class;name;symbol;shares;price;amount;fee;tax;currency\n' +
+        '2024-05-03T09:00:00 UTC;2024-05-03;CASH;CARD PAYMENT;CARD PAYMENT;;CARD PAYMENT;;;;"12,00";"";"";'
+    );
+    const parsed = parseBankMatrix('trade-republic', 'x.csv', matrix);
+    expect(parsed.movements.length).toBe(1);
+    expect(parsed.movements[0].type).toBe('refund');
+    expect(parsed.movements[0].amount).toBeCloseTo(12);
   });
 });
 
