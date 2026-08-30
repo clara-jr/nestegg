@@ -162,6 +162,7 @@ export default function InvestmentsSimulator() {
   } | null>(null);
   const [pendingClearAll, setPendingClearAll] = useState(false);
   const [showFileHistory, setShowFileHistory] = useState(false);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<string[] | null>(null);
 
   const priceOf = (key: string, ticker?: string, isin?: string): number | undefined => {
     if (!key) return undefined;
@@ -442,6 +443,27 @@ export default function InvestmentsSimulator() {
   const bulkUpdateType = (movementIds: string[], type: MovementType) => {
     if (movementIds.length === 0) return;
     applyType(movementIds, type);
+  };
+
+  const applyDeleteMovements = (movementIds: string[]) => {
+    if (movementIds.length === 0) return;
+    setStore(prev => ({
+      ...prev,
+      movements: prev.movements.filter(m => !movementIds.includes(m.id)),
+    }));
+  };
+
+  const deleteMovement = (movementId: string) => applyDeleteMovements([movementId]);
+
+  const requestDelete = (movementIds: string[]) => {
+    if (movementIds.length === 0) return;
+    setPendingDeleteIds(movementIds);
+  };
+
+  const confirmDelete = () => {
+    if (!pendingDeleteIds) return;
+    applyDeleteMovements(pendingDeleteIds);
+    setPendingDeleteIds(null);
   };
 
   const setManualPrice = (holdingKey: string, ticker: string | undefined, raw: string) => {
@@ -808,6 +830,8 @@ export default function InvestmentsSimulator() {
                   onSearchChange={setSearch}
                   onChangeType={updateType}
                   onBulkChangeType={bulkUpdateType}
+                  onDelete={deleteMovement}
+                  onRequestBulkDelete={requestDelete}
                 />
               )}
             </div>
@@ -912,6 +936,36 @@ export default function InvestmentsSimulator() {
             className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
           >
             Vaciar todo
+          </button>
+        </div>
+      </Modal>
+    <Modal
+        open={pendingDeleteIds !== null}
+        onClose={() => setPendingDeleteIds(null)}
+        title="Eliminar movimientos"
+      >
+        <p className="text-sm text-gray-700 leading-relaxed">
+          ¿Eliminar{' '}
+          <span className="font-semibold text-gray-900">{pendingDeleteIds?.length ?? 0}</span>{' '}
+          movimiento{pendingDeleteIds && pendingDeleteIds.length !== 1 ? 's' : ''}?
+        </p>
+        <p className="text-sm text-gray-500 leading-relaxed mt-2">
+          Esta acción no se puede deshacer.
+        </p>
+        <div className="flex flex-wrap justify-end gap-2 pt-5">
+          <button
+            type="button"
+            onClick={() => setPendingDeleteIds(null)}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmDelete}
+            className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
+          >
+            Eliminar
           </button>
         </div>
       </Modal>
@@ -2121,6 +2175,8 @@ function MovementsSection({
   onSearchChange,
   onChangeType,
   onBulkChangeType,
+  onDelete,
+  onRequestBulkDelete,
 }: {
   movements: Movement[];
   total: number;
@@ -2131,6 +2187,8 @@ function MovementsSection({
   onSearchChange: (v: string) => void;
   onChangeType: (id: string, type: MovementType) => void;
   onBulkChangeType: (ids: string[], type: MovementType) => void;
+  onDelete: (id: string) => void;
+  onRequestBulkDelete: (ids: string[]) => void;
 }) {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -2251,6 +2309,13 @@ function MovementsSection({
           </div>
           <button
             type="button"
+            onClick={() => { onRequestBulkDelete([...selected]); clearSelection(); }}
+            className="px-3 py-1.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 transition-colors cursor-pointer"
+          >
+            Eliminar
+          </button>
+          <button
+            type="button"
             onClick={clearSelection}
             className="ml-auto px-3 py-1.5 rounded-lg border border-gray-600 text-sm font-semibold text-gray-200 hover:bg-gray-700 transition-colors cursor-pointer"
           >
@@ -2300,6 +2365,7 @@ function MovementsSection({
                 />
               ),
             },
+            { title: 'Eliminar', align: 'left', muted: true },
           ]}
           rows={shown.map(m => [
             {
@@ -2358,6 +2424,25 @@ function MovementsSection({
                         : m.amount
                   )}
                 </span>
+              ),
+            },
+            {
+              content: (
+                <Tooltip text="Eliminar movimiento">
+                  <button
+                    type="button"
+                    onClick={() => onDelete(m.id)}
+                    aria-label="Eliminar movimiento"
+                    className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                      <line x1="10" y1="11" x2="10" y2="17"/>
+                      <line x1="14" y1="11" x2="14" y2="17"/>
+                    </svg>
+                  </button>
+                </Tooltip>
               ),
             },
           ])}
