@@ -5,7 +5,7 @@ export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank' | 'santander'
 export const BANKS: ReadonlyArray<{ id: BankId; label: string; hint: string }> = [
   { id: 'trade-republic', label: 'Trade Republic', hint: 'CSV exportado por Trade Republic con datetime, type, name, shares, price, amount…' },
   { id: 'myinvestor', label: 'MyInvestor', hint: 'Movimientos de cuenta (CSV obtenido de MyInvestor) o de fondos (XLS exportado por Inversis)' },
-  { id: 'caixabank', label: 'CaixaBank', hint: 'XLS exportado por CaixaBank con fecha operación, fecha valor, concepto, importe y saldo' },
+  { id: 'caixabank', label: 'CaixaBank', hint: 'XLS/CDV exportado por CaixaBank con fechas, concepto o movimiento, importe y saldo' },
   { id: 'santander', label: 'Santander', hint: 'XLS/XLSX exportado por Santander con fecha operación, fecha valor, concepto, importe y saldo' },
 ];
 
@@ -1039,11 +1039,57 @@ export function parseMyInvestorFunds(matrix: CellMatrix): ParsedBankFile {
 // CaixaBank — detección flexible
 // ---------------------------------------------------------------------------
 
+// Cabeceras conocidas de los distintos formatos de CaixaBank. Se usa para
+// puntuar cada fila y distinguir la cabecera real de las filas de metadatos
+// previas («Movimientos de la cuenta», «Importes expresados en euros»…) que
+// también contienen alguna palabra clave (p. ej. MOVIMIENTO).
+const CAIXA_HEADER_KEYWORDS = [
+  'FECHA OPERACION',
+  'F. OPERACION',
+  'FECHA VALOR',
+  'F. VALOR',
+  'FECHA CONTABLE',
+  'FECHA',
+  'CONCEPTO',
+  'MOVIMIENTO',
+  'MAS DATOS',
+  'IMPORTE',
+  'INGRESO',
+  'GASTO',
+  'SALDO',
+] as const;
+
+function scoreCaixaHeaderRow(row: string[]): number {
+  let score = 0;
+  for (const kw of CAIXA_HEADER_KEYWORDS) {
+    if (row.some(c => c.includes(kw))) score++;
+  }
+  return score;
+}
+
 export function parseCaixaBank(matrix: CellMatrix): ParsedBankFile {
-  const headerIdx = firstHeaderIndex(
+  // Detección previa: primera fila que empiece por FECHA/F. o contenga
+  // CONCEPTO/MOVIMIENTO. Se conserva para no alterar los formatos existentes.
+  const legacyIdx = firstHeaderIndex(
     matrix,
     c => c.startsWith('FECHA') || c.startsWith('F.') || c.includes('CONCEPTO') || c.includes('MOVIMIENTO')
   );
+
+  // Escaneo por puntuación: sirve solo si encuentra una cabecera claramente
+  // más completa que la de la detección previa (p. ej. cuando el metadato
+  // «Movimientos de la cuenta» capturaba el legacyIdx).
+  let bestIdx = -1;
+  let bestScore = 0;
+  for (let r = 0; r < matrix.length; r++) {
+    const score = scoreCaixaHeaderRow(matrix[r].map(norm));
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = r;
+    }
+  }
+  const legacyScore = legacyIdx >= 0 ? scoreCaixaHeaderRow(matrix[legacyIdx].map(norm)) : 0;
+  const headerIdx =
+    bestIdx >= 0 && bestScore >= 3 && bestScore > legacyScore ? bestIdx : legacyIdx;
   if (headerIdx < 0) return { movements: [], skipped: matrix.length };
   const header = matrix[headerIdx].map(c => norm(c));
 
@@ -1148,6 +1194,7 @@ function parseCaixaBankLegacy(matrix: CellMatrix, headerIdx: number, header: str
     findColumn(header, c => c.includes('CONCEPTO')) >= 0
       ? findColumn(header, c => c.includes('CONCEPTO'))
       : findColumn(header, c => c.includes('MOVIMIENTO') || c.includes('DESCRIPC'));
+  const masDatosCol = findColumn(header, c => c.includes('MAS DATOS'));
   const amountCol = findColumn(header, c => c.includes('IMPORTE'));
   const balanceCol = findColumn(header, c => c.includes('SALDO'));
 
@@ -1165,7 +1212,7 @@ function parseCaixaBankLegacy(matrix: CellMatrix, headerIdx: number, header: str
       continue;
     }
 
-    const concept = (conceptCol >= 0 ? row[conceptCol] : '') || 'Movimiento CaixaBank';
+    const concept = (conceptCol >= 0 ? row[conceptCol] : '') || (masDatosCol >= 0 ? row[masDatosCol] : '') || 'Movimiento CaixaBank';
     const type = classifyCaixaBankConcept(concept, amount);
     const balance = balanceCol >= 0 ? parseNumber(row[balanceCol]) : undefined;
 

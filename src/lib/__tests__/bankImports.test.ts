@@ -294,6 +294,34 @@ describe('parseCaixaBank', () => {
   it('asigna el banco correcto', () => {
     for (const m of result.movements) expect(m.bank).toBe('caixabank');
   });
+
+  it('importa el formato XLS con cabeceras Fecha/Fecha valor/Movimiento/Más datos', () => {
+    const rows: string[][] = [
+      ['Movimientos de la cuenta', 'Importes expresados en euros'],
+      ['', ''],
+      ['Fecha', 'Fecha valor', 'Movimiento', 'Más datos', 'Importe', 'Saldo'],
+      ['2026-08-30', '2026-08-30', 'FARMACIA P.EXTREM', 'Fecha de operación: 28-08-2026', '-0,41', '4284,14'],
+      ['2026-08-28', '2026-08-28', 'DIGI SPAIN TEL', 'Recibos varios', '-20,55', '4284,55'],
+    ];
+    const parsed = parseCaixaBank(rows);
+
+    expect(parsed.movements.length).toBe(2);
+    expect(parsed.skipped).toBe(0);
+
+    const [farmacia, digi] = parsed.movements;
+    expect(farmacia.type).toBe('expense');
+    expect(farmacia.amount).toBeCloseTo(-0.41);
+    expect(farmacia.balance).toBeCloseTo(4284.14);
+    expect(farmacia.concept).toBe('FARMACIA P.EXTREM');
+    expect(farmacia.date).toBe('2026-08-30');
+    expect(farmacia.bank).toBe('caixabank');
+
+    expect(digi.type).toBe('expense');
+    expect(digi.amount).toBeCloseTo(-20.55);
+    expect(digi.balance).toBeCloseTo(4284.55);
+    expect(digi.concept).toBe('DIGI SPAIN TEL');
+    expect(digi.date).toBe('2026-08-28');
+  });
 });
 
 describe('parseSantander', () => {
