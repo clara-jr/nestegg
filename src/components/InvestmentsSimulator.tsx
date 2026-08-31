@@ -2511,18 +2511,14 @@ function MovementsSection({
             {
               content: (
                 <span className={
-                  m.type === 'tax'
-                    ? 'text-red-700'
-                    : m.amount >= 0
-                      ? 'text-emerald-700'
-                      : 'text-gray-800'
+                  m.amount >= 0
+                    ? 'text-emerald-700'
+                    : 'text-gray-800'
                 }>
                   {signedAmount(
                     m.type === 'interest'
                       ? interestNetAmount(m)
-                      : m.type === 'tax'
-                        ? -Math.abs(m.amount)
-                        : m.amount
+                      : m.amount
                   )}
                 </span>
               ),
