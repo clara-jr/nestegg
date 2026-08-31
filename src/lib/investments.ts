@@ -445,10 +445,15 @@ export function computeCashBalance(movements: Movement[]): number {
   // Buscar bancos que reportan saldo explícito (p. ej. CaixaBank).
   const balanceByBank = new Map<string, number>();
   const lastBalanceDate = new Map<string, string>();
+  const transferPairs = paypalTransferPairIds(movements);
   for (const m of movements) {
     if (m.balance === undefined || m.balance === null) continue;
     const prev = lastBalanceDate.get(m.bank);
-    if (!prev || m.date > prev) {
+    // En PayPal, si el movimiento de fecha más reciente forma parte de una
+    // pareja gasto/devolución - traspaso del mismo día, se prefiere el saldo
+    // del traspaso (es el que refleja el saldo real de la cuenta).
+    const preferTransferPair = m.bank === 'paypal' && transferPairs.has(m.id);
+    if (!prev || m.date > prev || (m.date === prev && preferTransferPair)) {
       balanceByBank.set(m.bank, m.balance);
       lastBalanceDate.set(m.bank, m.date);
     }
@@ -568,6 +573,34 @@ export interface BankBreakdownEntry {
 }
 
 /**
+ * Ids de los movimientos de PayPal que son un traspaso por el que entra o sale
+ * dinero asociado a un gasto/devolución hermano (misma fecha e importe en
+ * valor absoluto). Para estos pares se prefiere el saldo del traspaso al elegir
+ * el saldo de la cuenta PayPal: el traspaso es el que refleja el saldo real.
+ */
+function paypalTransferPairIds(movements: Movement[]): Set<string> {
+  const byKey = new Map<string, { transfer: string[]; spend: string[] }>();
+  for (const m of movements) {
+    if (m.bank !== 'paypal') continue;
+    const isTransfer = m.type === 'transfer';
+    const isSpend = m.type === 'expense' || m.type === 'refund';
+    if (!isTransfer && !isSpend) continue;
+    const key = `${m.date}|${Math.abs(m.amount).toFixed(4)}`;
+    const bucket = byKey.get(key) ?? { transfer: [], spend: [] };
+    if (isTransfer) bucket.transfer.push(m.id);
+    else bucket.spend.push(m.id);
+    byKey.set(key, bucket);
+  }
+  const ids = new Set<string>();
+  for (const { transfer, spend } of byKey.values()) {
+    if (transfer.length > 0 && spend.length > 0) {
+      for (const id of transfer) ids.add(id);
+    }
+  }
+  return ids;
+}
+
+/**
  * Devuelve un desglose por banco del saldo actual y los intereses acumulados.
  * Para bancos que reportan saldo explícito (p. ej. CaixaBank), se usa el
  * último balance; para el resto, se reconstruye sumando flujos.
@@ -585,11 +618,13 @@ export function computeBankBreakdown(movements: Movement[]): BankBreakdownEntry[
   };
 
   // Primera pasada: detectar bancos con saldo explícito y acumular intereses.
+  const transferPairs = paypalTransferPairIds(movements);
   for (const m of movements) {
     const entry = ensure(m.bank);
     entry.count++;
     if (m.balance !== undefined && m.balance !== null) {
-      if (!entry.hasExplicitBalance || m.date > entry.lastDate) {
+      const preferTransferPair = m.bank === 'paypal' && transferPairs.has(m.id);
+      if (!entry.hasExplicitBalance || m.date > entry.lastDate || (m.date === entry.lastDate && preferTransferPair)) {
         entry.balance = m.balance;
         entry.lastDate = m.date;
         entry.hasExplicitBalance = true;
@@ -674,7 +709,7 @@ const CATEGORY_KEYWORDS: ReadonlyArray<[ExpenseCategory, RegExp]> = [
   ['Viajes', /BOOKING|IBERIAEXPR|AIRBNB|RYANAIR|VUELING|IBERIA EXPRESS|\bIBERIA\b|AENA|EDREAMS|EXPEDIA|HOTEL|MELIA|AIR EUROPA|EASYJET|SKYSCANNER|TRAINLINE|OMIO|ASTUN|CANDANCHU|FORMIGAL/],
   //['Educación', /UNIVERSIDAD|MATRICULA|COLEGIO|MASTERD|CAMPUS|COURSERA|UDEMY|UDACITY|ACADEMIA|ESCUELA|GUARDERIA/],
   ['Ocio y cultura', /\bCINE\b|KINEPOLIS|GOLEM|SALA|YELMO|WEGOW|TAQUILLA|CINE|SONORAMA|CINESA|PALMTROPIC|ZACATRUS|TEATRO|CONCER|CONCIERTO|MUSIC|FESTI|WIZINK|RIVIERA|TICKETMASTER|ENTRADAS\.COM|MUSEO|EXPOSICION|STEAM|PLAYSTATION|\bXBOX\b|NINTENDO|EPIC GAMES|LIBRERIA|PAPELERIA|FNAC\b/],
-  ['Ropa', /ZARA|C&A|PARFOIS|WOMEN S SECRET|WOMEN SECRET|INTIMISSIMI|DESIGUAL|NIKE|H&M|PULL AND BEAR|NEWYORKER|OYSHO|CALZEDONIA|INSIDE|HUNKEMOLLER|MANGO|BERSHKA|PULL&BEAR|STRADIVARIUS|MASSIMO DUTTI|SPRINGFIELD|CORTEFIEL|EL CORTE INGLES|DECATHLON|SHEIN|ASOS|PRIMARK/],
+  ['Ropa', /ZARA|ZALANDO|C&A|PARFOIS|WOMEN S SECRET|WOMEN SECRET|INTIMISSIMI|DESIGUAL|NIKE|H&M|PULL AND BEAR|NEWYORKER|OYSHO|CALZEDONIA|INSIDE|HUNKEMOLLER|MANGO|BERSHKA|PULL&BEAR|STRADIVARIUS|MASSIMO DUTTI|SPRINGFIELD|CORTEFIEL|EL CORTE INGLES|DECATHLON|SHEIN|ASOS|PRIMARK/],
   ['Otros', /AMAZON|BAZAR|YVES ROCHER|PERFUMERIA|ALIEXPRESS|EL CORTE INGLES|MEDIA MARKT|WALLAPOP|\bEBAY\b|PC COMPONENTES|MIRAVIA|\bTEMU\b|SPRAYGROUND|BRICO|HOGAR|PAYPAL/],
   ['Donaciones', /DONATIVOS?|DONACION|CARITAS?|CRUZ ROJA|ONG\b|SOLIDARIDAD|HELPAGE|UNICEF|MEDICOS SIN FRONTERAS|SAVE THE CHILDREN|INTERSOS|REDOPOS|TEEPEE|FAVILA|CÁRITAS|ANIMALEJOS|ADOPTA UN ABUELO|WWF/],
   ['Trabajo', /\bAWS\b|\bCLOUDFLARE\b|\bESCROW\b/],

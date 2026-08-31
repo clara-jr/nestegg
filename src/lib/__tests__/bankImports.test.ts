@@ -20,6 +20,8 @@ import {
   parseCaixaBank,
   parseSantander,
   parseBankMatrix,
+  parsePayPal,
+  paypalDuplicateIds,
 } from '../bankImports';
 import type { Movement } from '../bankImports';
 import { computeCashBalance, computeAccountEvolution } from '../investments';
@@ -677,5 +679,236 @@ describe('normalizeStoredMovements', () => {
     expect(fused.fee).toBeUndefined();
     expect(out[1].amount).toBeCloseTo(-1);
     expect(out[1].referenceId).toBe(fused.id);
+  });
+});
+
+const PAYPAL_CSV = `Fecha\tHora\tZona horaria\tDescripción\tDivisa\tBruto \tComisión \tNeto\tSaldo\tId. de transacción\tCorreo electrónico del remitente\tNombre\tNombre del banco\tCuenta bancaria\tImporte de envío y manipulación\tImpuesto de ventas\tId. de factura\tId. de referencia de trans.
+31/8/2023\t11:44:49\tEurope/Berlin\tPago con Pago exprés\tEUR\t-28,00\t0,00\t-28,00\t-28,00\t86H83599N7996272T\tinfo@organicup.dk\tAllMatters ApS\t\t\t4,00\t0,00\tc41511860666713.1\tB-5VS52241EX581491L
+31/8/2023\t11:44:49\tEurope/Berlin\tConversión de divisas general\tEUR\t28,00\t0,00\t28,00\t0,00\t24H5866269833882B\t\t\t\t\t4,00\t0,00\tc41511860666713.1\t86H83599N7996272T
+3/9/2023\t03:20:51\tEurope/Berlin\tReembolso de pago\tEUR\t92,88\t0,00\t92,88\t92,88\t6YF886265D8055346\tpaypalrow@booking.com\tBooking.com BV\t\t\t0,00\t0,00\t[}sc9DCS4FL!;?k.Y8e?\t0XX47519YG5042718
+3/9/2023\t03:20:51\tEurope/Berlin\tConversión de divisas general\tEUR\t-92,88\t0,00\t-92,88\t0,00\t4CA66448HW7933643\t\t\t\t\t0,00\t0,00\t[}sc9DCS4FL!;?k.Y8e?\t0XX47519YG5042718`;
+
+describe('parsePayPal', () => {
+  const result = parsePayPal(parseDelimited(PAYPAL_CSV));
+
+  it('filtra las conversiones de divisas internas', () => {
+    expect(result.movements.length).toBe(2);
+    expect(result.skipped).toBe(2);
+  });
+
+  it('clasifica pagos como gasto y reembolsos como devolución', () => {
+    expect(result.movements.map(m => m.type)).toEqual(['expense', 'refund']);
+  });
+
+  it('parsea fechas, horas y bruto en formato español', () => {
+    const [pago, reembolso] = result.movements;
+    expect(pago.date).toBe('2023-08-31');
+    expect(pago.datetime).toBe('2023-08-31T11:44');
+    expect(pago.amount).toBeCloseTo(-28);
+    expect(pago.balance).toBeCloseTo(-28);
+    expect(reembolso.date).toBe('2023-09-03');
+    expect(reembolso.datetime).toBe('2023-09-03T03:20');
+    expect(reembolso.amount).toBeCloseTo(92.88);
+    expect(reembolso.balance).toBeCloseTo(92.88);
+  });
+
+  it('asigna el banco correcto y conserva el id de transacción', () => {
+    for (const m of result.movements) expect(m.bank).toBe('paypal');
+    expect(result.movements[0].referenceId).toBe('86H83599N7996272T');
+  });
+
+  it('usa la columna Nombre como concepto en vez de la Descripción', () => {
+    const [pago, reembolso] = result.movements;
+    expect(pago.concept).toBe('AllMatters ApS');
+    expect(reembolso.concept).toBe('Booking.com BV');
+  });
+
+  it('se detecta el delimitador de tabuladores automáticamente', () => {
+    expect(result.movements.length).toBe(2);
+  });
+});
+
+describe('paypalDuplicateIds', () => {
+  it('marca el cargo de banco con concepto PayPal que coincide en fecha e importe', () => {
+    const paypal: Movement = {
+      id: 'p1', fileId: 'f1', bank: 'paypal', date: '2023-08-31',
+      type: 'expense', concept: 'Pago con Pago exprés', amount: -28,
+    };
+    const bankCharge: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'caixabank', date: '2023-08-31',
+      type: 'expense', concept: 'COMPRA PAYPAL ...', amount: -28,
+    };
+    const hidden = paypalDuplicateIds([paypal, bankCharge]);
+    expect(hidden.has('b1')).toBe(true);
+    expect(hidden.has('p1')).toBe(false);
+  });
+
+  it('no marca nada si no hay movimiento de PayPal equivalente', () => {
+    const bankCharge: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'santander', date: '2023-08-31',
+      type: 'expense', concept: 'COMPRA PAYPAL ...', amount: -28,
+    };
+    const hidden = paypalDuplicateIds([bankCharge]);
+    expect(hidden.size).toBe(0);
+  });
+
+  it('conserva los movimientos en el almacén aunque estén ocultos', () => {
+    const paypal: Movement = {
+      id: 'p1', fileId: 'f1', bank: 'paypal', date: '2023-08-31',
+      type: 'expense', concept: 'Pago con Pago exprés', amount: -28,
+    };
+    const bankCharge: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'caixabank', date: '2023-08-31',
+      type: 'expense', concept: 'COMPRA PAYPAL ...', amount: -28,
+    };
+    // La normalización no borra nada: solo marca ids a ocultar.
+    const out = normalizeStoredMovements([paypal, bankCharge]);
+    expect(out.map(m => m.id).sort()).toEqual(['b1', 'p1']);
+    expect(paypalDuplicateIds(out).has('b1')).toBe(true);
+  });
+
+  it('no marca un cargo de banco sin concepto PayPal aunque coincida fecha e importe', () => {
+    const paypal: Movement = {
+      id: 'p1', fileId: 'f1', bank: 'paypal', date: '2023-08-31',
+      type: 'refund', concept: 'Reembolso de pago', amount: 92.88,
+    };
+    const bank: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'caixabank', date: '2023-08-31',
+      type: 'refund', concept: 'ABONO BOOKING.COM', amount: 92.88,
+    };
+    const hidden = paypalDuplicateIds([paypal, bank]);
+    expect(hidden.size).toBe(0);
+  });
+
+  it('no marca un cargo si coincide el importe pero la fecha cae fuera de la ventana', () => {
+    const paypal: Movement = {
+      id: 'p1', fileId: 'f1', bank: 'paypal', date: '2023-08-31',
+      type: 'expense', concept: 'Pago con Pago exprés', amount: -28,
+    };
+    const bankCharge: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'caixabank', date: '2023-09-16',
+      type: 'expense', concept: 'COMPRA PAYPAL ...', amount: -28,
+    };
+    const hidden = paypalDuplicateIds([paypal, bankCharge]);
+    expect(hidden.size).toBe(0);
+  });
+
+  it('marca el cargo si las fechas difieren hasta 15 días (en ambos sentidos)', () => {
+    const paypal: Movement = {
+      id: 'p1', fileId: 'f1', bank: 'paypal', date: '2023-08-31',
+      type: 'expense', concept: 'Pago con Pago exprés', amount: -28,
+    };
+    const lateCharge: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'santander', date: '2023-09-15',
+      type: 'expense', concept: 'COMPRA PAYPAL ...', amount: -28,
+    };
+    expect(paypalDuplicateIds([paypal, lateCharge]).has('b1')).toBe(true);
+    const earlyCharge: Movement = {
+      id: 'b2', fileId: 'f3', bank: 'caixabank', date: '2023-08-16',
+      type: 'expense', concept: 'COMPRA PAYPAL ...', amount: -28,
+    };
+    expect(paypalDuplicateIds([paypal, earlyCharge]).has('b2')).toBe(true);
+  });
+
+  it('no marca el cargo si las fechas difieren más de 15 días', () => {
+    const paypal: Movement = {
+      id: 'p1', fileId: 'f1', bank: 'paypal', date: '2023-08-31',
+      type: 'expense', concept: 'Pago con Pago exprés', amount: -28,
+    };
+    const tooLate: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'santander', date: '2023-09-16',
+      type: 'expense', concept: 'COMPRA PAYPAL ...', amount: -28,
+    };
+    expect(paypalDuplicateIds([paypal, tooLate]).has('b1')).toBe(false);
+  });
+
+  it('oculta el cargo del banco aunque su concepto sea solo el comercio (sin «PAYPAL») si comparte el nombre con PayPal', () => {
+    // El concepto de PayPal es el comercio (columna Nombre); el del banco
+    // muestra el mismo comercio, p. ej. «MERCADONA» en lugar de «PAYPAL».
+    const paypal: Movement = {
+      id: 'p1', fileId: 'f1', bank: 'paypal', date: '2026-07-10',
+      type: 'expense', concept: 'Mercadona', amount: -28,
+    };
+    const bankCharge: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'caixabank', date: '2026-07-14',
+      type: 'expense', concept: 'MERCADONA', amount: -28,
+    };
+    expect(paypalDuplicateIds([paypal, bankCharge]).has('b1')).toBe(true);
+  });
+
+  it('no oculta un cargo del mismo importe y fechas cercanas pero de un comercio distinto', () => {
+    const paypal: Movement = {
+      id: 'p1', fileId: 'f1', bank: 'paypal', date: '2026-07-10',
+      type: 'expense', concept: 'Mercadona', amount: -28,
+    };
+    const otherCharge: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'caixabank', date: '2026-07-14',
+      type: 'expense', concept: 'GASOLINERA REPSOL', amount: -28,
+    };
+    expect(paypalDuplicateIds([paypal, otherCharge]).has('b1')).toBe(false);
+  });
+
+  it('oculta un cargo facturado por la entidad legal «COREPayPal» aunque muestre otro comercio', () => {
+    // El banco carga vía «COREPayPal Europe S.a.r.l.» (con «PayPal» incrustado)
+    // mientras que PayPal registra el comercio real («zooplus SE»).
+    const paypal: Movement = {
+      id: '1r7j92n', fileId: 't2k2t6', bank: 'paypal', date: '2026-07-10',
+      type: 'expense', concept: 'zooplus SE', amount: -138.27, balance: -138.27,
+    };
+    const bank: Movement = {
+      id: '1fd7e2p', fileId: 'xy2sct', bank: 'caixabank', date: '2026-07-14',
+      type: 'expense', concept: 'COREPayPal Europe S.a.r.l. et Cie S.C.A', amount: -138.27, balance: 2408.47,
+    };
+    const hidden = paypalDuplicateIds([paypal, bank]);
+    expect(hidden.has('1fd7e2p')).toBe(true);
+    expect(hidden.has('1r7j92n')).toBe(false);
+  });
+});
+
+describe('paypalTraspasos', () => {
+  it('clasifica el depósito bancario en cuenta PayPal como traspaso', () => {
+    const result = parsePayPal(parseDelimited([
+      'Fecha\tHora\tDescripción\tNombre\tBruto ',
+      '4/8/2026\t10:00:00\tDepósito bancario en cuenta PayPal\t\t42,00',
+    ].join('\n')));
+    expect(result.movements.length).toBe(1);
+    expect(result.movements[0].type).toBe('transfer');
+    expect(result.movements[0].amount).toBeCloseTo(42);
+  });
+
+  it('clasifica la retirada iniciada por el usuario como traspaso', () => {
+    const result = parsePayPal(parseDelimited([
+      'Fecha\tHora\tDescripción\tNombre\tBruto ',
+      '4/8/2026\t10:00:00\tRetirada iniciada por el usuario\t\t-42,00',
+    ].join('\n')));
+    expect(result.movements.length).toBe(1);
+    expect(result.movements[0].type).toBe('transfer');
+    expect(result.movements[0].amount).toBeCloseTo(-42);
+  });
+
+  it('no convierte un pago con nombre de comercio en traspaso', () => {
+    const result = parsePayPal(parseDelimited([
+      'Fecha\tHora\tDescripción\tNombre\tBruto ',
+      '4/8/2026\t10:00:00\tPago con Pago exprés\tMercadona\t-42,00',
+    ].join('\n')));
+    expect(result.movements[0].type).toBe('expense');
+  });
+
+  it('filtra las retenciones de cuenta para autorización abierta', () => {
+    const result = parsePayPal(parseDelimited([
+      'Fecha\tHora\tDescripción\tNombre\tBruto ',
+      '5/8/2026\t10:00:00\tRetención de cuenta para autorización abierta\t\t1,00',
+    ].join('\n')));
+    expect(result.movements.length).toBe(0);
+    expect(result.skipped).toBe(1);
+  });
+
+  it('filtra las cancelaciones de retención de cuenta general', () => {
+    const result = parsePayPal(parseDelimited([
+      'Fecha\tHora\tDescripción\tNombre\tBruto ',
+      '5/8/2026\t10:00:00\tCancelación de retención de cuenta general\t\t-1,00',
+    ].join('\n')));
+    expect(result.movements.length).toBe(0);
+    expect(result.skipped).toBe(1);
   });
 });

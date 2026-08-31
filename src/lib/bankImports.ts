@@ -1,12 +1,13 @@
 import * as XLSX from 'xlsx';
 
-export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank' | 'santander';
+export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank' | 'santander' | 'paypal';
 
 export const BANKS: ReadonlyArray<{ id: BankId; label: string; hint: string }> = [
   { id: 'trade-republic', label: 'Trade Republic', hint: 'CSV exportado por Trade Republic con datetime, type, name, shares, price, amount…' },
   { id: 'myinvestor', label: 'MyInvestor', hint: 'Movimientos de cuenta (CSV obtenido de MyInvestor) o de fondos (XLS exportado por Inversis)' },
   { id: 'caixabank', label: 'CaixaBank', hint: 'XLS/CDV exportado por CaixaBank con fechas, concepto o movimiento, importe y saldo' },
   { id: 'santander', label: 'Santander', hint: 'XLS/XLSX exportado por Santander con fecha operación, fecha valor, concepto, importe y saldo' },
+  { id: 'paypal', label: 'PayPal', hint: 'CSV exportado por PayPal con fecha, hora, descripción, nombre, bruto/comisión/neto y saldo' },
 ];
 
 export type MovementType =
@@ -412,6 +413,90 @@ export function dedupeMovements(movements: Movement[]): Movement[] {
   }
   return out;
 }
+
+// Se busca «PAYPAL» como subcadena (no solo como palabra): los cargos del
+// banco suelen venir facturados por la entidad legal de PayPal, p. ej.
+// «COREPayPal Europe S.a.r.l.», donde «PayPal» va incrustado en el nombre.
+const PAYPAL_CONCEPT_RE = /PAYPAL/i;
+
+/**
+ * Máxima diferencia de días permitida entre el movimiento de PayPal y el cargo
+ * homólogo del banco para considerarlos el mismo. El banco suele contabilizar
+ * el cargo días después de la operación PayPal (en la práctica hasta 15 días).
+ */
+const PAYPAL_DUP_DATE_WINDOW_DAYS = 15;
+
+/** Diferencia en días (valor absoluto) entre dos fechas ISO «YYYY-MM-DD». */
+function dateDiffDays(isoA: string, isoB: string): number {
+  const a = new Date(`${isoA}T00:00:00`).getTime();
+  const b = new Date(`${isoB}T00:00:00`).getTime();
+  return Math.abs(a - b) / 86400000;
+}
+
+// Palabras que no aportan identidad de comercio y se ignoran al comparar
+// conceptos (p. ej. PayPal, Pago exprés, COMPRA, TRX…), para que solo cuente
+// un token distintivo (idealmente el nombre del comercio).
+const MERCHANT_STOPWORDS = new Set([
+  'PAYPAL', 'PAGO', 'EXPRES', 'EXPRESS', 'COMPRA', 'PURCHASE', 'PAYMENT',
+  'TRX', 'TXN', 'TRANS', 'REF', 'CON', 'DE', 'EN', 'COM', 'A',
+  'MOVIMIENTO', 'OPERACION', 'ABONO', 'CARGO', 'REEMBOLSO', 'DEVOLUCION',
+]);
+
+/** Extrae los tokens distintivos del concepto (nombres de comercio) ya
+ *  normalizados (mayúsculas, sin acentos), filtrando palabras banales. */
+function merchantTokens(concept: string): Set<string> {
+  const tokens = new Set<string>();
+  for (const raw of norm(concept).split(/[^A-Z0-9]+/)) {
+    const t = raw.replace(/\.+$/, '');
+    if (t.length >= 3 && !MERCHANT_STOPWORDS.has(t) && !/^\d+$/.test(t)) tokens.add(t);
+  }
+  return tokens;
+}
+
+/**
+ * Devuelve los ids de los movimientos de otras cuentas bancarias
+ * (CaixaBank/Santander, etc.) que duplican un cargo de PayPal: cargos que
+ * coinciden en cuantía (importe absoluto) y en fecha (ventana de ±4 días) con
+ * un movimiento de PayPal y cuyo concepto es claramente el mismo comercio
+ * (contiene «PayPal», o comparte el nombre del comercio con el de PayPal).
+ * Estos movimientos se reclasifican de forma derivada como «Traspaso» (no se
+ * borran del almacén): si el fichero de PayPal se elimina, el cargo del banco
+ * vuelve a su tipo original (Gasto). Los movimientos de PayPal nunca se marcan.
+ */
+export function paypalDuplicateIds(movements: Movement[]): Set<string> {
+  interface PaypalHit {
+    date: string;
+    tokens: Set<string>;
+  }
+  const paypalByAmount = new Map<string, PaypalHit[]>();
+  for (const m of movements) {
+    if (m.bank !== 'paypal') continue;
+    const key = Math.abs(m.amount).toFixed(4);
+    const hits = paypalByAmount.get(key) ?? [];
+    hits.push({ date: m.date, tokens: merchantTokens(m.concept) });
+    paypalByAmount.set(key, hits);
+  }
+  if (paypalByAmount.size === 0) return new Set();
+  const hidden = new Set<string>();
+  for (const m of movements) {
+    if (m.bank === 'paypal') continue;
+    const hits = paypalByAmount.get(Math.abs(m.amount).toFixed(4));
+    if (!hits) continue;
+    const bankTokens = merchantTokens(m.concept);
+    const matches =
+      PAYPAL_CONCEPT_RE.test(m.concept) ||
+      [...bankTokens].some(bt => hits.some(h => h.tokens.has(bt)));
+    if (!matches) continue;
+    if (hits.some(h => dateDiffDays(h.date, m.date) <= PAYPAL_DUP_DATE_WINDOW_DAYS)) {
+      hidden.add(m.id);
+    }
+  }
+  return hidden;
+}
+
+// ---------------------------------------------------------------------------
+// Órdenes fragmentadas (Trade Republic parte una orden en dos filas)
+// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Órdenes fragmentadas (Trade Republic parte una orden en dos filas)
@@ -1343,6 +1428,121 @@ export function parseSantander(matrix: CellMatrix): ParsedBankFile {
 }
 
 // ---------------------------------------------------------------------------
+// PayPal
+// ---------------------------------------------------------------------------
+
+function classifyPayPalConcept(text: string, amount: number): MovementType {
+  const t = norm(text);
+  // Conversiones de divisas son reasignaciones internas de PayPal emparejadas
+  // con un pago/reembolso; no representan un flujo de caja real por separado y
+  // se filtran al importar.
+  if (/CONVERSION DE DIVISAS|CONVERSION MONEDA|CURRENCY CONVERSION/.test(t)) return 'other';
+  // Retenciones provisionales de autorizaciones abiertas y sus cancelaciones
+  // son bloqueos/liberaciones de saldo sin movimiento de caja real (se filtran).
+  if (/RETENCION DE CUENTA PARA AUTORIZACION ABIERTA/.test(t)) return 'other';
+  if (/CANCELACION DE RETENCION DE CUENTA GENERAL/.test(t)) return 'other';
+  // Depósitos bancarios en PayPal (dinero que entra, asociado a un gasto) y
+  // retiradas iniciadas por el usuario (dinero que sale, asociado a una
+  // devolución) son traspasos de fondos entre el banco y PayPal, no un ingreso
+  // ni una retirada real.
+  if (/DEPOSITO BANCARIO EN CUENTA PAYPAL/.test(t)) return 'transfer';
+  if (/RETIRADA INICIADA POR EL USUARIO/.test(t)) return 'transfer';
+  if (/REEMBOLSO|REIMBOLSO|REEMBURSEMENT|REFUND/.test(t)) return 'refund';
+  if (/RECIBIDO.*FAMILIA|RECIBIDO.*AMIGO|AMIGOS.?Y FAMILIA/.test(t)) return 'refund';
+  if (/\bPAGO/.test(t) || /PAYMENT|COMPRA|PURCHASE/.test(t)) return 'expense';
+  if (/TRANSFERENCIA|TRANSFER|DONACION|DONATION/.test(t) && amount < 0) return 'expense';
+  if (/RETIRADA|WITHDRAWAL|RETIRO/.test(t)) return 'withdrawal';
+  if (/COMISION|TAXA|FEE/.test(t)) return 'fee';
+  return amount <= 0 ? 'expense' : 'income';
+}
+
+/**
+ * Detecta el delimitador columnar del CSV de PayPal. PayPal exporta separado
+ * por tabuladores; aunque también puede venir como ; o ,. Reutiliza la
+ * detección general pero desactivando la preferencia por «;», ya que PayPal
+ * puede usar «;» dentro de los correos o nombres del fichero.
+ */
+export function parsePayPal(matrix: CellMatrix): ParsedBankFile {
+  const headerIdx = matrix.findIndex(row => {
+    const joined = row.map(norm).join(' ');
+    return joined.includes('FECHA') && joined.includes('DESCRIPCION') && (joined.includes('BRUTO') || joined.includes('NETO'));
+  });
+  if (headerIdx < 0) return { movements: [], skipped: matrix.length };
+  const header = matrix[headerIdx].map(c => norm(c));
+
+  const col = {
+    date: findColumn(header, c => c === 'FECHA'),
+    time: findColumn(header, c => c === 'HORA'),
+    timezone: findColumn(header, c => c.includes('ZONA HORARIA')),
+    description: findColumn(header, c => c === 'DESCRIPCION'),
+    name: findColumn(header, c => c === 'NOMBRE'),
+    currency: findColumn(header, c => c === 'DIVISA'),
+    gross: findColumn(header, c => c === 'BRUTO'),
+    fee: findColumn(header, c => c === 'COMISION'),
+    net: findColumn(header, c => c === 'NETO'),
+    balance: findColumn(header, c => c === 'SALDO'),
+    transactionId: findColumn(header, c => c.replace(/\./g, '').includes('ID DE TRANSACCION')),
+  };
+  if (col.date < 0 || (col.gross < 0 && col.net < 0)) {
+    return { movements: [], skipped: matrix.length };
+  }
+
+  const movements: Movement[] = [];
+  let skipped = 0;
+
+  for (let r = headerIdx + 1; r < matrix.length; r++) {
+    const row = matrix[r];
+    if (!row.some(c => c.length > 0)) continue;
+
+    const date = col.date >= 0 ? parseDateToISO(row[col.date]) : undefined;
+    const gross = col.gross >= 0 ? parseNumber(row[col.gross]) : undefined;
+    if (!date || gross === undefined) {
+      skipped++;
+      continue;
+    }
+
+    const time = col.time >= 0 ? String(row[col.time] ?? '').trim() : '';
+    const timeMatch = time.match(/^(\d{1,2}):(\d{2})/);
+    const datetime = timeMatch
+      ? `${date}T${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`
+      : undefined;
+
+    const rawDescription = (col.description >= 0 ? row[col.description] : '') || 'Movimiento PayPal';
+    const type = classifyPayPalConcept(rawDescription, gross);
+    // Las conversiones de divisas se filtran: son pares internos que netean a
+    // cero junto con su pago/reembolso asociado.
+    if (type === 'other') {
+      skipped++;
+      continue;
+    }
+    // El concepto es el nombre del comercio/contraparte (columna «Nombre»),
+    // que es lo que comparten el banco y PayPal; la descripción solo sirve de
+    // respaldo cuando no hay nombre.
+    const name = (col.name >= 0 ? row[col.name] : '') || '';
+    const concept = name || rawDescription;
+    const currency = col.currency >= 0 ? row[col.currency] : '';
+    const balanceRaw = col.balance >= 0 ? (row[col.balance] ?? '') : '';
+    const balance = parseNumber(balanceRaw);
+    const transactionId = col.transactionId >= 0 ? (row[col.transactionId] ?? '') : '';
+
+    movements.push({
+      id: movementId('paypal', date, type, concept, gross, `${currency}|${transactionId}`),
+      fileId: '',
+      bank: 'paypal',
+      date,
+      datetime,
+      type,
+      concept,
+      amount: gross,
+      balance: balance ?? undefined,
+      referenceId: transactionId || undefined,
+    });
+  }
+
+  return { movements, skipped };
+}
+
+// ---------------------------------------------------------------------------
 // Entrada principal
 // ---------------------------------------------------------------------------
 
@@ -1375,6 +1575,9 @@ export function parseBankMatrix(bank: BankId, _fileName: string, matrix: CellMat
       break;
     case 'santander':
       parsed = parseSantander(matrix);
+      break;
+    case 'paypal':
+      parsed = parsePayPal(matrix);
       break;
   }
   // Corrige el signo de gastos/devoluciones (p. ej. reembolsos positivos de

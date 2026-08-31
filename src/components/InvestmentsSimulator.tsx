@@ -19,6 +19,7 @@ import {
   movementSignature,
   normalizeStoredMovements,
   parseBankMatrix,
+  paypalDuplicateIds,
   readFileAsMatrix,
   type BankId,
   type FileMeta,
@@ -145,6 +146,7 @@ export default function InvestmentsSimulator() {
   const [updatingPrices, setUpdatingPrices] = useState(false);
   const [priceStatus, setPriceStatus] = useState<string | null>(null);
   const [movementFilter, setMovementFilter] = useState<'all' | MovementType>('all');
+  const [bankFilter, setBankFilter] = useState<'all' | BankId>('all');
   const [search, setSearch] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingCategoryChange, setPendingCategoryChange] = useState<{
@@ -171,24 +173,37 @@ export default function InvestmentsSimulator() {
     return undefined;
   };
 
+  // Movimientos efectivos: se reclasifican de forma derivada como «Traspaso»
+  // los cargos de otros bancos que duplican un movimiento de PayPal (mismo
+  // importe y dentro de la ventana de fechas). El tipo se sobrescribe sin tocar
+  // el almacén, así que si se elimina el fichero de PayPal esos movimientos
+  // vuelven a su tipo original (Gasto) automáticamente.
+  const visibleMovements = useMemo(() => {
+    const transfers = paypalDuplicateIds(store.movements);
+    if (transfers.size === 0) return store.movements;
+    return store.movements.map(m =>
+      transfers.has(m.id) ? { ...m, type: 'transfer' as const } : m
+    );
+  }, [store.movements]);
+
   const portfolio = useMemo(
-    () => computePortfolio(store.movements, priceOf, plazoConfigs),
-    [store.movements, priceMap, plazoConfigs]
+    () => computePortfolio(visibleMovements, priceOf, plazoConfigs),
+    [visibleMovements, priceMap, plazoConfigs]
   );
   const interest = useMemo(() => {
-    const interestMovements = store.movements.filter(m => m.type === 'interest');
-    const taxOnInterest = store.movements.filter(
+    const interestMovements = visibleMovements.filter(m => m.type === 'interest');
+    const taxOnInterest = visibleMovements.filter(
       m => m.type === 'tax' && /INTERES/i.test(m.concept)
     );
     return computeInterest(interestMovements, taxOnInterest);
-  }, [store.movements]);
+  }, [visibleMovements]);
   const expenses = useMemo(
-    () => computeExpenses(store.movements.filter(m => m.type === 'expense' || m.type === 'refund')),
-    [store.movements]
+    () => computeExpenses(visibleMovements.filter(m => m.type === 'expense' || m.type === 'refund')),
+    [visibleMovements]
   );
   const income = useMemo(
-    () => computeIncome(store.movements.filter(m => m.type === 'income')),
-    [store.movements]
+    () => computeIncome(visibleMovements.filter(m => m.type === 'income')),
+    [visibleMovements]
   );
   const savingsAvg = income.averageMonthly - expenses.averageMonthly;
 
@@ -219,16 +234,16 @@ export default function InvestmentsSimulator() {
   }, []);
 
   const cashBalance = useMemo(
-    () => computeCashBalance(store.movements),
-    [store.movements]
+    () => computeCashBalance(visibleMovements),
+    [visibleMovements]
   );
   const account = useMemo(
-    () => computeAccountEvolution(store.movements),
-    [store.movements]
+    () => computeAccountEvolution(visibleMovements),
+    [visibleMovements]
   );
   const bankBreakdown = useMemo(
-    () => computeBankBreakdown(store.movements),
-    [store.movements]
+    () => computeBankBreakdown(visibleMovements),
+    [visibleMovements]
   );
 
   const totalCapital = portfolio.summary.currentValue + cashBalance;
@@ -297,6 +312,14 @@ export default function InvestmentsSimulator() {
       }
       addedCount = toAdd.length;
 
+      // Cuenta los cargos de otros bancos (CaixaBank/Santander…) que pasan a
+      // reclasificarse como Traspaso por duplicar un movimiento de PayPal tras
+      // esta importación.
+      const hiddenBefore = new Set(paypalDuplicateIds(store.movements));
+      const hiddenAfter = paypalDuplicateIds([...store.movements, ...toAdd]);
+      let newlyHidden = 0;
+      for (const id of hiddenAfter) if (!hiddenBefore.has(id)) newlyHidden++;
+
       setStore(prev => {
         const filesById = new Map(prev.files.map(f => [f.id, f]));
         for (const f of newFiles) filesById.set(f.id, f);
@@ -318,6 +341,9 @@ export default function InvestmentsSimulator() {
           `${addedCount} movimiento${addedCount === 1 ? '' : 's'} importado${addedCount === 1 ? '' : 's'}`,
           `${duplicateCount} duplicado${duplicateCount === 1 ? '' : 's'} omitido${duplicateCount === 1 ? '' : 's'}`,
         ];
+        if (newlyHidden > 0) {
+          parts.push(`${newlyHidden} cargo${newlyHidden === 1 ? '' : 's'} de banco reclasificado${newlyHidden === 1 ? '' : 's'} a Traspaso por duplicar PayPal`);
+        }
         if (skippedRows > 0) parts.push(`${skippedRows} filas sin fecha o importe ignoradas`);
         setFeedback({ kind: addedCount > 0 ? 'success' : 'warning', text: `${parts.join(' · ')}.` });
       }
@@ -545,11 +571,11 @@ export default function InvestmentsSimulator() {
     // (fundOperation) coincide en fecha + importe con un movimiento de cuenta,
     // solo mostramos el de cuenta (el negativo).
     const accountKeys = new Set(
-      store.movements
+      visibleMovements
         .filter(m => m.type === 'buy' && !m.fundOperation)
         .map(m => `${m.date}|${Math.abs(m.amount)}`)
     );
-    return store.movements
+    return visibleMovements
       .filter(m => {
         if (m.type === 'buy' && m.fundOperation) {
           if (accountKeys.has(`${m.date}|${Math.abs(m.amount)}`)) return false;
@@ -557,6 +583,7 @@ export default function InvestmentsSimulator() {
         return true;
       })
       .filter(m => (movementFilter === 'all' ? true : m.type === movementFilter))
+      .filter(m => (bankFilter === 'all' ? true : m.bank === bankFilter))
       .filter(m =>
         q.length === 0 ||
         m.concept.toLowerCase().includes(q) ||
@@ -564,13 +591,13 @@ export default function InvestmentsSimulator() {
         (m.isin ?? '').toLowerCase().includes(q)
       )
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [store.movements, movementFilter, search]);
+  }, [visibleMovements, movementFilter, bankFilter, search]);
 
   const presentTypes = useMemo(() => {
     const types = new Set<MovementType>();
-    for (const m of store.movements) types.add(m.type);
+    for (const m of visibleMovements) types.add(m.type);
     return [...types];
-  }, [store.movements]);
+  }, [visibleMovements]);
 
   // Orden por defecto por % Anual: solo se recalcula cuando cambia la
   // composición de la cartera (entra o sale un producto), nunca al editar los
@@ -805,14 +832,14 @@ export default function InvestmentsSimulator() {
                   expCurrent={expenses.currentMonth}
                   expPrev={expenses.previousMonth}
                   expMonthly={expenses.monthly}
-                  movements={store.movements.filter(m => m.type === 'income')}
+                  movements={visibleMovements.filter(m => m.type === 'income')}
                 />
               )}
 
               {tab === 'expenses' && (
                 <ExpensesSection
                   data={expenses}
-                  movements={store.movements.filter(m => m.type === 'expense' || m.type === 'refund')}
+                  movements={visibleMovements.filter(m => m.type === 'expense' || m.type === 'refund')}
                   onChangeCategory={updateCategory}
                   onBulkChangeCategory={bulkUpdateCategory}
                 />
@@ -824,8 +851,10 @@ export default function InvestmentsSimulator() {
                   total={filteredMovements.length}
                   types={presentTypes}
                   filter={movementFilter}
+                  bankFilter={bankFilter}
                   search={search}
                   onFilterChange={setMovementFilter}
+                  onBankFilterChange={setBankFilter}
                   onSearchChange={setSearch}
                   onChangeType={updateType}
                   onBulkChangeType={bulkUpdateType}
@@ -1714,6 +1743,7 @@ function ExpensesSection({
 }) {
   const [expPage, setExpPage] = useState(1);
   const [expCategory, setExpCategory] = useState<string>('all');
+  const [expBank, setExpBank] = useState<'all' | BankId>('all');
   const [expSearch, setExpSearch] = useState('');
   const [expSortKey, setExpSortKey] = useState<'date' | 'amount'>('date');
   const [expSortDir, setExpSortDir] = useState<'asc' | 'desc'>('desc');
@@ -1740,8 +1770,9 @@ function ExpensesSection({
     const q = expSearch.trim().toLowerCase();
     return movements
       .filter(m => expCategory === 'all' || (m.category ?? 'Otros') === expCategory)
+      .filter(m => expBank === 'all' || m.bank === expBank)
       .filter(m => q.length === 0 || m.concept.toLowerCase().includes(q));
-  }, [movements, expCategory, expSearch]);
+  }, [movements, expCategory, expBank, expSearch]);
 
   const sortedMovements = useMemo(() => {
     const dir = expSortDir === 'asc' ? 1 : -1;
@@ -1758,7 +1789,7 @@ function ExpensesSection({
   const expTotalPages = Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE));
   const expShown = sortedMovements.slice((expPage - 1) * PAGE_SIZE, expPage * PAGE_SIZE);
 
-  useEffect(() => setExpPage(1), [expCategory, expSearch, expSortKey, expSortDir]);
+  useEffect(() => setExpPage(1), [expCategory, expBank, expSearch, expSortKey, expSortDir]);
   useEffect(() => setSelected(new Set()), [movements]);
 
   const toggleSort = (key: 'date' | 'amount') => {
@@ -1888,6 +1919,16 @@ function ExpensesSection({
               <option value="all">Todas las categorías</option>
               {EXPENSE_CATEGORY_LIST.map(c => (
                 <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <select
+              value={expBank}
+              onChange={e => setExpBank(e.target.value as 'all' | BankId)}
+              className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+            >
+              <option value="all">Todos los bancos</option>
+              {BANKS.map(b => (
+                <option key={b.id} value={b.id}>{b.label}</option>
               ))}
             </select>
           </div>
@@ -2214,8 +2255,10 @@ function MovementsSection({
   total,
   types,
   filter,
+  bankFilter,
   search,
   onFilterChange,
+  onBankFilterChange,
   onSearchChange,
   onChangeType,
   onBulkChangeType,
@@ -2226,8 +2269,10 @@ function MovementsSection({
   total: number;
   types: MovementType[];
   filter: 'all' | MovementType;
+  bankFilter: 'all' | BankId;
   search: string;
   onFilterChange: (v: 'all' | MovementType) => void;
+  onBankFilterChange: (v: 'all' | BankId) => void;
   onSearchChange: (v: string) => void;
   onChangeType: (id: string, type: MovementType) => void;
   onBulkChangeType: (ids: string[], type: MovementType) => void;
@@ -2323,6 +2368,16 @@ function MovementsSection({
             <option value="all">Todos los tipos</option>
             {types.map(t => (
               <option key={t} value={t}>{MOVEMENT_TYPE_LABELS[t]}</option>
+            ))}
+          </select>
+          <select
+            value={bankFilter}
+            onChange={e => { onBankFilterChange(e.target.value as 'all' | BankId); setPage(1); }}
+            className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+          >
+            <option value="all">Todos los bancos</option>
+            {BANKS.map(b => (
+              <option key={b.id} value={b.id}>{b.label}</option>
             ))}
           </select>
         </div>

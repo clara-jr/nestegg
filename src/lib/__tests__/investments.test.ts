@@ -5,6 +5,7 @@ import {
   computeExpenses,
   computeCashBalance,
   computeAccountEvolution,
+  computeBankBreakdown,
   guessExpenseCategory,
   aggregateByMonth,
   cleanConcept,
@@ -339,6 +340,53 @@ describe('computeCashBalance', () => {
       mk({ type: 'sell', amount: 999.96, fee: -1 }),
     ];
     expect(computeCashBalance(movements)).toBeCloseTo(4900 - 976 - 1 - 24 + 999.96 - 1);
+  });
+});
+
+describe('computeBankBreakdown (saldo PayPal)', () => {
+  it('usa el saldo del movimiento con fecha más reciente', () => {
+    const movements: Movement[] = [
+      mk({ bank: 'paypal', date: '2026-08-01', type: 'expense', amount: -10, balance: 90 }),
+      mk({ bank: 'paypal', date: '2026-08-10', type: 'expense', amount: -20, balance: 70 }),
+    ];
+    const entry = computeBankBreakdown(movements).find(e => e.bank === 'paypal')!;
+    expect(entry.balance).toBeCloseTo(70);
+  });
+
+  it('ante una pareja gasto/traspaso del mismo día prefiere el saldo del traspaso', () => {
+    // El gasto aparece primero en el fichero; el traspaso (depósito) después.
+    const movements: Movement[] = [
+      mk({ bank: 'paypal', date: '2026-08-04', type: 'expense', amount: -42, balance: 0 }),
+      mk({ bank: 'paypal', date: '2026-08-04', type: 'transfer', amount: 42, balance: 42 }),
+    ];
+    const entry = computeBankBreakdown(movements).find(e => e.bank === 'paypal')!;
+    expect(entry.balance).toBeCloseTo(42);
+  });
+
+  it('prefiere el saldo del traspaso aunque el gasto sea el último del fichero', () => {
+    const movements: Movement[] = [
+      mk({ bank: 'paypal', date: '2026-08-04', type: 'transfer', amount: 42, balance: 42 }),
+      mk({ bank: 'paypal', date: '2026-08-04', type: 'expense', amount: -42, balance: 0 }),
+    ];
+    const entry = computeBankBreakdown(movements).find(e => e.bank === 'paypal')!;
+    expect(entry.balance).toBeCloseTo(42);
+  });
+
+  it('usa el saldo más reciente, sin preferir el traspaso si no hay pareja', () => {
+    const movements: Movement[] = [
+      mk({ bank: 'paypal', date: '2026-08-04', type: 'transfer', amount: 42, balance: 42 }),
+      mk({ bank: 'paypal', date: '2026-08-10', type: 'expense', amount: -42, balance: 0 }),
+    ];
+    const entry = computeBankBreakdown(movements).find(e => e.bank === 'paypal')!;
+    expect(entry.balance).toBeCloseTo(0);
+  });
+
+  it('computeCashBalance usa también el saldo del traspaso de la pareja', () => {
+    const movements: Movement[] = [
+      mk({ bank: 'paypal', date: '2026-08-04', type: 'expense', amount: -42, balance: 0 }),
+      mk({ bank: 'paypal', date: '2026-08-04', type: 'transfer', amount: 42, balance: 42 }),
+    ];
+    expect(computeCashBalance(movements)).toBeCloseTo(42);
   });
 });
 
