@@ -174,7 +174,7 @@ describe('parseTradeRepublic', () => {
     );
     const parsed = parseTradeRepublic(matrix);
     expect(parsed.movements.map(m => m.type)).toEqual([
-      'deposit',
+      'transfer',
       'withdrawal',
       'expense',
       'tax',
@@ -635,7 +635,7 @@ describe('splitTradeFees', () => {
     const movements = [
       trade({ date: '2024-07-15', shares: 10, price: 100, fee: -1 }),
       trade({ date: '2024-08-01', type: 'sell', shares: -4, amount: 420, fee: -1 }),
-      trade({ date: '2024-08-02', type: 'deposit', amount: 2000 }),
+      trade({ date: '2024-08-02', type: 'transfer', amount: 2000 }),
     ];
     const once = normalizeStoredMovements(movements);
     expect(once.filter(m => m.type === 'fee').length).toBe(2);

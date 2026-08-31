@@ -311,7 +311,7 @@ describe('aggregateByMonth y computeInterest', () => {
 describe('computeCashBalance', () => {
   it('reconstruye el saldo con el importe firmado de los movimientos', () => {
     const movements: Movement[] = [
-      mk({ type: 'deposit', amount: 1000 }),
+      mk({ type: 'transfer', amount: 1000 }),
       mk({ type: 'buy', amount: -400 }),
       mk({ type: 'dividend', amount: 25 }),
       mk({ type: 'interest', amount: 6.5 }),
@@ -324,7 +324,7 @@ describe('computeCashBalance', () => {
 
   it('resta la retención (tax) de intereses y dividendos abonados netos', () => {
     const movements: Movement[] = [
-      mk({ type: 'deposit', amount: 1000 }),
+      mk({ type: 'transfer', amount: 1000 }),
       mk({ type: 'interest', amount: 12.34, tax: -0.57 }),
       mk({ type: 'dividend', amount: 50, tax: -5 }),
     ];
@@ -333,7 +333,7 @@ describe('computeCashBalance', () => {
 
   it('resta las comisiones (fee) cobradas aparte del importe', () => {
     const movements: Movement[] = [
-      mk({ type: 'deposit', amount: 4900 }),
+      mk({ type: 'transfer', amount: 4900 }),
       mk({ type: 'buy', amount: -976, fee: -1 }),
       mk({ type: 'buy', amount: -24 }), // sin comisión
       mk({ type: 'sell', amount: 999.96, fee: -1 }),
@@ -345,7 +345,7 @@ describe('computeCashBalance', () => {
 describe('computeAccountEvolution', () => {
   it('acumula aportaciones netas e intereses mes a mes', () => {
     const movements: Movement[] = [
-      mk({ type: 'deposit', date: '2024-01-10', amount: 1000 }),
+      mk({ type: 'transfer', date: '2024-01-10', amount: 1000 }),
       mk({ type: 'interest', date: '2024-01-31', amount: 5, tax: -1 }),
       mk({ type: 'withdrawal', date: '2024-02-10', amount: -200 }),
       mk({ type: 'interest', date: '2024-03-31', amount: 3 }),
@@ -363,7 +363,7 @@ describe('computeAccountEvolution', () => {
 
   it('la serie acaba en el saldo en cuenta y separa ingresos de intereses', () => {
     const movements: Movement[] = [
-      mk({ type: 'deposit', date: '2024-01-10', amount: 1000 }),
+      mk({ type: 'transfer', date: '2024-01-10', amount: 1000 }),
       mk({ type: 'buy', date: '2024-01-15', amount: -400, fee: -1 }),
       mk({ type: 'sell', date: '2024-02-01', amount: 150, tax: -5 }),
       mk({ type: 'dividend', date: '2024-02-10', amount: 10 }),

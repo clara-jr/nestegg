@@ -14,9 +14,8 @@ export type MovementType =
   | 'sell'
   | 'dividend'
   | 'interest'
-  | 'deposit'
-  | 'withdrawal'
   | 'transfer'
+  | 'withdrawal'
   | 'fee'
   | 'tax'
   | 'expense'
@@ -30,9 +29,8 @@ export const MOVEMENT_TYPE_LABELS: Record<MovementType, string> = {
   sell: 'Venta',
   dividend: 'Dividendo',
   interest: 'Intereses',
-  deposit: 'Traspaso (+)',
+  transfer: 'Traspaso',
   withdrawal: 'Retirada',
-  transfer: 'Traspaso (-)',
   fee: 'Comisión',
   tax: 'Impuestos',
   expense: 'Gasto',
@@ -593,7 +591,7 @@ function classifyByKeywords(text: string, amount: number): MovementType {
   if (/INTERES|ZINS/.test(t)) return 'interest';
   if (/RETENCION|CAPITAL GAINS|IMPUESTO|TRIBUTARIAS|STEUER|(\b|_)TAX(_|\b)/.test(t)) return 'tax';
   if (/COMISION|GEBUHR|(\b|_)FEE(_|\b)/.test(t)) return 'fee';
-  if (/DEPOSIT|INGRESO|APORTE|EINZAHLUNG|INBOUND|INPAYMENT/.test(t)) return 'deposit';
+  if (/DEPOSIT|INGRESO|APORTE|EINZAHLUNG|INBOUND|INPAYMENT/.test(t)) return 'transfer';
   if (/RETIRADA|RETIRO|WITHDRAWAL|AUSZAHLUNG|OUTBOUND|OUTPAYMENT/.test(t)) return 'withdrawal';
   // Devoluciones de compras, dinero prestado devuelto, etc.: ingresos
   // reversiones de gastos (no son nómina ni rentabilidad). Van antes que los
@@ -727,7 +725,7 @@ function classifyMyInvestorType(text: string, amount: number): MovementType {
   // Intereses: «REGULARIZACION INTERESES», «PERIODO ...»
   if (/INTERES|PERIODO/.test(t)) return 'interest';
   if (/RETIRADA|DISPOSICION/.test(t)) return 'withdrawal';
-  if (/IMPOSICION|APORTACION|INGRESO|TRANSFERENCIA/.test(t)) return 'deposit';
+  if (/IMPOSICION|APORTACION|INGRESO|TRANSFERENCIA/.test(t)) return 'transfer';
   if (/COMISION/.test(t)) return 'fee';
   if (/DEVOLUCION|DEVOLUCIÓN|REEMBOLSO|REFUND|RESTITUCION|BIZUM RECIBIDO/.test(t)) return 'refund';
   if (/TARJETA|RECIBO|PAGO/.test(t)) return 'expense';

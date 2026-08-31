@@ -529,7 +529,7 @@ export function computeAccountEvolution(movements: Movement[]): AccountSummary {
     } else {
       bucket.contributed += flow;
     }
-    if (m.type === 'buy' || m.type === 'sell' || m.type === 'transfer') {
+    if (m.type === 'buy' || m.type === 'sell' || (m.type === 'transfer' && flow < 0)) {
       // Compra/depósito: el efectivo pasa a cartera; venta/retirada: vuelve.
       totalInvested -= flow;
     }
@@ -606,7 +606,7 @@ export function computeBankBreakdown(movements: Movement[]): BankBreakdownEntry[
   for (const m of movements) {
     const entry = byBank.get(m.bank)!;
     if (entry.hasExplicitBalance) continue;
-    if (m.type === 'transfer' || m.fundOperation) continue;
+    if ((m.type === 'transfer' && m.amount < 0) || m.fundOperation) continue;
     entry.balance += m.amount - Math.abs(m.tax ?? 0) - Math.abs(m.fee ?? 0);
   }
 

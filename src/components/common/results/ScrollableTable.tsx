@@ -4,6 +4,7 @@ export interface ScrollableTableColumn {
   title: React.ReactNode;
   align?: 'left' | 'right';
   muted?: boolean;
+  className?: string;
 }
 
 export interface ScrollableTableCell {
@@ -42,7 +43,7 @@ export function ScrollableTable({ columns, rows }: Readonly<ScrollableTableProps
                   key={i}
                   className={`px-6 sm:px-8 py-3 text-xs font-bold uppercase tracking-wider sticky top-0 bg-gray-50 z-10 ${
                     col.align === 'left' ? 'text-left' : 'text-right'
-                  } ${col.muted ? 'text-gray-500' : 'text-gray-900'}`}
+                  } ${col.muted ? 'text-gray-500' : 'text-gray-900'} ${col.className ?? ''}`}
                 >
                   {col.title}
                 </th>

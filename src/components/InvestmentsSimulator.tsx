@@ -90,7 +90,6 @@ const SECTION_TABS: ReadonlyArray<{ id: SectionTab; label: string }> = [
 
 const TYPE_COLORS: Record<MovementType, string> = {
   buy: 'text-emerald-700',
-  deposit: 'text-emerald-700',
   income: 'text-emerald-700',
   perk: 'text-fuchsia-700',
   sell: 'text-blue-700',
@@ -2398,7 +2397,7 @@ function MovementsSection({
               align: 'left',
             },
             { title: 'Banco', align: 'left', muted: true },
-            { title: 'Tipo', align: 'left' },
+            { title: 'Tipo', align: 'left', className: 'min-w-[160px]' },
             { title: 'Concepto', align: 'left' },
             {
               title: (
@@ -2441,15 +2440,17 @@ function MovementsSection({
             },
             {
               content: (
-                <span className="block truncate max-w-[340px]">
-                  {m.concept}
-                  {(m.shares !== undefined || m.price !== undefined) && (
-                    <span className="ml-2 text-xs text-gray-400">
-                      {m.shares !== undefined ? `${formatQuantity(m.shares)} part.` : ''}
-                      {m.price !== undefined ? ` @ ${m.price}` : ''}
-                    </span>
-                  )}
-                </span>
+                <Tooltip text={m.concept}>
+                  <span className="block truncate max-w-[220px]">
+                    {m.concept}
+                    {(m.shares !== undefined || m.price !== undefined) && (
+                      <span className="ml-2 text-xs text-gray-400">
+                        {m.shares !== undefined ? `${formatQuantity(m.shares)} part.` : ''}
+                        {m.price !== undefined ? ` @ ${m.price}` : ''}
+                      </span>
+                    )}
+                  </span>
+                </Tooltip>
               ),
             },
             {
