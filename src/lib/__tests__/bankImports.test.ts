@@ -743,6 +743,24 @@ describe('paypalDuplicateIds', () => {
     expect(hidden.has('p1')).toBe(false);
   });
 
+  it('marca igual el cargo de banco sin depender del orden de importación (PayPal primero o después)', () => {
+    const paypal: Movement = {
+      id: 'p1', fileId: 'f1', bank: 'paypal', date: '2023-08-31',
+      type: 'expense', concept: 'Pago con Pago exprés', amount: -28,
+    };
+    const bankCharge: Movement = {
+      id: 'b1', fileId: 'f2', bank: 'caixabank', date: '2023-09-10',
+      type: 'expense', concept: 'COMPRA PAYPAL ...', amount: -28,
+    };
+    // Tanto si se importa primero PayPal y luego el banco…
+    const paypalPrimero = paypalDuplicateIds([paypal, bankCharge]);
+    // …como a la inversa, el resultado es idéntico.
+    const bancoPrimero = paypalDuplicateIds([bankCharge, paypal]);
+    expect([...paypalPrimero].sort()).toEqual([...bancoPrimero].sort());
+    expect(paypalPrimero.has('b1')).toBe(true);
+    expect(paypalPrimero.has('p1')).toBe(false);
+  });
+
   it('no marca nada si no hay movimiento de PayPal equivalente', () => {
     const bankCharge: Movement = {
       id: 'b1', fileId: 'f2', bank: 'santander', date: '2023-08-31',
