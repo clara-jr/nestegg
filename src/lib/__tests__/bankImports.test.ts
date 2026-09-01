@@ -912,6 +912,24 @@ describe('paypalTraspasos', () => {
     expect(result.movements[0].type).toBe('expense');
   });
 
+  it('parsea el formato nuevo (columna Tipo/Importe) y filtra las autorizaciones generales', () => {
+    const result = parsePayPal(parseDelimited([
+      'Fecha\tHora\tZona horaria\tNombre\tTipo\tEstado\tDivisa\tImporte\tTarifas\tTotal\tTipo de cambio\tId. del recibo\tSaldo\tId. de transacción\tDescripción',
+      '26/07/2024\t11:08:52\tCEST\tMAKSU ESPAÑA, S.L.U\tAutorización general\tPendiente\tEUR\t-3,32\t0,00\t-3,32\t\t\t0,00\t6X944045N5968970R\t',
+      '26/07/2024\t11:09:06\tGMT+02:00\tMAKSU ESPAÑA, S.L.U\tPago con Pago de usuario de BillPay preaprobado\tCompletado\tEUR\t-3,32\t0,00\t-3,32\t\t\t-3,32\t8Y765054HS566081W\t',
+      '26/07/2024\t11:09:06\tCEST\t\tDepósito bancario en cuenta PayPal\tPendiente\tEUR\t3,32\t0,00\t3,32\t\t\t0,00\t76B645418E7371340\t',
+      '26/07/2024\t11:09:06\tCEST\tMAKSU ESPAÑA, S.L.U\tAutorización general\tCompletado\tEUR\t-3,32\t0,00\t-3,32\t\t\t0,00\t6X944045N5968970R\t',
+    ].join('\n')));
+    // Las dos «Autorización general» se filtran; quedan el pago (gasto) y el depósito (traspaso).
+    expect(result.skipped).toBe(2);
+    expect(result.movements.length).toBe(2);
+    const expense = result.movements.find(m => m.type === 'expense');
+    const transfer = result.movements.find(m => m.type === 'transfer');
+    expect(expense?.concept).toBe('MAKSU ESPAÑA, S.L.U');
+    expect(expense?.amount).toBeCloseTo(-3.32);
+    expect(transfer?.amount).toBeCloseTo(3.32);
+  });
+
   it('filtra las retenciones de cuenta para autorización abierta', () => {
     const result = parsePayPal(parseDelimited([
       'Fecha\tHora\tDescripción\tNombre\tBruto ',
@@ -925,6 +943,24 @@ describe('paypalTraspasos', () => {
     const result = parsePayPal(parseDelimited([
       'Fecha\tHora\tDescripción\tNombre\tBruto ',
       '5/8/2026\t10:00:00\tCancelación de retención de cuenta general\t\t-1,00',
+    ].join('\n')));
+    expect(result.movements.length).toBe(0);
+    expect(result.skipped).toBe(1);
+  });
+
+  it('filtra los movimientos de autorización general', () => {
+    const result = parsePayPal(parseDelimited([
+      'Fecha\tHora\tDescripción\tNombre\tBruto ',
+      '5/8/2026\t10:00:00\tAutorización general\t\t1,00',
+    ].join('\n')));
+    expect(result.movements.length).toBe(0);
+    expect(result.skipped).toBe(1);
+  });
+
+  it('filtra los movimientos desprovistos de autorización', () => {
+    const result = parsePayPal(parseDelimited([
+      'Fecha\tHora\tTipo\tNombre\tImporte\tTarifas\tTotal',
+      '5/8/2026\t10:00:00\tDesprovisto de autorización\tMAKSU ESPAÑA, S.L.U\t-3,32\t0,00\t-3,32',
     ].join('\n')));
     expect(result.movements.length).toBe(0);
     expect(result.skipped).toBe(1);

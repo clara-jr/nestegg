@@ -1647,7 +1647,9 @@ function IncomeSection({
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(sorted.length / INCOME_PAGE_SIZE));
   const shown = sorted.slice((page - 1) * INCOME_PAGE_SIZE, page * INCOME_PAGE_SIZE);
-  useEffect(() => setPage(1), [movements]);
+  // Al cambiar los movimientos (p. ej. editar tipo/categoría) solo se recorta
+  // la página actual si queda fuera de rango, en lugar de saltar a la página 1.
+  useEffect(() => setPage(p => Math.min(p, Math.max(1, Math.ceil(sorted.length / INCOME_PAGE_SIZE)))), [movements]);
 
   return (
     <section className="space-y-4 pb-6">
@@ -1751,20 +1753,46 @@ function ExpensesSection({
   const [chartCategory, setChartCategory] = useState<string>('all');
 
   const last12Avg = useMemo(() => {
-    const last = data.monthly.slice(-12);
-    if (last.length === 0) return 0;
-    return last.reduce((sum, p) => sum + p.total, 0) / last.length;
+    // Media mensual de los últimos 12 MESES CALENDARIO y dividida entre 12: la
+    // serie global solo contiene meses con movimientos, así que se ancla al
+    // último mes y se recorre el calendario (los meses vacíos cuentan 0).
+    const lastGlobal = data.monthly[data.monthly.length - 1]?.month;
+    if (!lastGlobal) return 0;
+    const [year, month] = lastGlobal.split('-').map(Number);
+    const byMonth = new Map(data.monthly.map(p => [p.month, p.total]));
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(Date.UTC(year, month - 1 - i, 1));
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      sum += byMonth.get(key) ?? 0;
+    }
+    return sum / 12;
   }, [data.monthly]);
 
   const last12ByCategory = useMemo(() => {
+    // Media mensual de los últimos 12 MESES CALENDARIO: se divide siempre entre
+    // 12 (los meses sin gastos de una categoría contribuyen 0). La ventana se
+    // ancla al último mes con movimientos y se recorre el calendario hacia
+    // atrás, porque la serie por categoría solo contiene los meses que tienen
+    // gastos y no se puede recortar con slice (sumaría meses fuera del año).
     const out: Record<string, number> = {};
-    for (const [cat, series] of Object.entries(data.monthlyByCategory)) {
-      const last = series.slice(-12);
-      const sum = last.reduce((s, p) => s + p.total, 0);
-      out[cat] = last.length > 0 ? sum / last.length : 0;
+    const byCat = data.monthlyByCategory;
+    const lastGlobal = data.monthly[data.monthly.length - 1]?.month;
+    if (!lastGlobal) return out;
+    const [year, month] = lastGlobal.split('-').map(Number);
+    const window: string[] = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(Date.UTC(year, month - 1 - i, 1));
+      window.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
+    }
+    for (const [cat, series] of Object.entries(byCat)) {
+      const byMonth = new Map(series.map(p => [p.month, p.total]));
+      let sum = 0;
+      for (const mk of window) sum += byMonth.get(mk) ?? 0;
+      out[cat] = sum / 12;
     }
     return out;
-  }, [data.monthlyByCategory]);
+  }, [data.monthly, data.monthlyByCategory]);
 
   const filteredMovements = useMemo(() => {
     const q = expSearch.trim().toLowerCase();
@@ -1991,6 +2019,7 @@ function ExpensesSection({
               align: 'left',
             },
             { title: 'Concepto', align: 'left' },
+            { title: 'Banco', align: 'left', muted: true },
             { title: 'Categoría', align: 'left' },
             {
               title: (
@@ -2021,6 +2050,7 @@ function ExpensesSection({
                 <span className="block max-w-[420px] whitespace-normal break-words">{m.concept}</span>
               ),
             },
+            { content: <span className="text-gray-500">{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
             {
               content: (
                 <select
@@ -2084,26 +2114,32 @@ function CategoryBreakdown({ categories }: { categories: CategoryTotal[] }) {
     <div>
       <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-8">Por categoría</h4>
       <ul className="space-y-2">
-        {categories.map(c => (
-          <li key={c.category} className="space-y-1">
-            <div className="flex items-baseline justify-between text-sm">
-              <span className="font-medium text-gray-800">{c.category}</span>
-              <span className="text-gray-600 text-right flex flex-col justify-end sm:flex-row">
-                <span className="text-gray-400">
-                  ~ {formatCurrency(c.averageMonthly)}/mes desde {new Date(`${c.firstDate}T00:00:00`).toLocaleDateString('es-ES')} 
+        {categories.map(c => {
+          const isCredit = c.total < 0;
+          return (
+            <li key={c.category} className="space-y-1">
+              <div className="flex items-baseline justify-between text-sm">
+                <span className="font-medium text-gray-800">{c.category}</span>
+                <span className="text-gray-600 text-right flex items-baseline justify-end gap-3">
+                  <span className="whitespace-nowrap">
+                    {signedExpenseFormat(c.averageMonthly, '/mes')}
+                    <span className="text-gray-400 text-xs ml-1">desde {new Date(`${c.firstDate}T00:00:00`).toLocaleDateString('es-ES')}</span>
+                  </span>
+                  <span>{signedExpenseFormat(c.total)}</span>
+                  <span className="text-gray-400">
+                    {!isCredit && c.pct >= 0.05 ? `${c.pct.toFixed(1)}%` : ''}
+                  </span>
                 </span>
-                <span className="ml-2">{formatCurrency(c.total)}</span>
-                <span className="text-gray-400 ml-2">{c.pct.toFixed(1)}%</span>
-              </span>
-            </div>
-            <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-red-400/80"
-                style={{ width: `${Math.max(1, Math.min(100, c.pct))}%` }}
-              />
-            </div>
-          </li>
-        ))}
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div
+                  className={`h-full rounded-full ${isCredit ? 'bg-emerald-400/80' : 'bg-red-400/80'}`}
+                  style={{ width: `${Math.max(1, Math.min(100, Math.abs(c.pct)))}%` }}
+                />
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -2300,7 +2336,11 @@ function MovementsSection({
   const totalPages = Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE));
   const shown = sortedMovements.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  useEffect(() => setPage(1), [movements, movSortKey, movSortDir]);
+  // Al cambiar orden/filtro se vuelve a la primera página; al cambiar los
+  // movimientos (p. ej. editar tipo/categoría) solo se recorta la página actual
+  // si queda fuera de rango, para no saltar a la página 1.
+  useEffect(() => setPage(1), [movSortKey, movSortDir]);
+  useEffect(() => setPage(p => Math.min(p, Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE)))), [movements]);
 
   const toggleMovSort = (key: 'date' | 'amount') => {
     if (movSortKey === key) {

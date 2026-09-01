@@ -1441,6 +1441,12 @@ function classifyPayPalConcept(text: string, amount: number): MovementType {
   // son bloqueos/liberaciones de saldo sin movimiento de caja real (se filtran).
   if (/RETENCION DE CUENTA PARA AUTORIZACION ABIERTA/.test(t)) return 'other';
   if (/CANCELACION DE RETENCION DE CUENTA GENERAL/.test(t)) return 'other';
+  // Las «Autorización general» de PayPal son autorizaciones/holds del propio
+  // PayPal, no un movimiento de caja real; se filtran al importar (p. ej. las
+  // destinadas a compras que luego se confirman por separado). Igual ocurre con
+  // los movimientos «Desprovisto de autorización».
+  if (/AUTORIZACION GENERAL/.test(t)) return 'other';
+  if (/DESPROVISTO DE AUTORIZACION/.test(t)) return 'other';
   // Depósitos bancarios en PayPal (dinero que entra, asociado a un gasto) y
   // retiradas iniciadas por el usuario (dinero que sale, asociado a una
   // devolución) son traspasos de fondos entre el banco y PayPal, no un ingreso
@@ -1465,7 +1471,9 @@ function classifyPayPalConcept(text: string, amount: number): MovementType {
 export function parsePayPal(matrix: CellMatrix): ParsedBankFile {
   const headerIdx = matrix.findIndex(row => {
     const joined = row.map(norm).join(' ');
-    return joined.includes('FECHA') && joined.includes('DESCRIPCION') && (joined.includes('BRUTO') || joined.includes('NETO'));
+    const hasDate = joined.includes('FECHA');
+    const hasAmount = joined.includes('BRUTO') || joined.includes('NETO') || joined.includes('IMPORTE');
+    return hasDate && hasAmount;
   });
   if (headerIdx < 0) return { movements: [], skipped: matrix.length };
   const header = matrix[headerIdx].map(c => norm(c));
@@ -1475,15 +1483,20 @@ export function parsePayPal(matrix: CellMatrix): ParsedBankFile {
     time: findColumn(header, c => c === 'HORA'),
     timezone: findColumn(header, c => c.includes('ZONA HORARIA')),
     description: findColumn(header, c => c === 'DESCRIPCION'),
+    tipo: findColumn(header, c => c === 'TIPO'),
     name: findColumn(header, c => c === 'NOMBRE'),
     currency: findColumn(header, c => c === 'DIVISA'),
     gross: findColumn(header, c => c === 'BRUTO'),
-    fee: findColumn(header, c => c === 'COMISION'),
+    importe: findColumn(header, c => c === 'IMPORTE'),
     net: findColumn(header, c => c === 'NETO'),
+    fee: findColumn(header, c => c === 'COMISION' || c === 'TARIFAS'),
     balance: findColumn(header, c => c === 'SALDO'),
     transactionId: findColumn(header, c => c.replace(/\./g, '').includes('ID DE TRANSACCION')),
   };
-  if (col.date < 0 || (col.gross < 0 && col.net < 0)) {
+  // Columna de importe: en el formato nuevo PayPal la llama «Importe», en los
+  // antiguos «Bruto» o «Neto».
+  const amountCol = col.importe >= 0 ? col.importe : (col.gross >= 0 ? col.gross : col.net);
+  if (col.date < 0 || amountCol < 0) {
     return { movements: [], skipped: matrix.length };
   }
 
@@ -1495,8 +1508,8 @@ export function parsePayPal(matrix: CellMatrix): ParsedBankFile {
     if (!row.some(c => c.length > 0)) continue;
 
     const date = col.date >= 0 ? parseDateToISO(row[col.date]) : undefined;
-    const gross = col.gross >= 0 ? parseNumber(row[col.gross]) : undefined;
-    if (!date || gross === undefined) {
+    const amount = parseNumber(row[amountCol]);
+    if (!date || amount === undefined) {
       skipped++;
       continue;
     }
@@ -1507,33 +1520,37 @@ export function parsePayPal(matrix: CellMatrix): ParsedBankFile {
       ? `${date}T${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`
       : undefined;
 
-    const rawDescription = (col.description >= 0 ? row[col.description] : '') || 'Movimiento PayPal';
-    const type = classifyPayPalConcept(rawDescription, gross);
-    // Las conversiones de divisas se filtran: son pares internos que netean a
-    // cero junto con su pago/reembolso asociado.
+    // En los ficheros nuevos el tipo va en la columna «Tipo»; en los antiguos es
+    // la descripción. Se combinan ambas (la descripción puede añadir detalle).
+    const rawTipo = col.tipo >= 0 ? row[col.tipo] : '';
+    const rawDescription = (col.description >= 0 ? row[col.description] : '') || '';
+    const typeText = norm(`${rawTipo} ${rawDescription}`).trim() || 'MOVIMIENTO PAYPAL';
+    const type = classifyPayPalConcept(typeText, amount);
+    // Las conversiones de divisas y autorizaciones generales se filtran: son
+    // pares/bloqueos internos de PayPal sin movimiento de caja real.
     if (type === 'other') {
       skipped++;
       continue;
     }
     // El concepto es el nombre del comercio/contraparte (columna «Nombre»),
-    // que es lo que comparten el banco y PayPal; la descripción solo sirve de
-    // respaldo cuando no hay nombre.
+    // que es lo que comparten el banco y PayPal; el tipo/descripción solo sirve
+    // de respaldo cuando no hay nombre.
     const name = (col.name >= 0 ? row[col.name] : '') || '';
-    const concept = name || rawDescription;
+    const concept = name || rawTipo || rawDescription || 'Movimiento PayPal';
     const currency = col.currency >= 0 ? row[col.currency] : '';
     const balanceRaw = col.balance >= 0 ? (row[col.balance] ?? '') : '';
     const balance = parseNumber(balanceRaw);
     const transactionId = col.transactionId >= 0 ? (row[col.transactionId] ?? '') : '';
 
     movements.push({
-      id: movementId('paypal', date, type, concept, gross, `${currency}|${transactionId}`),
+      id: movementId('paypal', date, type, concept, amount, `${currency}|${transactionId}`),
       fileId: '',
       bank: 'paypal',
       date,
       datetime,
       type,
       concept,
-      amount: gross,
+      amount,
       balance: balance ?? undefined,
       referenceId: transactionId || undefined,
     });

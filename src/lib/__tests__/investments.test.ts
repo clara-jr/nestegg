@@ -498,7 +498,7 @@ describe('guessExpenseCategory', () => {
     expect(guessExpenseCategory('DIAGER VET CLINICA')).toBe('Animales');
     expect(guessExpenseCategory('GATTOS COMIDA')).toBe('Animales');
     expect(guessExpenseCategory('CORECDAD. PROP. PASEO EXTREMADURA, 99')).toBe('Vivienda');
-    expect(guessExpenseCategory('PELUQUERIA PRINCIPE')).toBe('Peluquería');
+    expect(guessExpenseCategory('PELUQUERIA PRINCIPE')).toBe('Peluquería y cosmética');
     expect(guessExpenseCategory('AYTO MADRID DEPOR')).toBe('Gimnasio');
     expect(guessExpenseCategory('CLINICA ODONTOL')).toBe('Salud');
     expect(guessExpenseCategory('regalo a maria')).toBe('Regalos');
