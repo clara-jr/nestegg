@@ -166,6 +166,7 @@ export default function InvestmentsSimulator() {
   const [pendingClearAll, setPendingClearAll] = useState(false);
   const [showFileHistory, setShowFileHistory] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[] | null>(null);
+  const [editingFile, setEditingFile] = useState<{ id: string; name: string } | null>(null);
 
   const priceOf = (key: string, ticker?: string, isin?: string): number | undefined => {
     if (!key) return undefined;
@@ -365,6 +366,20 @@ export default function InvestmentsSimulator() {
       files: prev.files.filter(f => f.id !== fileId),
       movements: prev.movements.filter(m => m.fileId !== fileId),
     }));
+  };
+
+  const renameFile = (fileId: string, name: string) => {
+    setStore(prev => ({
+      ...prev,
+      files: prev.files.map(f => (f.id === fileId ? { ...f, name } : f)),
+    }));
+  };
+
+  const commitRename = () => {
+    if (!editingFile) return;
+    const name = editingFile.name.trim();
+    if (name) renameFile(editingFile.id, name);
+    setEditingFile(null);
   };
 
   const clearAll = () => {
@@ -735,7 +750,34 @@ export default function InvestmentsSimulator() {
                       className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-gray-50 border border-gray-200 text-xs text-gray-700 max-w-full"
                     >
                       <span className="font-semibold">{BANK_LABELS[f.bank]}</span>
-                      <span className="truncate max-w-[180px]">{f.name}</span>
+                      {editingFile?.id === f.id ? (
+                        <input
+                          autoFocus
+                          value={editingFile.name}
+                          onChange={e => setEditingFile({ id: f.id, name: e.target.value })}
+                          onBlur={commitRename}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') commitRename();
+                            if (e.key === 'Escape') setEditingFile(null);
+                          }}
+                          className="w-[180px] px-1.5 py-0.5 rounded-md border border-gray-300 bg-white text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                        />
+                      ) : (
+                        <>
+                          <span className="truncate max-w-[160px]">{f.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setEditingFile({ id: f.id, name: f.name })}
+                            aria-label="Renombrar fichero"
+                            title="Renombrar fichero"
+                            className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                            </svg>
+                          </button>
+                        </>
+                      )}
                       <span className="text-gray-400">{f.count} mov.</span>
                       <Tooltip text="Eliminar fichero y sus movimientos">
                         <button
