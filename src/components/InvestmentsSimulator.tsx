@@ -1328,7 +1328,7 @@ function PortfolioSection({
 }
 
 function formatQuantity(value: number): string {
-  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 8 }).format(value);
+  return new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2 }).format(value);
 }
 
 function formatPct(value: number): string {
@@ -2733,13 +2733,16 @@ function MovementsSection({
             },
             {
               content: (
-                <Tooltip text={m.concept}>
+                <Tooltip
+                  text={`${m.concept}${m.shares !== undefined ? ` · ${formatQuantity(m.shares)} part.` : ''}${m.price !== undefined ? ` · ${formatQuantity(m.price)} €/part.` : ''}`}
+                  className="cursor-default"
+                >
                   <span className="block truncate max-w-[220px]">
                     {m.concept}
                     {(m.shares !== undefined || m.price !== undefined) && (
                       <span className="ml-2 text-xs text-gray-400">
                         {m.shares !== undefined ? `${formatQuantity(m.shares)} part.` : ''}
-                        {m.price !== undefined ? ` @ ${m.price}` : ''}
+                        {m.price !== undefined ? ` @ ${formatQuantity(m.price)} €/part.` : ''}
                       </span>
                     )}
                   </span>
