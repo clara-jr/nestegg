@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 
-export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank' | 'santander' | 'paypal';
+export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank' | 'santander' | 'paypal' | 'revolut';
 
 export const BANKS: ReadonlyArray<{ id: BankId; label: string; hint: string }> = [
   { id: 'trade-republic', label: 'Trade Republic', hint: 'CSV exportado por Trade Republic con datetime, type, name, shares, price, amount…' },
@@ -8,6 +8,7 @@ export const BANKS: ReadonlyArray<{ id: BankId; label: string; hint: string }> =
   { id: 'caixabank', label: 'CaixaBank', hint: 'XLS/CDV exportado por CaixaBank con fechas, concepto o movimiento, importe y saldo' },
   { id: 'santander', label: 'Santander', hint: 'XLS/XLSX exportado por Santander con fecha operación, fecha valor, concepto, importe y saldo' },
   { id: 'paypal', label: 'PayPal', hint: 'CSV exportado por PayPal con fecha, hora, descripción, nombre, bruto/comisión/neto y saldo' },
+  { id: 'revolut', label: 'Revolut', hint: 'CSV exportado por Revolut con tipo, producto, fechas, descripción, importe, comisión, divisa y saldo' },
 ];
 
 export type MovementType =
@@ -1560,6 +1561,95 @@ export function parsePayPal(matrix: CellMatrix): ParsedBankFile {
 }
 
 // ---------------------------------------------------------------------------
+// Revolut
+// ---------------------------------------------------------------------------
+
+function classifyRevolutType(rawTipo: string, concept: string, amount: number): MovementType {
+  const t = norm(rawTipo);
+  const c = norm(concept);
+
+  if (/RECARGAS/.test(t)) return 'transfer';
+  if (/TRASPASO/.test(c) || /CUENTA REMUNERADA/.test(c)) return 'transfer';
+  if (/INTERES/.test(c)) return 'interest';
+  if (/COMISION/.test(c)) return 'fee';
+  if (/DEVOLUCION|REFUND|REEMBOLSO/.test(c)) return 'refund';
+  if (/NOMINA|SUELDO|SALARY|INGRESO/.test(c)) return 'income';
+  if (/TARJETA|CARD|PAGO|COMPRA|PAYMENT|PURCHASE/.test(c)) return 'expense';
+  if (/RETIRADA|WITHDRAWAL/.test(c)) return 'withdrawal';
+  return amount <= 0 ? 'expense' : 'income';
+}
+
+export function parseRevolut(matrix: CellMatrix): ParsedBankFile {
+  const headerIdx = firstHeaderIndex(
+    matrix,
+    c => c.includes('TIPO') || c.includes('TYPE') || c.includes('DESCRIPCION') || c.includes('SALDO')
+  );
+  if (headerIdx < 0) return { movements: [], skipped: matrix.length };
+  const header = matrix[headerIdx].map(c => norm(c));
+
+  const col = {
+    tipo: findColumn(header, c => c === 'TIPO' || c === 'TYPE'),
+    producto: findColumn(header, c => c === 'PRODUCTO' || c === 'PRODUCT'),
+    dateStart: findColumn(header, c => c.includes('FECHA DE INICIO') || c.includes('START DATE')),
+    description: findColumn(header, c => c === 'DESCRIPCION' || c === 'DESCRIPTION'),
+    amount: findColumn(header, c => c === 'IMPORTE' || c === 'AMOUNT'),
+    fee: findColumn(header, c => c === 'COMISION' || c === 'FEE'),
+    currency: findColumn(header, c => c === 'DIVISA' || c === 'CURRENCY'),
+    balance: findColumn(header, c => c === 'SALDO' || c === 'BALANCE'),
+  };
+
+  if (col.dateStart < 0 || col.amount < 0) {
+    return { movements: [], skipped: matrix.length };
+  }
+
+  const movements: Movement[] = [];
+  let skipped = 0;
+
+  for (let r = headerIdx + 1; r < matrix.length; r++) {
+    const row = matrix[r];
+    if (!row.some(c => c.length > 0)) continue;
+
+    const date = parseDateToISO(row[col.dateStart]);
+    const rawAmount = parseNumber(row[col.amount]);
+    if (!date || rawAmount === undefined) {
+      skipped++;
+      continue;
+    }
+
+    const rawTipo = col.tipo >= 0 ? String(row[col.tipo] ?? '').trim() : '';
+    const rawDescription = col.description >= 0 ? String(row[col.description] ?? '').trim() : '';
+    const concept = rawDescription || 'Movimiento Revolut';
+
+    const fee = col.fee >= 0 ? parseNumber(row[col.fee]) : undefined;
+
+    let amount = rawAmount;
+    if (fee !== undefined && fee !== 0) {
+      amount = amount - Math.abs(fee);
+    }
+
+    const type = classifyRevolutType(rawTipo, concept, amount);
+
+    const currency = col.currency >= 0 ? String(row[col.currency] ?? '').trim() : '';
+
+    const balanceRaw = col.balance >= 0 ? (row[col.balance] ?? '') : '';
+    const balance = parseNumber(balanceRaw);
+
+    movements.push({
+      id: movementId('revolut', date, type, concept, amount, `${rawTipo}|${currency}|${fee ?? ''}`),
+      fileId: '',
+      bank: 'revolut',
+      date,
+      type,
+      concept,
+      amount,
+      balance: balance ?? undefined,
+    });
+  }
+
+  return { movements, skipped };
+}
+
+// ---------------------------------------------------------------------------
 // Entrada principal
 // ---------------------------------------------------------------------------
 
@@ -1595,6 +1685,9 @@ export function parseBankMatrix(bank: BankId, _fileName: string, matrix: CellMat
       break;
     case 'paypal':
       parsed = parsePayPal(matrix);
+      break;
+    case 'revolut':
+      parsed = parseRevolut(matrix);
       break;
   }
   // Corrige el signo de gastos/devoluciones (p. ej. reembolsos positivos de
