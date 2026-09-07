@@ -349,6 +349,19 @@ export function aggregateByYear(movements: Movement[]): YearPoint[] {
     .sort((a, b) => a.year.localeCompare(b.year));
 }
 
+/** Clave YYYY-MM del mes en curso, que todavía no ha terminado. */
+export function currentMonthKey(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Filtra una serie mensual dejando solo los meses ya terminados, excluyendo
+ *  el mes en curso porque todavía está en marcha y solo aporta datos parciales. */
+export function completedMonths(points: MonthPoint[]): MonthPoint[] {
+  const cur = currentMonthKey();
+  return points.filter(p => p.month < cur);
+}
+
 // ---------------------------------------------------------------------------
 // Intereses
 // ---------------------------------------------------------------------------
@@ -809,11 +822,12 @@ const EXCLUDED_CATEGORY = 'Excluido';
 function categoryMonthsSince(firstDate: string): number {
   const first = new Date(`${firstDate}T00:00:00`);
   if (Number.isNaN(first.getTime())) return 1;
-  const now = new Date();
+  // Se cuenta hasta el último mes ya terminado (el mes en curso se excluye).
+  const anchor = new Date(new Date().getFullYear(), new Date().getMonth(), 0);
   const months =
-    (now.getFullYear() - first.getFullYear()) * 12 +
-    (now.getMonth() - first.getMonth()) +
-    (now.getDate() >= first.getDate() ? 1 : 0);
+    (anchor.getFullYear() - first.getFullYear()) * 12 +
+    (anchor.getMonth() - first.getMonth()) +
+    (anchor.getDate() >= first.getDate() ? 1 : 0);
   return Math.max(1, months);
 }
 
@@ -834,17 +848,19 @@ export function computeExpenses(expenseMovements: Movement[]): ExpensesSummary {
     .map(([month, total]) => ({ month, total }))
     .sort((a, b) => a.month.localeCompare(b.month));
   const total = monthly.reduce((sum, p) => sum + p.total, 0);
-  const span = monthSpan(monthly);
+  const completed = completedMonths(monthly);
+  const span = monthSpan(completed);
+  const completedTotal = completed.reduce((sum, p) => sum + p.total, 0);
 
   const now = new Date();
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const current = currentMonthKey();
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonthKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
 
   const catTotals = new Map<string, { total: number; firstDate: string; lastMonth: number }>();
   for (const m of counted) {
     const cat = m.category ?? 'Otros';
-    const inCurrent = m.date.startsWith(currentMonthKey);
+    const inCurrent = m.date.startsWith(current);
     const entry = catTotals.get(cat) ?? { total: 0, firstDate: m.date, lastMonth: 0 };
     entry.total += signedAbs(m);
     if (inCurrent) entry.lastMonth += signedAbs(m);
@@ -894,10 +910,10 @@ export function computeExpenses(expenseMovements: Movement[]): ExpensesSummary {
     total,
     monthly,
     monthlyByCategory,
-    averageMonthly: span > 0 ? total / span : 0,
+    averageMonthly: span > 0 ? completedTotal / span : 0,
     monthCount: span,
     currentMonth: counted
-      .filter(m => m.date.startsWith(currentMonthKey))
+      .filter(m => m.date.startsWith(current))
       .reduce((sum, m) => sum + signedAbs(m), 0),
     previousMonth: counted
       .filter(m => m.date.startsWith(previousMonthKey))
@@ -930,20 +946,22 @@ export function computeIncome(incomeMovements: Movement[]): IncomeSummary {
     .map(([month, total]) => ({ month, total }))
     .sort((a, b) => a.month.localeCompare(b.month));
   const total = monthly.reduce((sum, p) => sum + p.total, 0);
-  const span = monthSpan(monthly);
+  const completed = completedMonths(monthly);
+  const span = monthSpan(completed);
+  const completedTotal = completed.reduce((sum, p) => sum + p.total, 0);
 
   const now = new Date();
-  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const current = currentMonthKey();
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const previousMonthKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
 
   return {
     total,
     monthly,
-    averageMonthly: span > 0 ? total / span : 0,
+    averageMonthly: span > 0 ? completedTotal / span : 0,
     monthCount: span,
     currentMonth: incomeMovements
-      .filter(m => m.date.startsWith(currentMonthKey))
+      .filter(m => m.date.startsWith(current))
       .reduce((sum, m) => sum + Math.abs(m.amount), 0),
     previousMonth: incomeMovements
       .filter(m => m.date.startsWith(previousMonthKey))

@@ -3,6 +3,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -30,6 +31,7 @@ import {
   EXPENSE_CATEGORY_LIST,
   buildConceptCategoryMap,
   cleanConcept,
+  completedMonths,
   computeAccountEvolution,
   computeBankBreakdown,
   computeCashBalance,
@@ -1633,23 +1635,50 @@ function IncomeSection({
   );
 
   const { incomeMedian, savingsMedian } = useMemo(() => {
-    const savingsByMonth = income.monthly.map(p => p.total - (expByMonth.get(p.month) ?? 0));
+    const completed = completedMonths(income.monthly);
+    const savingsByMonth = completed.map(p => p.total - (expByMonth.get(p.month) ?? 0));
     return {
-      incomeMedian: median(income.monthly.map(p => p.total)),
+      incomeMedian: median(completed.map(p => p.total)),
       savingsMedian: median(savingsByMonth),
     };
   }, [income.monthly, expByMonth]);
+
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const selectedOverview = useMemo(() => {
+    if (!selectedMonth) return undefined;
+    return chartData.find(p => p.month === selectedMonth);
+  }, [chartData, selectedMonth]);
+
+  useEffect(() => {
+    if (selectedMonth && !income.monthly.some(p => p.month === selectedMonth)) {
+      setSelectedMonth(null);
+    }
+  }, [selectedMonth, income.monthly]);
+
+  const handleBarClick = (bar: { payload?: { month?: string }; month?: string }) => {
+    const month = bar?.payload?.month ?? bar?.month;
+    if (!month) return;
+    setSelectedMonth(prev => (prev === month ? null : month));
+  };
 
   const sorted = useMemo(
     () => [...movements].sort((a, b) => b.date.localeCompare(a.date)),
     [movements]
   );
   const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(sorted.length / INCOME_PAGE_SIZE));
-  const shown = sorted.slice((page - 1) * INCOME_PAGE_SIZE, page * INCOME_PAGE_SIZE);
+  const detailMovements = useMemo(
+    () =>
+      selectedMonth
+        ? sorted.filter(m => m.date.slice(0, 7) === selectedMonth)
+        : sorted,
+    [sorted, selectedMonth]
+  );
+  const totalPages = Math.max(1, Math.ceil(detailMovements.length / INCOME_PAGE_SIZE));
+  const shown = detailMovements.slice((page - 1) * INCOME_PAGE_SIZE, page * INCOME_PAGE_SIZE);
   // Al cambiar los movimientos (p. ej. editar tipo/categoría) solo se recorta
   // la página actual si queda fuera de rango, en lugar de saltar a la página 1.
-  useEffect(() => setPage(p => Math.min(p, Math.max(1, Math.ceil(sorted.length / INCOME_PAGE_SIZE)))), [movements]);
+  useEffect(() => setPage(p => Math.min(p, Math.max(1, Math.ceil(detailMovements.length / INCOME_PAGE_SIZE)))), [detailMovements.length]);
+  useEffect(() => setPage(1), [selectedMonth]);
 
   return (
     <section className="space-y-4 pb-6">
@@ -1700,15 +1729,67 @@ function IncomeSection({
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} interval="preserveStartEnd" />
             <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={70} tickFormatter={v => `${v} €`} />
             {incomeTooltipRecharts()}
-              <Bar dataKey="total" fill="#059669" radius={[3, 3, 0, 0]} name="Ingresos" />
+              <Bar
+                dataKey="total"
+                radius={[3, 3, 0, 0]}
+                name="Ingresos"
+                onClick={handleBarClick}
+                className="cursor-pointer"
+                background={{ fill: 'transparent', stroke: 'none', cursor: 'pointer' }}
+              >
+                {chartData.map(p => {
+                  const isSelected = p.month === selectedMonth;
+                  return (
+                    <Cell
+                      key={p.month}
+                      fill="#059669"
+                      opacity={selectedMonth && !isSelected ? 0.35 : 1}
+stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
+                      strokeWidth={isSelected ? 2 : 0}
+                    />
+                );
+              })}
+              </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
       <div>
         <div className="flex items-center justify-between gap-3 my-4 mt-8">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Detalle de ingresos</h4>
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Detalle de ingresos{selectedMonth ? ` · ${fmtMonthLabel(selectedMonth)}` : ''}
+          </h4>
+          {selectedMonth && (
+            <button
+              type="button"
+              onClick={() => setSelectedMonth(null)}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" className="w-3.5 h-3.5">
+                <path d="M10.5 3.5 6 8l4.5 4.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Ver histórico
+            </button>
+          )}
         </div>
+        {selectedMonth && selectedOverview && (
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <SummaryCard label="Ingresos" value={formatCurrency(selectedOverview.total)} variant="positive" />
+            <SummaryCard
+              label="Gastos"
+              value={formatCurrency(selectedOverview.expenses < 0 ? -selectedOverview.expenses : selectedOverview.expenses)}
+              variant={selectedOverview.expenses < 0 ? 'positive' : 'negative'}
+              subtitle={
+                selectedOverview.expenses < 0 ? 'Las devoluciones superan a los gastos.' : undefined
+              }
+            />
+            <SummaryCard
+              label="Capacidad de ahorro"
+              value={formatCurrency(selectedOverview.savings)}
+              variant={selectedOverview.savings >= 0 ? 'positive' : 'negative'}
+            />
+          </div>
+        )}
         <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl">
           {shown.map(m => (
             <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
@@ -1751,12 +1832,15 @@ function ExpensesSection({
   const [expSortDir, setExpSortDir] = useState<'asc' | 'desc'>('desc');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [chartCategory, setChartCategory] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
 
   const last12Avg = useMemo(() => {
     // Media mensual de los últimos 12 MESES CALENDARIO y dividida entre 12: la
     // serie global solo contiene meses con movimientos, así que se ancla al
-    // último mes y se recorre el calendario (los meses vacíos cuentan 0).
-    const lastGlobal = data.monthly[data.monthly.length - 1]?.month;
+    // último mes ya terminado y se recorre el calendario (los meses vacíos
+    // cuentan 0). El mes en curso, todavía en marcha, no cuenta.
+    const completed = completedMonths(data.monthly);
+    const lastGlobal = completed[completed.length - 1]?.month;
     if (!lastGlobal) return 0;
     const [year, month] = lastGlobal.split('-').map(Number);
     const byMonth = new Map(data.monthly.map(p => [p.month, p.total]));
@@ -1772,12 +1856,13 @@ function ExpensesSection({
   const last12ByCategory = useMemo(() => {
     // Media mensual de los últimos 12 MESES CALENDARIO: se divide siempre entre
     // 12 (los meses sin gastos de una categoría contribuyen 0). La ventana se
-    // ancla al último mes con movimientos y se recorre el calendario hacia
+    // ancla al último mes ya terminado y se recorre el calendario hacia
     // atrás, porque la serie por categoría solo contiene los meses que tienen
     // gastos y no se puede recortar con slice (sumaría meses fuera del año).
     const out: Record<string, number> = {};
     const byCat = data.monthlyByCategory;
-    const lastGlobal = data.monthly[data.monthly.length - 1]?.month;
+    const completed = completedMonths(data.monthly);
+    const lastGlobal = completed[completed.length - 1]?.month;
     if (!lastGlobal) return out;
     const [year, month] = lastGlobal.split('-').map(Number);
     const window: string[] = [];
@@ -1793,6 +1878,36 @@ function ExpensesSection({
     }
     return out;
   }, [data.monthly, data.monthlyByCategory]);
+
+  const monthCategories = useMemo(() => {
+    const byMonth = new Map<string, Array<{ category: string; total: number }>>();
+    for (const [cat, series] of Object.entries(data.monthlyByCategory)) {
+      for (const p of series) {
+        if (p.total === 0) continue;
+        const list = byMonth.get(p.month) ?? [];
+        list.push({ category: cat, total: p.total });
+        byMonth.set(p.month, list);
+      }
+    }
+    return byMonth;
+  }, [data.monthlyByCategory]);
+
+  useEffect(() => {
+    if (selectedMonth && !data.monthly.some(p => p.month === selectedMonth)) {
+      setSelectedMonth(null);
+    }
+  }, [selectedMonth, data.monthly]);
+
+  const expenseChartData = useMemo(
+    () => monthlyExpenseChartData(data, chartCategory),
+    [data, chartCategory]
+  );
+
+  const handleBarClick = (bar: { payload?: { month?: string }; month?: string }) => {
+    const month = bar?.payload?.month ?? bar?.month;
+    if (!month) return;
+    setSelectedMonth(prev => (prev === month ? null : month));
+  };
 
   const filteredMovements = useMemo(() => {
     const q = expSearch.trim().toLowerCase();
@@ -1904,22 +2019,45 @@ function ExpensesSection({
           </select>
         </div>
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={monthlyExpenseChartData(data, chartCategory)} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+          <BarChart data={expenseChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
             <CartesianGrid stroke="#f3f4f6" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} interval="preserveStartEnd" />
             <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={70} tickFormatter={v => `${v} €`} />
             {monthTooltipRecharts()}
             <Bar
               dataKey="total"
-              fill={chartCategory === 'all' ? '#dc2626' : '#f59e0b'}
               radius={[3, 3, 0, 0]}
               name={chartCategory === 'all' ? 'Gastos' : chartCategory}
-            />
+              onClick={handleBarClick}
+              className="cursor-pointer"
+              background={{ fill: 'transparent', stroke: 'none', cursor: 'pointer' }}
+            >
+              {expenseChartData.map(p => {
+                const isSelected = p.month === selectedMonth;
+                return (
+                  <Cell
+                    key={p.month}
+                    fill={chartCategory === 'all' ? '#dc2626' : '#f59e0b'}
+                    opacity={selectedMonth && !isSelected ? 0.35 : 1}
+                    stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
+                    strokeWidth={isSelected ? 2 : 0}
+                  />
+                );
+              })}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      <CategoryBreakdown categories={data.byCategory} />
+      {selectedMonth ? (
+        <MonthCategoryBreakdown
+          month={selectedMonth}
+          categories={monthCategories.get(selectedMonth) ?? []}
+          onClose={() => setSelectedMonth(null)}
+        />
+      ) : (
+        <CategoryBreakdown categories={data.byCategory} />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <LastYearBreakdown avgByCategory={last12ByCategory} />
@@ -2105,6 +2243,66 @@ function SortableHeader({
         <span className={active && dir === 'desc' ? 'text-gray-900' : 'text-gray-300 group-hover:text-gray-400'}>▼</span>
       </span>
     </button>
+  );
+}
+
+function MonthCategoryBreakdown({
+  month,
+  categories,
+  onClose,
+}: {
+  month: string;
+  categories: Array<{ category: string; total: number }>;
+  onClose: () => void;
+}) {
+  const gross = categories.reduce((sum, c) => sum + Math.max(c.total, 0), 0);
+  const total = categories.reduce((sum, c) => sum + c.total, 0);
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-2 mt-8">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          Por categoría · {fmtMonthLabel(month)}
+        </h4>
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+        >
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" className="w-3.5 h-3.5">
+            <path d="M10.5 3.5 6 8l4.5 4.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Ver histórico
+        </button>
+      </div>
+      {categories.length === 0 ? (
+        <p className="text-sm text-gray-500 py-2">Sin gastos registrados este mes.</p>
+      ) : (
+        <ul className="space-y-2">
+          {categories.map(c => {
+            const isCredit = c.total < 0;
+            const pct = c.total > 0 && gross > 0 ? (c.total / gross) * 100 : 0;
+            return (
+              <li key={c.category} className="space-y-1">
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="font-medium text-gray-800">{c.category}</span>
+                  <span className="text-gray-600 text-right flex items-baseline justify-end gap-3">
+                    <span>{signedExpenseFormat(c.total)}</span>
+                    <span className="text-gray-400">{!isCredit && pct >= 0.05 ? `${pct.toFixed(1)}%` : ''}</span>
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${isCredit ? 'bg-emerald-400/80' : 'bg-red-400/80'}`}
+                    style={{ width: `${Math.max(1, Math.min(100, pct))}%` }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p className="text-xs text-gray-400 mt-3">Total mes: {signedExpenseFormat(total)}</p>
+    </div>
   );
 }
 

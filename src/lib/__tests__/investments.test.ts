@@ -3,6 +3,7 @@ import {
   computePortfolio,
   computeInterest,
   computeExpenses,
+  computeIncome,
   computeCashBalance,
   computeAccountEvolution,
   computeBankBreakdown,
@@ -460,10 +461,10 @@ describe('computeExpenses', () => {
     expect(summary.byCategory.map(c => c.category)).not.toContain('Excluido');
   });
 
-  it('calcula media mensual sobre el rango desde el primer gasto hasta el último', () => {
+  it('calcula media mensual solo sobre meses terminados (excluye el mes en curso)', () => {
     const summary = computeExpenses(movements);
-    expect(summary.monthCount).toBe(3);
-    expect(summary.averageMonthly).toBeCloseTo(153.99 / 3);
+    expect(summary.monthCount).toBe(2);
+    expect(summary.averageMonthly).toBeCloseTo((100 + 13.99) / 2);
   });
 
   it('separa mes actual y anterior', () => {
@@ -476,6 +477,32 @@ describe('computeExpenses', () => {
     const summary = computeExpenses(movements);
     expect(summary.byCategory[0].category).toBe('Alimentación');
     expect(summary.byCategory[0].total).toBeCloseTo(100);
+  });
+});
+
+describe('computeIncome', () => {
+  const now = new Date();
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 10);
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 20);
+
+  const movements: Movement[] = [
+    mk({ type: 'income', date: iso(previousMonth), concept: 'NOMINA', amount: 2000 }),
+    mk({ type: 'income', date: iso(thisMonth), concept: 'NOMINA', amount: 2000 }),
+  ];
+
+  it('excluye el mes en curso de la media mensual', () => {
+    const summary = computeIncome(movements);
+    expect(summary.currentMonth).toBeCloseTo(2000);
+    expect(summary.monthCount).toBe(1);
+    expect(summary.averageMonthly).toBeCloseTo(2000);
+  });
+
+  it('mantiene el mes en curso en la serie mensual', () => {
+    const summary = computeIncome(movements);
+    expect(summary.monthly.length).toBe(2);
+    expect(summary.total).toBeCloseTo(4000);
   });
 });
 
