@@ -84,6 +84,7 @@ import {
   Tooltip,
   signedExpenseFormat,
   Icon,
+  BankLogo,
 } from './common';
 
 interface InvestmentsStore {
@@ -675,7 +676,7 @@ export default function InvestmentsSimulator() {
                 fullWidth
                 ariaLabel="Banco de origen"
                 onChange={handleBankChange}
-                options={BANKS.map(b => ({ value: b.id, label: b.label }))}
+                options={BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={18} /> }))}
               />
               <span className="block text-xs text-gray-500 mt-1">
                 {BANKS.find(b => b.id === bank)?.hint}
@@ -759,13 +760,18 @@ export default function InvestmentsSimulator() {
                 </button>
               </div>
               {showFileHistory && (
-                <ul className="flex flex-wrap gap-2">
+                <ul
+                  className="grid gap-2 w-full grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+                >
                   {store.files.map(f => (
                     <li
                       key={f.id}
-                      className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-zinc-100 border border-gray-200 text-xs text-gray-700 max-w-full"
+                      className="inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 min-w-0 w-full rounded-full bg-zinc-100 border border-gray-200 text-xs text-gray-700"
                     >
-                      <span className="font-semibold">{BANK_LABELS[f.bank]}</span>
+                      <span className="inline-flex items-center gap-1.5 shrink-0 font-semibold">
+                        <BankLogo bank={f.bank} size={12} />
+                        {BANK_LABELS[f.bank]}
+                      </span>
                       {editingFile?.id === f.id ? (
                         <input
                           autoFocus
@@ -776,11 +782,11 @@ export default function InvestmentsSimulator() {
                             if (e.key === 'Enter') commitRename();
                             if (e.key === 'Escape') setEditingFile(null);
                           }}
-                          className="w-[180px] px-1.5 py-0.5 rounded-md border border-gray-300 bg-[#fdfdfe] text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                          className="flex-1 min-w-0 px-1.5 py-0.5 rounded-md border border-gray-300 bg-[#fdfdfe] text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
                         />
                       ) : (
                         <>
-                          <span className="truncate max-w-[160px]">{f.name}</span>
+                          <span className="truncate flex-1 min-w-0">{f.name}</span>
                           <button
                             type="button"
                             onClick={() => setEditingFile({ id: f.id, name: f.name })}
@@ -1558,7 +1564,7 @@ function AccountSection({
               { title: 'Intereses' },
             ]}
             rows={bankBreakdown.map(b => [
-              { content: <span className="font-semibold text-gray-900">{BANK_LABELS[b.bank as BankId] ?? b.bank}</span> },
+              { content: <span className="inline-flex items-center gap-2 font-semibold text-gray-900"><BankLogo bank={b.bank as BankId} size={18} />{BANK_LABELS[b.bank as BankId] ?? b.bank}</span> },
               { content: <span className={b.balance >= 0 ? 'text-gray-900' : 'text-red-600'}>{formatCurrency(b.balance - b.interest)}</span> },
               { content: <span className={b.balance >= 0 ? 'text-gray-900' : 'text-red-600'}>{formatCurrency(b.balance)}</span> },
               { content: <span className={b.interest > 0 ? 'text-emerald-600 font-semibold' : 'text-gray-500'}>{formatSigned(b.interest)}</span> },
@@ -1940,8 +1946,9 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
             <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
               <div className="min-w-0">
                 <p className="font-medium text-gray-700 truncate">{m.concept}</p>
-                <p className="text-xs text-gray-400">
-                  {new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES')} · {BANK_LABELS[m.bank]}
+                <p className="inline-flex items-center gap-1.5 text-xs text-gray-400">
+                  {new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES')} · <BankLogo bank={m.bank} size={11} />
+                  {BANK_LABELS[m.bank]}
                 </p>
               </div>
               <span className="text-emerald-700 font-semibold whitespace-nowrap">{formatSigned(m.amount)}</span>
@@ -2357,7 +2364,7 @@ function ExpensesSection({
               className="w-44"
               options={[
                 { value: 'all', label: 'Todos los bancos' },
-                ...BANKS.map(b => ({ value: b.id, label: b.label })),
+                ...BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
               ]}
             />
           </div>
@@ -2417,7 +2424,7 @@ function ExpensesSection({
               align: 'left',
             },
             { title: 'Concepto', align: 'left' },
-            { title: 'Banco', align: 'left' },
+            { title: 'Banco', align: 'left', className: 'min-w-[160px]' },
             { title: 'Categoría', align: 'left' },
             {
               title: (
@@ -2451,7 +2458,7 @@ function ExpensesSection({
                 </span>
               ),
             },
-            { content: <span className="text-gray-500">{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
+            { content: <span className="inline-flex items-center gap-2 whitespace-nowrap text-gray-500"><BankLogo bank={m.bank} size={18} />{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
             {
               content: (
                 <Select
@@ -2766,7 +2773,7 @@ function MovementsSection({
             className="w-44"
             options={[
               { value: 'all', label: 'Todos los bancos' },
-              ...BANKS.map(b => ({ value: b.id, label: b.label })),
+              ...BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
             ]}
           />
         </div>
@@ -2833,7 +2840,7 @@ function MovementsSection({
               ),
               align: 'left',
             },
-            { title: 'Banco', align: 'left' },
+            { title: 'Banco', align: 'left', className: 'min-w-[180px]' },
             { title: 'Tipo', align: 'left', className: 'min-w-[160px]' },
             { title: 'Concepto', align: 'left' },
             {
@@ -2861,7 +2868,7 @@ function MovementsSection({
               ),
             },
             new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES'),
-            { content: <span className="text-gray-500">{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
+            { content: <span className="inline-flex items-center gap-2 whitespace-nowrap text-gray-500"><BankLogo bank={m.bank} size={18} />{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
             {
               content: (
                 <Select

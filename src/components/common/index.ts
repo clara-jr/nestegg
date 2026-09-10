@@ -21,6 +21,7 @@ export { ScrollableTable, type ScrollableTableColumn, type ScrollableTableCell, 
 export { ChartRangeSummary, type ChartRangeSummaryProps } from './results/ChartRangeSummary';
 export { SummaryCard, type SummaryCardProps } from './results/SummaryCard';
 export { ExpenseCategoryIcon } from './results/CategoryIcon';
+export { BankLogo } from './results/BankLogo';
 export { Icon } from './Icons';
 export {
   CategoryBreakdown,
