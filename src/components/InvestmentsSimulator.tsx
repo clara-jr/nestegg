@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { formatCurrency } from '../lib/calculations';
+import { formatCurrency, formatSigned } from '../lib/calculations';
 import {
   BANKS,
   MOVEMENT_TYPE_LABELS,
@@ -21,6 +21,7 @@ import {
   normalizeStoredMovements,
   parseBankMatrix,
   paypalDuplicateIds,
+  reclassifyPaypalDuplicates,
   readFileAsMatrix,
   type BankId,
   type FileMeta,
@@ -29,18 +30,26 @@ import {
 } from '../lib/bankImports';
 import {
   EXPENSE_CATEGORY_LIST,
+  averageInRange,
   buildConceptCategoryMap,
   cleanConcept,
   completedMonths,
   computeAccountEvolution,
   computeBankBreakdown,
   computeCashBalance,
+  computeDailySeries,
   computeExpenses,
   computeIncome,
   computeInterest,
   computePortfolio,
+  currentMonthKey,
+  fillMonthly,
+  formatDay,
   guessExpenseCategory,
   interestNetAmount,
+  rangeFromDay,
+  rangeMonth,
+  rangeToDay,
   resolveExpenseCategory,
   type AccountEvolutionPoint,
   type BankBreakdownEntry,
@@ -49,19 +58,32 @@ import {
   type PlazoFijoConfig,
 } from '../lib/investments';
 import { fetchPrices, type PriceRequest } from '../lib/prices';
-import { useLocalStorage } from '../lib/sharedStore';
+import { dispatchDataChanged, useProfileLocalStorage, useProfiles } from '../lib/profiles';
+import ProfileSelector from './ProfileSelector';
+import JointSimulator from './JointSimulator';
 import {
+  CategoryBreakdown,
+  ChartRangeSummary,
   ChartTooltip,
+  DateRangeFilter,
+  type DateRange,
+  ExpenseCategoryIcon,
   FormContainer,
   FormSection,
+  IncomeExpenseTooltip,
+  LastMonthBreakdown,
+  LastYearBreakdown,
   Modal,
   NoteCard,
   ResultsContainer,
   ScenarioSection,
   ScrollableTable,
+  Select,
   SimulatorLayout,
   SummaryCard,
   Tooltip,
+  signedExpenseFormat,
+  Icon,
 } from './common';
 
 interface InvestmentsStore {
@@ -81,31 +103,16 @@ interface ImportFeedback {
   text: string;
 }
 
-type SectionTab = 'portfolio' | 'account' | 'income' | 'expenses' | 'movements';
+type SectionTab = 'portfolio' | 'account' | 'income' | 'expenses' | 'movements' | 'joint';
 
-const SECTION_TABS: ReadonlyArray<{ id: SectionTab; label: string }> = [
+const SECTION_TABS: ReadonlyArray<{ id: SectionTab; label: string; onlyWithTwoProfiles?: boolean }> = [
   { id: 'portfolio', label: 'Cartera' },
   { id: 'account', label: 'Cuenta' },
   { id: 'income', label: 'Ingresos' },
   { id: 'expenses', label: 'Gastos' },
   { id: 'movements', label: 'Movimientos' },
+  { id: 'joint', label: 'Convivencia', onlyWithTwoProfiles: true },
 ];
-
-const TYPE_COLORS: Record<MovementType, string> = {
-  buy: 'text-emerald-700',
-  income: 'text-emerald-700',
-  perk: 'text-fuchsia-700',
-  sell: 'text-blue-700',
-  dividend: 'text-violet-700',
-  interest: 'text-amber-700',
-  expense: 'text-red-700',
-  withdrawal: 'text-red-700',
-  transfer: 'text-gray-500',
-  fee: 'text-gray-500',
-  tax: 'text-gray-500',
-  refund: 'text-teal-700',
-  other: 'text-gray-500',
-};
 
 const BANK_LABELS: Record<BankId, string> = Object.fromEntries(
   BANKS.map(b => [b.id, b.label])
@@ -114,10 +121,6 @@ const BANK_LABELS: Record<BankId, string> = Object.fromEntries(
 function fmtMonthLabel(month: string): string {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
-}
-
-function signedAmount(value: number): string {
-  return `${value > 0 ? '+' : ''}${formatCurrency(value)}`;
 }
 
 /** Reparto del capital entre cartera y efectivo, con porcentaje sobre el total. */
@@ -134,15 +137,21 @@ function pnlColor(value: number): string {
 }
 
 export default function InvestmentsSimulator() {
-  const [store, setStore] = useLocalStorage<InvestmentsStore>('nestegg-investments-v1', {
+  const { profiles } = useProfiles();
+  const [store, setStore] = useProfileLocalStorage<InvestmentsStore>('nestegg-investments-v1', {
     files: [],
     movements: [],
   });
-  const [priceMap, setPriceMap] = useLocalStorage<PriceMap>('nestegg-prices-v1', {});
+  const [priceMap, setPriceMap] = useProfileLocalStorage<PriceMap>('nestegg-prices-v1', {});
   // Parámetros declarados por el usuario para cada depósito a plazo (TIR + duración).
-  const [plazoConfigs, setPlazoConfigs] = useLocalStorage<Record<string, PlazoFijoConfig>>('nestegg-plazos-v1', {});
+  const [plazoConfigs, setPlazoConfigs] = useProfileLocalStorage<Record<string, PlazoFijoConfig>>('nestegg-plazos-v1', {});
   const [bank, setBank] = useState<BankId>('trade-republic');
   const [tab, setTab] = useState<SectionTab>('portfolio');
+  // «Convivencia» solo existe cuando hay más de un perfil; si se elimina el
+  // segundo, se vuelve a la sección Cartera.
+  useEffect(() => {
+    if (tab === 'joint' && profiles.length <= 1) setTab('portfolio');
+  }, [tab, profiles.length]);
   const [importing, setImporting] = useState(false);
   const [feedback, setFeedback] = useState<ImportFeedback | null>(null);
   const [updatingPrices, setUpdatingPrices] = useState(false);
@@ -177,17 +186,9 @@ export default function InvestmentsSimulator() {
   };
 
   // Movimientos efectivos: se reclasifican de forma derivada como «Traspaso»
-  // los cargos de otros bancos que duplican un movimiento de PayPal (mismo
-  // importe y dentro de la ventana de fechas). El tipo se sobrescribe sin tocar
-  // el almacén, así que si se elimina el fichero de PayPal esos movimientos
-  // vuelven a su tipo original (Gasto) automáticamente.
-  const visibleMovements = useMemo(() => {
-    const transfers = paypalDuplicateIds(store.movements);
-    if (transfers.size === 0) return store.movements;
-    return store.movements.map(m =>
-      transfers.has(m.id) ? { ...m, type: 'transfer' as const } : m
-    );
-  }, [store.movements]);
+  // los cargos de otros bancos que duplican un movimiento de PayPal. La misma
+  // derivación se aplica en la vista conjunta para que ambas coincidan.
+  const visibleMovements = useMemo(() => reclassifyPaypalDuplicates(store.movements), [store.movements]);
 
   const portfolio = useMemo(
     () => computePortfolio(visibleMovements, priceOf, plazoConfigs),
@@ -211,6 +212,14 @@ export default function InvestmentsSimulator() {
   const savingsAvg = income.averageMonthly - expenses.averageMonthly;
 
   const hasData = store.movements.length > 0;
+
+  // Notifica a la vista conjunta cuando cambian los datos de este perfil.
+  useEffect(() => {
+    if (!storageHydratedRef.current) return;
+    dispatchDataChanged();
+  }, [store]);
+  const storageHydratedRef = useRef(false);
+  useEffect(() => { storageHydratedRef.current = true; }, []);
 
   // Normaliza los datos guardados al arrancar: reclasifica perks antiguos
   // (STOCKPERK guardados como ingreso), fusiona órdenes partidas por el banco
@@ -654,20 +663,20 @@ export default function InvestmentsSimulator() {
 
   return (
     <SimulatorLayout>
+      <ProfileSelector />
       <FormContainer>
         <FormSection title="Importar extractos bancarios" cols="single">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
             <label className="block">
               <span className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">Banco de origen</span>
-              <select
+              <Select
                 value={bank}
-                onChange={e => handleBankChange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
-              >
-                {BANKS.map(b => (
-                  <option key={b.id} value={b.id}>{b.label}</option>
-                ))}
-              </select>
+                size="md"
+                fullWidth
+                ariaLabel="Banco de origen"
+                onChange={handleBankChange}
+                options={BANKS.map(b => ({ value: b.id, label: b.label }))}
+              />
               <span className="block text-xs text-gray-500 mt-1">
                 {BANKS.find(b => b.id === bank)?.hint}
               </span>
@@ -679,7 +688,7 @@ export default function InvestmentsSimulator() {
                 type="file"
                 accept=".csv,.xls,.xlsx,text/csv,text/plain"
                 multiple
-                className="w-full text-sm text-gray-600 file:mr-3 file:px-4 file:py-2 file:rounded-lg file:border-0 file:bg-gray-900 file:text-white file:text-sm file:font-semibold file:cursor-pointer hover:file:bg-gray-700 cursor-pointer"
+                className="w-full text-sm text-gray-600 file:mr-3 file:px-4 file:py-2 file:rounded-xl file:border file:border-gray-200 file:bg-zinc-100 file:text-gray-900 file:text-sm file:font-semibold file:cursor-pointer hover:file:bg-zinc-200 cursor-pointer"
               />
             </label>
           </div>
@@ -688,9 +697,16 @@ export default function InvestmentsSimulator() {
               type="button"
               onClick={handleImport}
               disabled={importing}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {importing ? 'Importando…' : '📥 Importar movimientos'}
+              {importing
+                ? 'Importando…'
+                : (
+                    <>
+                      <Icon name="upload" className="h-4 w-4" />
+                      Importar movimientos
+                    </>
+                  )}
             </button>
             {feedback && (
               <p className={`text-xs leading-relaxed ${
@@ -747,7 +763,7 @@ export default function InvestmentsSimulator() {
                   {store.files.map(f => (
                     <li
                       key={f.id}
-                      className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-gray-50 border border-gray-200 text-xs text-gray-700 max-w-full"
+                      className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1.5 rounded-full bg-zinc-100 border border-gray-200 text-xs text-gray-700 max-w-full"
                     >
                       <span className="font-semibold">{BANK_LABELS[f.bank]}</span>
                       {editingFile?.id === f.id ? (
@@ -760,7 +776,7 @@ export default function InvestmentsSimulator() {
                             if (e.key === 'Enter') commitRename();
                             if (e.key === 'Escape') setEditingFile(null);
                           }}
-                          className="w-[180px] px-1.5 py-0.5 rounded-md border border-gray-300 bg-white text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                          className="w-[180px] px-1.5 py-0.5 rounded-md border border-gray-300 bg-[#fdfdfe] text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
                         />
                       ) : (
                         <>
@@ -801,7 +817,7 @@ export default function InvestmentsSimulator() {
       <ResultsContainer>
         {!hasData ? (
           <div className="py-14 flex flex-col items-center justify-center text-center gap-3">
-            <span className="text-4xl">📊</span>
+            <Icon name="chart" className="h-14 w-14 text-gray-400" />
             <p className="text-base font-bold text-gray-900">Aún no hay datos</p>
             <p className="text-sm text-gray-500 max-w-md leading-relaxed">
               Sube los extractos CSV/XLS de tus bancos para ver el beneficio de tu cartera,
@@ -811,7 +827,7 @@ export default function InvestmentsSimulator() {
           </div>
         ) : (
           <>
-            <ScenarioSection gridCols="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <ScenarioSection title="Resumen de Finanzas" gridCols="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <SummaryCard
                 label="Capital Total"
                 value={formatCurrency(totalCapital)}
@@ -820,31 +836,31 @@ export default function InvestmentsSimulator() {
               />
               <SummaryCard
                 label="Beneficio Total"
-                value={`${signedAmount(totalBenefit)} (${totalBenefit > 0 ? '+' : ''}${((totalBenefit / totalCapital) * 100).toFixed(2)}%)`}
+                value={`${formatSigned(totalBenefit)} (${totalBenefit > 0 ? '+' : ''}${((totalBenefit / totalCapital) * 100).toFixed(2)}%)`}
                 variant={
                   totalBenefit > 0.005 ? 'positive' : totalBenefit < -0.005 ? 'negative' : 'neutral'
                 }
-                subtitle={`Cartera ${signedAmount(portfolio.summary.totalBenefit)} · Cuenta ${signedAmount(interest.total)}`}
+                subtitle={`Cartera ${formatSigned(portfolio.summary.totalBenefit)} · Cuenta ${formatSigned(interest.total)}`}
               />
               <SummaryCard
                 label="Capacidad de Ahorro"
-                value={formatCurrency(savingsAvg)}
+                value={formatSigned(savingsAvg)}
                 variant={savingsAvg >= 0 ? 'positive' : 'negative'}
-                subtitle={`Ingresos medios: +${formatCurrency(income.averageMonthly)} · Gastos medios: -${formatCurrency(expenses.averageMonthly)}`}
+                subtitle={`Ingresos medios: ${formatSigned(income.averageMonthly)} · Gastos medios: ${formatSigned(-expenses.averageMonthly)}`}
               />
             </ScenarioSection>
 
             <div className="-mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 space-y-5">
               <div className="flex flex-wrap gap-2">
-                {SECTION_TABS.map(t => (
+                {SECTION_TABS.filter(t => !t.onlyWithTwoProfiles || profiles.length > 1).map(t => (
                   <button
                     key={t.id}
                     type="button"
                     onClick={() => setTab(t.id)}
                     className={`px-4 py-2 text-sm font-semibold rounded-full border transition-colors cursor-pointer ${
                       tab === t.id
-                        ? 'bg-gray-900 text-white border-gray-900'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-900'
+                        ? 'bg-zinc-100 text-gray-900 border-gray-200'
+                        : 'bg-[#fdfdfe] text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-900'
                     }`}
                   >
                     {t.label}
@@ -877,13 +893,16 @@ export default function InvestmentsSimulator() {
                   expPrev={expenses.previousMonth}
                   expMonthly={expenses.monthly}
                   movements={visibleMovements.filter(m => m.type === 'income')}
+                  expenseMovements={visibleMovements.filter(m => m.type === 'expense' || m.type === 'refund')}
                 />
               )}
 
               {tab === 'expenses' && (
                 <ExpensesSection
                   data={expenses}
+                  income={income}
                   movements={visibleMovements.filter(m => m.type === 'expense' || m.type === 'refund')}
+                  incomeMovements={visibleMovements.filter(m => m.type === 'income')}
                   onChangeCategory={updateCategory}
                   onBulkChangeCategory={bulkUpdateCategory}
                 />
@@ -906,11 +925,14 @@ export default function InvestmentsSimulator() {
                   onRequestBulkDelete={requestDelete}
                 />
               )}
+
+              {tab === 'joint' && profiles.length > 1 && <JointSimulator />}
             </div>
           </>
         )}
         <NoteCard variant="info" >
-          🔒 Todos los datos se procesan y almacenan localmente en tu navegador.
+          <Icon name="lock" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-gray-500" />
+          Todos los datos se procesan y almacenan localmente en tu navegador.
           Nada se envía a ningún servidor.
         </NoteCard>
       </ResultsContainer>
@@ -934,14 +956,14 @@ export default function InvestmentsSimulator() {
           <button
             type="button"
             onClick={confirmMoveOne}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
             Solo este
           </button>
           <button
             type="button"
             onClick={confirmMoveAll}
-            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
           >
             Mover todos ({pendingCategoryChange?.ids.length})
           </button>
@@ -969,14 +991,14 @@ export default function InvestmentsSimulator() {
           <button
             type="button"
             onClick={confirmTypeOne}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
             Solo este
           </button>
           <button
             type="button"
             onClick={confirmTypeAll}
-            className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
           >
             Cambiar todos ({pendingTypeChange?.ids.length})
           </button>
@@ -998,14 +1020,14 @@ export default function InvestmentsSimulator() {
           <button
             type="button"
             onClick={() => setPendingClearAll(false)}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="button"
             onClick={clearAll}
-            className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
           >
             Vaciar todo
           </button>
@@ -1028,14 +1050,14 @@ export default function InvestmentsSimulator() {
           <button
             type="button"
             onClick={() => setPendingDeleteIds(null)}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
             Cancelar
           </button>
           <button
             type="button"
             onClick={confirmDelete}
-            className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
           >
             Eliminar
           </button>
@@ -1140,25 +1162,25 @@ function PortfolioSection({
         <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">
           Evolución de la cartera ({rows.length} productos)
         </h3>
-        {portfolioSort !== 'annual' && (
+        {/*portfolioSort !== 'annual' && (
           <button
             type="button"
             onClick={() => {
               setPortfolioSort('annual');
               setPortfolioDir('desc');
             }}
-            className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer"
+            className="px-3 py-1.5 rounded-xl border border-gray-300 text-xs font-semibold text-gray-600 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
             ↺ Ordenar por % Anual
           </button>
-        )}
+        )*/}
         {/*<div className="flex items-center gap-3">
           {status && <p className="text-xs text-gray-500 max-w-[320px] text-right">{status}</p>}
           <button
             type="button"
             onClick={onUpdatePrices}
             disabled={updating}
-            className="px-4 py-2 rounded-lg border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
+            className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
           >
             {updating ? 'Actualizando…' : '🔄 Actualizar precios'}
           </button>
@@ -1168,9 +1190,9 @@ function PortfolioSection({
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
         <SummaryCard label="Invertido" value={formatCurrency(summary.investedCost)} variant="info" />
         <SummaryCard label="Valor Actual" value={formatCurrency(summary.currentValue)} variant="info" subtitle={`${summary.currentValue - summary.investedCost > 0 ? '+' : ''}${((summary.currentValue - summary.investedCost) / summary.investedCost * 100).toFixed(2)}%`} />
-        <SummaryCard label="Latente" value={signedAmount(summary.unrealized)} variant={summary.unrealized >= 0 ? 'positive' : 'negative'} subtitle="Pendiente de vender" />
-        <SummaryCard label="Recibido" value={signedAmount(summary.realized)} variant={summary.realized >= 0 ? 'positive' : 'negative'} subtitle="Ventas" />
-        <SummaryCard label="Dividendos" value={signedAmount(summary.dividends)} subtitle={undefined} />
+        <SummaryCard label="Latente" value={formatSigned(summary.unrealized)} variant={summary.unrealized >= 0 ? 'positive' : 'negative'} subtitle="Pendiente de vender" />
+        <SummaryCard label="Recibido" value={formatSigned(summary.realized)} variant={summary.realized >= 0 ? 'positive' : 'negative'} subtitle="Ventas" />
+        <SummaryCard label="Dividendos" value={formatSigned(summary.dividends)} subtitle={undefined} />
       </div>
 
       <ScrollableTable
@@ -1336,16 +1358,16 @@ function PortfolioSection({
                             : 'Diferencia entre el valor actual y el invertido (pendiente de vender).'
                       }
                     >
-                      <span className={pnlColor(h.unrealizedPnl)}>{signedAmount(h.unrealizedPnl)}</span>
+                      <span className={pnlColor(h.unrealizedPnl)}>{formatSigned(h.unrealizedPnl)}</span>
                     </Tooltip>
                   ),
                 },
-            { content: <span className={pnlColor(h.realizedPnl)}>{signedAmount(h.realizedPnl)}</span> },
-            { content: <span className="text-gray-600">{isPF ? '—' : signedAmount(h.dividends)}</span> },
+            { content: <span className={pnlColor(h.realizedPnl)}>{formatSigned(h.realizedPnl)}</span> },
+            { content: <span className="text-gray-600">{isPF ? '—' : formatSigned(h.dividends)}</span> },
             {
               content: (
                 <span className={pnlColor(h.totalPnl)}>
-                  {signedAmount(h.totalPnl)}
+                  {formatSigned(h.totalPnl)}
                   {pct !== null && (
                     <span className={`block text-xs font-normal ${pct >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {pct >= 0 ? '+' : ''}{pct.toFixed(2)}%
@@ -1508,8 +1530,8 @@ function AccountSection({
           subtitle={`+${((cashBalance/(cashBalance - account.totalInterest) - 1) * 100).toFixed(2)}%`}
         />
         <SummaryCard
-          label="Intereses Netos"
-          value={formatCurrency(account.totalInterest)}
+          label="Intereses"
+          value={formatSigned(account.totalInterest)}
           variant={account.totalInterest > 0 ? 'positive' : 'neutral'}
           subtitle={`${data.monthly.length} meses de histórico`}
           /*subtitle={
@@ -1520,14 +1542,14 @@ function AccountSection({
         />
         <SummaryCard
           label={`Intereses Año en Curso`}
-          value={formatCurrency(data.currentYear)}
+          value={formatSigned(data.currentYear)}
           variant="info"
         />
       </div>
 
       {bankBreakdown.length > 1 && (
         <div>
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-8">Saldo por cuenta</h4>
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-8">Saldo por cuenta</h4>
           <ScrollableTable
             columns={[
               { title: 'Banco', align: 'left' },
@@ -1539,27 +1561,27 @@ function AccountSection({
               { content: <span className="font-semibold text-gray-900">{BANK_LABELS[b.bank as BankId] ?? b.bank}</span> },
               { content: <span className={b.balance >= 0 ? 'text-gray-900' : 'text-red-600'}>{formatCurrency(b.balance - b.interest)}</span> },
               { content: <span className={b.balance >= 0 ? 'text-gray-900' : 'text-red-600'}>{formatCurrency(b.balance)}</span> },
-              { content: <span className={b.interest > 0 ? 'text-emerald-600 font-semibold' : 'text-gray-500'}>{formatCurrency(b.interest)}</span> },
+              { content: <span className={b.interest > 0 ? 'text-emerald-600 font-semibold' : 'text-gray-500'}>{formatSigned(b.interest)}</span> },
             ])}
           />
         </div>
       )}
 
       {/*<div>
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+        <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
           Evolución del dinero en la cuenta (ingresos + intereses)
         </h4>
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={evolutionChartData(account.evolution)} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-            <CartesianGrid stroke="#f3f4f6" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} interval="preserveStartEnd" />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={70} tickFormatter={v => `${v} €`} />
+            <CartesianGrid stroke="#ececea" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9b9a95' }} interval="preserveStartEnd" />
+            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => `${v} €`} />
             {accountTooltip()}
             <Line
               type="monotone"
               dataKey="total"
               name="En cuenta"
-              stroke="#059669"
+              stroke="#00bc7d"
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
@@ -1572,7 +1594,7 @@ function AccountSection({
         columns={[
           { title: 'Año', align: 'left' },
           { title: 'Aportado' },
-          { title: 'Intereses netos' },
+          { title: 'Intereses' },
         ]}
         rows={yearlyAccountRows(account.evolution)}
       />*/}
@@ -1603,11 +1625,11 @@ function yearlyAccountRows(points: AccountEvolutionPoint[]): Array<Array<ReactNo
   }
   return [...byYear.entries()].map(([year, totals]) => [
     year,
-    formatCurrency(totals.contributed),
+    formatSigned(totals.contributed),
     {
       content: (
         <span className={totals.interest > 0 ? 'text-emerald-600 font-semibold' : ''}>
-          {formatCurrency(totals.interest)}
+          {formatSigned(totals.interest)}
         </span>
       ),
     },
@@ -1629,8 +1651,8 @@ function accountTooltip() {
             return (
               <>
                 <p className="font-semibold text-gray-900">{point?.label ?? ''}</p>
-                <p style={{ color: '#6b7280' }}>Ingresos: {formatCurrency(contributed)}</p>
-                <p style={{ color: '#059669' }}>Intereses: {formatCurrency(interest)}</p>
+                <p style={{ color: '#706f6c' }}>Ingresos: {formatSigned(contributed)}</p>
+                <p style={{ color: '#00bc7d' }}>Intereses: {formatSigned(interest)}</p>
                 <p className="font-semibold text-gray-900 border-t border-gray-200 mt-1 pt-1">
                   En cuenta: {formatCurrency(point?.total ?? contributed + interest)}
                 </p>
@@ -1654,6 +1676,7 @@ function IncomeSection({
   expPrev,
   expMonthly,
   movements,
+  expenseMovements,
 }: {
   income: ReturnType<typeof computeIncome>;
   expAvg: number;
@@ -1661,14 +1684,19 @@ function IncomeSection({
   expPrev: number;
   expMonthly: Array<{ month: string; total: number }>;
   movements: Movement[];
+  expenseMovements: Movement[];
 }) {
   const savingsAvg = income.averageMonthly - expAvg;
   const savingsCurrent = income.currentMonth - expCurrent;
   const savingsPrev = income.previousMonth - expPrev;
   const expByMonth = useMemo(() => new Map(expMonthly.map(p => [p.month, p.total])), [expMonthly]);
+  // Rellena hasta el mes en curso (no solo hasta el último mes con datos), para
+  // que el mes actual aparezca en el eje aunque todavía no tenga movimientos.
   const chartData = useMemo(
     () =>
-      monthlyChartData(monthlyExpenseSlice(income.monthly)).map(p => ({
+      monthlyChartData(
+        monthlyExpenseSlice(fillMonthly(income.monthly, income.monthly[0]?.month, currentMonthKey())),
+      ).map(p => ({
         ...p,
         expenses: expByMonth.get(p.month) ?? 0,
         savings: p.total - (expByMonth.get(p.month) ?? 0),
@@ -1686,16 +1714,68 @@ function IncomeSection({
   }, [income.monthly, expByMonth]);
 
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+  const visibleData = useMemo(
+    () =>
+      dateRange
+        ? chartData.filter(p => p.month >= rangeMonth(dateRange.from) && p.month <= rangeMonth(dateRange.to))
+        : chartData,
+    [chartData, dateRange]
+  );
+  // Cuando el intervalo elegido no supera un mes, el eje pasa a ser diario:
+  // se acumulan los movimientos de ese mes por día, se recorta a los días del
+  // intervalo y se rellenan los días sin actividad con 0.
+  const isDaily = dateRange ? dateRange.from.slice(0, 7) === dateRange.to.slice(0, 7) : false;
+  const dailyData = useMemo(() => {
+    if (!dateRange) return [] as typeof chartData;
+    return computeDailySeries(rangeMonth(dateRange.from), movements, expenseMovements, null)
+      .filter(p => p.date >= rangeFromDay(dateRange.from) && p.date <= rangeToDay(dateRange.to))
+      .map(p => ({
+        month: p.date,
+        label: formatDay(p.date),
+        total: p.income,
+        expenses: p.expenses,
+        savings: p.savings,
+      }));
+  }, [dateRange, movements, expenseMovements]);
+  const chartRows = isDaily ? dailyData : visibleData;
+  // Límites del intervalo «Sin filtro de tiempo»: de la fecha del primer
+  // movimiento de ingresos al último mes de ingresos ya terminado (las mismas
+  // fechas que usan las cards de esta sección).
+  const todoBounds = useMemo(() => {
+    const completed = [...income.monthly].map(p => p.month).filter(m => m < currentMonthKey()).sort();
+    return { from: completed[0], to: completed[completed.length - 1] };
+  }, [income.monthly]);
+  const intervalSummary = useMemo(() => {
+    // En modo diario se usan las filas diarias. En modo mensual se usa la serie
+    // completa dentro del intervalo (no la ventana de 24 meses de la gráfica),
+    // para que las medias coincidan con las de la gráfica de Gastos en las
+    // mismas condiciones. Sin filtro de tiempo no se cuenta el mes en curso
+    // (aún incompleto); con un intervalo seleccionado sí se incluye lo elegido.
+    if (isDaily) {
+      const n = chartRows.length;
+      if (n === 0) return null;
+      const income = chartRows.reduce((s, p) => s + p.total, 0) / n;
+      const expenses = chartRows.reduce((s, p) => s + p.expenses, 0) / n;
+      return { income, expenses, savings: income - expenses };
+    }
+    const from = dateRange ? rangeMonth(dateRange.from) : todoBounds.from;
+    const to = dateRange ? rangeMonth(dateRange.to) : todoBounds.to;
+    if (!from || !to || from > to) return null;
+    const avgIncome = averageInRange(income.monthly, from, to);
+    const avgExpenses = averageInRange(expMonthly, from, to);
+    return { income: avgIncome, expenses: avgExpenses, savings: avgIncome - avgExpenses };
+  }, [isDaily, dateRange, chartRows, income.monthly, expMonthly, todoBounds]);
   const selectedOverview = useMemo(() => {
     if (!selectedMonth) return undefined;
-    return chartData.find(p => p.month === selectedMonth);
-  }, [chartData, selectedMonth]);
+    return chartRows.find(p => p.month === selectedMonth);
+  }, [chartRows, selectedMonth]);
 
   useEffect(() => {
-    if (selectedMonth && !income.monthly.some(p => p.month === selectedMonth)) {
+    if (selectedMonth && !chartRows.some(p => p.month === selectedMonth)) {
       setSelectedMonth(null);
     }
-  }, [selectedMonth, income.monthly]);
+  }, [selectedMonth, chartRows]);
 
   const handleBarClick = (bar: { payload?: { month?: string }; month?: string }) => {
     const month = bar?.payload?.month ?? bar?.month;
@@ -1711,7 +1791,7 @@ function IncomeSection({
   const detailMovements = useMemo(
     () =>
       selectedMonth
-        ? sorted.filter(m => m.date.slice(0, 7) === selectedMonth)
+        ? sorted.filter(m => m.date.startsWith(selectedMonth))
         : sorted,
     [sorted, selectedMonth]
   );
@@ -1726,35 +1806,35 @@ function IncomeSection({
     <section className="space-y-4 pb-6">
       <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Ingresos</h3>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <SummaryCard label="Ingreso Medio Mensual" value={formatCurrency(income.averageMonthly)} variant="info" subtitle={`Mediana: ${formatCurrency(incomeMedian)} · ${income.monthCount} meses`} />
+        <SummaryCard label="Ingreso Medio Mensual" value={formatSigned(income.averageMonthly)} variant="info" subtitle={`Mediana: ${formatSigned(incomeMedian)} · ${income.monthCount} meses`} />
         <SummaryCard
           label="Capacidad de Ahorro Media"
-          value={formatCurrency(savingsAvg)}
+          value={formatSigned(savingsAvg)}
           variant={savingsAvg >= 0 ? 'positive' : 'negative'}
-          subtitle={`Mediana: ${formatCurrency(savingsMedian)}`}
+          subtitle={`Mediana: ${formatSigned(savingsMedian)}`}
         />
         <SummaryCard
           label="Mes Actual"
-          value={formatCurrency(income.currentMonth)}
+          value={formatSigned(income.currentMonth)}
           variant="neutral"
           subtitle={
             <span>
               Capacidad de ahorro:{' '}
               <span className={`font-semibold ${savingsCurrent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {formatCurrency(savingsCurrent)}
+                {formatSigned(savingsCurrent)}
               </span>
             </span>
           }
         />
         <SummaryCard
           label="Mes Anterior"
-          value={formatCurrency(income.previousMonth)}
+          value={formatSigned(income.previousMonth)}
           variant="neutral"
           subtitle={
             <span>
               Capacidad de ahorro:{' '}
               <span className={`font-semibold ${savingsPrev >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                {formatCurrency(savingsPrev)}
+                {formatSigned(savingsPrev)}
               </span>
             </span>
           }
@@ -1763,13 +1843,33 @@ function IncomeSection({
 
       <div>
         <div className="flex items-center gap-3 mb-2 mt-8">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Ingresos por mes</h4>
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Ingresos por mes</h4>
+          {chartData.length > 0 && (
+            <DateRangeFilter
+              min={chartData[0].month}
+              max={chartData[chartData.length - 1].month}
+              defaultFrom={todoBounds.from}
+              defaultTo={todoBounds.to}
+              onChange={setDateRange}
+              className="ml-auto"
+            />
+          )}
         </div>
+        <div className="relative">
+        {/* La caja de medias solo se muestra con un intervalo explicitamente elegido */}
+        {dateRange && intervalSummary && (
+          <ChartRangeSummary
+            income={intervalSummary.income}
+            expenses={intervalSummary.expenses}
+            savings={intervalSummary.savings}
+            perDay={isDaily}
+          />
+        )}
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-            <CartesianGrid stroke="#f3f4f6" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} interval="preserveStartEnd" />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={70} tickFormatter={v => `${v} €`} />
+          <BarChart data={chartRows} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+            <CartesianGrid stroke="#ececea" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9b9a95' }} interval={isDaily ? 2 : 'preserveStartEnd'} />
+            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => `${v} €`} />
             {incomeTooltipRecharts()}
               <Bar
                 dataKey="total"
@@ -1779,27 +1879,30 @@ function IncomeSection({
                 className="cursor-pointer"
                 background={{ fill: 'transparent', stroke: 'none', cursor: 'pointer' }}
               >
-                {chartData.map(p => {
+                {chartRows.map(p => {
                   const isSelected = p.month === selectedMonth;
                   return (
                     <Cell
                       key={p.month}
-                      fill="#059669"
+                      fill="#00bc7d"
                       opacity={selectedMonth && !isSelected ? 0.35 : 1}
 stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
                       strokeWidth={isSelected ? 2 : 0}
                     />
                 );
               })}
-              </Bar>
+</Bar>
           </BarChart>
         </ResponsiveContainer>
+        </div>
       </div>
 
       <div>
         <div className="flex items-center justify-between gap-3 my-4 mt-8">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Detalle de ingresos{selectedMonth ? ` · ${fmtMonthLabel(selectedMonth)}` : ''}
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+            Detalle de ingresos{selectedMonth
+              ? ` · ${selectedMonth.length === 10 ? formatDay(selectedMonth) : fmtMonthLabel(selectedMonth)}`
+              : ''}
           </h4>
           {selectedMonth && (
             <button
@@ -1819,7 +1922,7 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
             <SummaryCard label="Ingresos" value={formatCurrency(selectedOverview.total)} variant="positive" />
             <SummaryCard
               label="Gastos"
-              value={formatCurrency(selectedOverview.expenses < 0 ? -selectedOverview.expenses : selectedOverview.expenses)}
+              value={formatSigned(-selectedOverview.expenses)}
               variant={selectedOverview.expenses < 0 ? 'positive' : 'negative'}
               subtitle={
                 selectedOverview.expenses < 0 ? 'Las devoluciones superan a los gastos.' : undefined
@@ -1827,21 +1930,21 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
             />
             <SummaryCard
               label="Capacidad de ahorro"
-              value={formatCurrency(selectedOverview.savings)}
+              value={formatSigned(selectedOverview.savings)}
               variant={selectedOverview.savings >= 0 ? 'positive' : 'negative'}
             />
           </div>
         )}
-        <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl">
+        <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl mb-3">
           {shown.map(m => (
             <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
               <div className="min-w-0">
-                <p className="font-medium text-gray-800 truncate">{m.concept}</p>
+                <p className="font-medium text-gray-700 truncate">{m.concept}</p>
                 <p className="text-xs text-gray-400">
                   {new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES')} · {BANK_LABELS[m.bank]}
                 </p>
               </div>
-              <span className="text-emerald-700 font-semibold whitespace-nowrap">{formatCurrency(Math.abs(m.amount))}</span>
+              <span className="text-emerald-700 font-semibold whitespace-nowrap">{formatSigned(m.amount)}</span>
             </li>
           ))}
         </ul>
@@ -1857,12 +1960,16 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
 
 function ExpensesSection({
   data,
+  income,
   movements,
+  incomeMovements,
   onChangeCategory,
   onBulkChangeCategory,
 }: {
   data: ReturnType<typeof computeExpenses>;
+  income: ReturnType<typeof computeIncome>;
   movements: Movement[];
+  incomeMovements: Movement[];
   onChangeCategory: (id: string, category: string) => void;
   onBulkChangeCategory: (ids: string[], category: string) => void;
 }) {
@@ -1875,6 +1982,7 @@ function ExpensesSection({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [chartCategory, setChartCategory] = useState<string>('all');
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
 
   const last12Avg = useMemo(() => {
     // Media mensual de los últimos 12 MESES CALENDARIO y dividida entre 12: la
@@ -1934,16 +2042,72 @@ function ExpensesSection({
     return byMonth;
   }, [data.monthlyByCategory]);
 
+  const incomeByMonth = useMemo(() => new Map(income.monthly.map(p => [p.month, p.total])), [income.monthly]);
+  const expenseChartData = useMemo(
+    () => monthlyExpenseChartData(data, chartCategory, incomeByMonth),
+    [data, chartCategory, incomeByMonth]
+  );
+
+  const visibleExpenseData = useMemo(
+    () =>
+      dateRange
+        ? expenseChartData.filter(p => p.month >= rangeMonth(dateRange.from) && p.month <= rangeMonth(dateRange.to))
+        : expenseChartData,
+    [expenseChartData, dateRange]
+  );
+  // Cuando el intervalo elegido no supera un mes, el eje pasa a ser diario:
+  // se acumulan los movimientos de ese mes por día (y de la categoría
+  // seleccionada, si hay una), se recorta a los días del intervalo y se
+  // rellenan los días sin actividad con 0.
+  const isDaily = dateRange ? dateRange.from.slice(0, 7) === dateRange.to.slice(0, 7) : false;
+  const dailyData = useMemo(() => {
+    if (!dateRange) return [] as typeof visibleExpenseData;
+    const cat = chartCategory === 'all' ? null : chartCategory;
+    return computeDailySeries(rangeMonth(dateRange.from), incomeMovements, movements, cat)
+      .filter(p => p.date >= rangeFromDay(dateRange.from) && p.date <= rangeToDay(dateRange.to))
+      .map(p => ({
+        month: p.date,
+        label: formatDay(p.date),
+        total: p.expenses,
+        income: p.income,
+        savings: p.savings,
+      }));
+  }, [dateRange, incomeMovements, movements, chartCategory]);
+  const chartRows = isDaily ? dailyData : visibleExpenseData;
+  // Límites del intervalo «Sin filtro de tiempo»: de la fecha del primer
+  // movimiento de gastos al último mes de gastos ya terminado (las mismas
+  // fechas que usan las cards de esta sección).
+  const todoBounds = useMemo(() => {
+    const completed = [...data.monthly].map(p => p.month).filter(m => m < currentMonthKey()).sort();
+    return { from: completed[0], to: completed[completed.length - 1] };
+  }, [data.monthly]);
+  const intervalSummary = useMemo(() => {
+    // En modo diario se usan las filas diarias. En modo mensual se usa la serie
+    // completa dentro del intervalo (no la ventana de 24 meses de la gráfica),
+    // para que las medias coincidan con las de la gráfica de Ingresos en las
+    // mismas condiciones. Sin filtro de tiempo no se cuenta el mes en curso
+    // (aún incompleto); con un intervalo seleccionado sí se incluye lo elegido.
+    if (isDaily) {
+      const n = chartRows.length;
+      if (n === 0) return null;
+      const income = chartRows.reduce((s, p) => s + p.income, 0) / n;
+      const expenses = chartRows.reduce((s, p) => s + p.total, 0) / n;
+      return { income, expenses, savings: income - expenses };
+    }
+    const expenseSeries = chartCategory === 'all' ? data.monthly : data.monthlyByCategory[chartCategory] ?? [];
+    const from = dateRange ? rangeMonth(dateRange.from) : todoBounds.from;
+    const to = dateRange ? rangeMonth(dateRange.to) : todoBounds.to;
+    if (!from || !to || from > to) return null;
+    const avgIncome = averageInRange(income.monthly, from, to);
+    const avgExpenses = averageInRange(expenseSeries, from, to);
+    return { income: avgIncome, expenses: avgExpenses, savings: avgIncome - avgExpenses };
+  }, [isDaily, dateRange, chartRows, income.monthly, data.monthly, data.monthlyByCategory, chartCategory, todoBounds]);
+
   useEffect(() => {
-    if (selectedMonth && !data.monthly.some(p => p.month === selectedMonth)) {
+    if (selectedMonth && !chartRows.some(p => p.month === selectedMonth)) {
       setSelectedMonth(null);
     }
-  }, [selectedMonth, data.monthly]);
-
-  const expenseChartData = useMemo(
-    () => monthlyExpenseChartData(data, chartCategory),
-    [data, chartCategory]
-  );
+  }, [selectedMonth, chartRows]);
 
   const handleBarClick = (bar: { payload?: { month?: string }; month?: string }) => {
     const month = bar?.payload?.month ?? bar?.month;
@@ -2038,33 +2202,85 @@ function ExpensesSection({
       <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Seguimiento de gastos</h3>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* <SummaryCard label="Gasto Total" value={formatCurrency(data.total)} variant="negative" /> */}
-        <SummaryCard label="Gasto Medio Mensual" value={<>{formatCurrency(data.averageMonthly)}/mes</>} variant="info" subtitle={`${data.monthCount} meses de histórico`} />
-        <SummaryCard label="Media último año" value={<>{formatCurrency(last12Avg)}/mes</>} variant="neutral" subtitle="Últimos 12 meses" />
-        <SummaryCard label="Mes Actual" value={formatCurrency(data.currentMonth)} variant="neutral" />
-        <SummaryCard label="Mes Anterior" value={formatCurrency(data.previousMonth)} variant="neutral" />
+        <SummaryCard label="Gasto Medio Mensual" value={<>{formatSigned(-data.averageMonthly)}/mes</>} variant="info" subtitle={`Mediana: ${formatSigned(-data.medianMonthly)} · ${data.monthCount} meses`} />
+        <SummaryCard label="Media último año" value={<>{formatSigned(-last12Avg)}/mes</>} variant="neutral" subtitle="Últimos 12 meses" />
+        <SummaryCard
+          label="Mes Actual"
+          value={formatSigned(-data.currentMonth)}
+          variant="neutral"
+          subtitle={
+            <span>
+              Capacidad de ahorro:{' '}
+              <span className={`font-semibold ${income.currentMonth - data.currentMonth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {formatSigned(income.currentMonth - data.currentMonth)}
+              </span>
+            </span>
+          }
+        />
+        <SummaryCard
+          label="Mes Anterior"
+          value={formatSigned(-data.previousMonth)}
+          variant="neutral"
+          subtitle={
+            <span>
+              Capacidad de ahorro:{' '}
+              <span className={`font-semibold ${income.previousMonth - data.previousMonth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {formatSigned(income.previousMonth - data.previousMonth)}
+              </span>
+            </span>
+          }
+        />
       </div>
 
       <div>
         <div className="flex flex-wrap items-center gap-3 mb-2 mt-8">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Gastos por mes
           </h4>
-          <select
-            value={chartCategory}
-            onChange={e => setChartCategory(e.target.value)}
-            className="ml-auto px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
-          >
-            <option value="all">Todas las categorías</option>
-            {data.byCategory.map(c => (
-              <option key={c.category} value={c.category}>{c.category}</option>
-            ))}
-          </select>
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            <DateRangeFilter
+              min={expenseChartData[0]?.month ?? ''}
+              max={expenseChartData[expenseChartData.length - 1]?.month ?? ''}
+              defaultFrom={todoBounds.from}
+              defaultTo={todoBounds.to}
+              onChange={setDateRange}
+            />
+            <Select
+              value={chartCategory}
+              onChange={setChartCategory}
+              ariaLabel="Categoría del gráfico"
+              className="w-52"
+              options={[
+                { value: 'all', label: 'Todas las categorías' },
+                ...data.byCategory
+                  .slice()
+                  .sort((a, b) => a.category.localeCompare(b.category, 'es', { sensitivity: 'base' }))
+                  .map(c => ({
+                    value: c.category,
+                    label: c.category,
+                    icon: <ExpenseCategoryIcon category={c.category} size={12} />,
+                  })),
+              ]}
+            />
+          </div>
         </div>
+        <div className="relative">
+        {/* La caja de medias solo se muestra con un intervalo explicitamente elegido */}
+        {dateRange && intervalSummary && (
+          <ChartRangeSummary
+            income={intervalSummary.income}
+            expenses={intervalSummary.expenses}
+            savings={intervalSummary.savings}
+            perDay={isDaily}
+            categoryOnly={chartCategory !== 'all'}
+            categoryLabel={chartCategory !== 'all' ? chartCategory : undefined}
+          />
+        )}
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={expenseChartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-            <CartesianGrid stroke="#f3f4f6" vertical={false} />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} interval="preserveStartEnd" />
-            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={70} tickFormatter={v => `${v} €`} />
+          <BarChart data={chartRows} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+            <CartesianGrid stroke="#ececea" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9b9a95' }} interval={isDaily ? 2 : 'preserveStartEnd'} />
+            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => `${v} €`} />
             {monthTooltipRecharts()}
             <Bar
               dataKey="total"
@@ -2074,12 +2290,12 @@ function ExpensesSection({
               className="cursor-pointer"
               background={{ fill: 'transparent', stroke: 'none', cursor: 'pointer' }}
             >
-              {expenseChartData.map(p => {
+              {chartRows.map(p => {
                 const isSelected = p.month === selectedMonth;
                 return (
                   <Cell
                     key={p.month}
-                    fill={chartCategory === 'all' ? '#dc2626' : '#f59e0b'}
+                    fill="#ff637e"
                     opacity={selectedMonth && !isSelected ? 0.35 : 1}
                     stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
                     strokeWidth={isSelected ? 2 : 0}
@@ -2089,12 +2305,13 @@ function ExpensesSection({
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+        </div>
       </div>
 
       {selectedMonth ? (
         <MonthCategoryBreakdown
-          month={selectedMonth}
-          categories={monthCategories.get(selectedMonth) ?? []}
+          month={selectedMonth.length > 7 ? selectedMonth.slice(0, 7) : selectedMonth}
+          categories={monthCategories.get(selectedMonth.length > 7 ? selectedMonth.slice(0, 7) : selectedMonth) ?? []}
           onClose={() => setSelectedMonth(null)}
         />
       ) : (
@@ -2108,7 +2325,7 @@ function ExpensesSection({
 
       <div>
         <div className="flex flex-wrap items-center justify-between gap-3 my-4 mt-8">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Detalle de gastos
           </h4>
           <div className="flex flex-wrap items-center gap-3">
@@ -2117,57 +2334,58 @@ function ExpensesSection({
               value={expSearch}
               onChange={e => setExpSearch(e.target.value)}
               placeholder="Buscar concepto…"
-              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm w-44 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+              className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm w-44 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
             />
-            <select
+            <Select
               value={expCategory}
-              onChange={e => setExpCategory(e.target.value)}
-              className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
-            >
-              <option value="all">Todas las categorías</option>
-              {EXPENSE_CATEGORY_LIST.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <select
+              onChange={setExpCategory}
+              ariaLabel="Filtrar por categoría"
+              className="w-48"
+              options={[
+                { value: 'all', label: 'Todas las categorías' },
+                ...EXPENSE_CATEGORY_LIST.map(c => ({
+                  value: c,
+                  label: c,
+                  icon: <ExpenseCategoryIcon category={c} size={12} />,
+                })),
+              ]}
+            />
+            <Select
               value={expBank}
-              onChange={e => setExpBank(e.target.value as 'all' | BankId)}
-              className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
-            >
-              <option value="all">Todos los bancos</option>
-              {BANKS.map(b => (
-                <option key={b.id} value={b.id}>{b.label}</option>
-              ))}
-            </select>
+              onChange={v => setExpBank(v as 'all' | BankId)}
+              ariaLabel="Filtrar por banco"
+              className="w-44"
+              options={[
+                { value: 'all', label: 'Todos los bancos' },
+                ...BANKS.map(b => ({ value: b.id, label: b.label })),
+              ]}
+            />
           </div>
         </div>
         {bulkSelectedMovements.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3 py-2 px-3 rounded-lg bg-gray-900 text-white">
+          <div className="flex flex-wrap items-center gap-3 py-2 px-3 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900">
             <span className="text-sm font-semibold">
               {selected.size} seleccionado{selected.size === 1 ? '' : 's'}
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-300">Mover a:</span>
-              <select
+              <span className="text-xs text-gray-500">Mover a:</span>
+              <Select
                 value=""
-                onChange={e => {
-                  if (e.target.value) {
-                    applyBulk(e.target.value);
-                    e.target.value = '';
-                  }
-                }}
-                className="px-2.5 py-1.5 border border-gray-600 rounded-lg text-sm bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-              >
-                <option value="">Elegir categoría…</option>
-                {EXPENSE_CATEGORY_LIST.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+                placeholder="Elegir categoría…"
+                ariaLabel="Mover movimientos a categoría"
+                className="w-44"
+                onChange={applyBulk}
+                options={EXPENSE_CATEGORY_LIST.map(c => ({
+                  value: c,
+                  label: c,
+                  icon: <ExpenseCategoryIcon category={c} size={12} />,
+                }))}
+              />
             </div>
             <button
               type="button"
               onClick={clearSelection}
-              className="ml-auto px-3 py-1.5 rounded-lg border border-gray-600 text-sm font-semibold text-gray-200 hover:bg-gray-700 transition-colors cursor-pointer"
+              className="ml-auto px-3 py-1.5 rounded-xl border border-gray-300 text-sm font-semibold text-gray-500 hover:bg-zinc-200 transition-colors cursor-pointer"
             >
               Limpiar
             </button>
@@ -2199,7 +2417,7 @@ function ExpensesSection({
               align: 'left',
             },
             { title: 'Concepto', align: 'left' },
-            { title: 'Banco', align: 'left', muted: true },
+            { title: 'Banco', align: 'left' },
             { title: 'Categoría', align: 'left' },
             {
               title: (
@@ -2227,28 +2445,34 @@ function ExpensesSection({
             new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES'),
             {
               content: (
-                <span className="block max-w-[420px] whitespace-normal break-words">{m.concept}</span>
+                <span className="flex items-center gap-2">
+                  <ExpenseCategoryIcon category={m.category ?? 'Otros'} />
+                  <span className="block max-w-[420px] whitespace-normal break-words">{m.concept}</span>
+                </span>
               ),
             },
             { content: <span className="text-gray-500">{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
             {
               content: (
-                <select
+                <Select
                   value={m.category ?? 'Otros'}
-                  onChange={e => onChangeCategory(m.id, e.target.value)}
-                  className="max-w-[170px] w-full px-2 py-1 border border-gray-200 rounded-md text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
-                >
-                  {EXPENSE_CATEGORY_LIST.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                  size="xs"
+                  ariaLabel={`Categoría de ${m.concept}`}
+                  className="w-[170px]"
+                  onChange={v => onChangeCategory(m.id, v)}
+                  options={EXPENSE_CATEGORY_LIST.map(c => ({
+                    value: c,
+                    label: c,
+                    icon: <ExpenseCategoryIcon category={c} size={11} />,
+                  }))}
+                />
               ),
             },
             {
               content: m.type === 'refund' ? (
-                <span className="text-teal-600 font-semibold">+{formatCurrency(Math.abs(m.amount))}</span>
+                <span className="text-emerald-600 font-semibold">{formatSigned(m.amount)}</span>
               ) : (
-                <span className="text-red-600 font-semibold">−{formatCurrency(Math.abs(m.amount))}</span>
+                <span className="text-red-600 font-semibold">{formatSigned(m.amount)}</span>
               ),
             },
           ])}
@@ -2275,14 +2499,28 @@ function SortableHeader({
       type="button"
       onClick={onClick}
       title={`Ordenar por ${label} (${active ? (dir === 'asc' ? 'ascendente' : 'descendente') : 'descendente'})`}
-      className={`inline-flex items-center gap-1 uppercase tracking-wider font-bold cursor-pointer group ${
-        active ? 'text-gray-900' : 'text-gray-900 hover:text-gray-600'
-      }`}
+      className="inline-flex items-center gap-1 uppercase tracking-wider font-bold cursor-pointer group text-gray-900"
     >
       {label}
-      <span className="flex flex-col leading-none">
-        <span className={active && dir === 'asc' ? 'text-gray-900' : 'text-gray-300 group-hover:text-gray-400'}>▲</span>
-        <span className={active && dir === 'desc' ? 'text-gray-900' : 'text-gray-300 group-hover:text-gray-400'}>▼</span>
+      <span className="flex flex-col gap-[3px]">
+        <svg
+          width="12"
+          height="7"
+          viewBox="0 0 12 7"
+          aria-hidden="true"
+          className={active && dir === 'asc' ? 'text-gray-900' : 'text-gray-300 group-hover:text-gray-400'}
+        >
+          <path d="M6 0 12 7H0z" fill="currentColor" />
+        </svg>
+        <svg
+          width="12"
+          height="7"
+          viewBox="0 0 12 7"
+          aria-hidden="true"
+          className={active && dir === 'desc' ? 'text-gray-900' : 'text-gray-300 group-hover:text-gray-400'}
+        >
+          <path d="M0 0h12L6 7z" fill="currentColor" />
+        </svg>
       </span>
     </button>
   );
@@ -2302,7 +2540,7 @@ function MonthCategoryBreakdown({
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-2 mt-8">
-        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
           Por categoría · {fmtMonthLabel(month)}
         </h4>
         <button
@@ -2326,13 +2564,16 @@ function MonthCategoryBreakdown({
             return (
               <li key={c.category} className="space-y-1">
                 <div className="flex items-baseline justify-between text-sm">
-                  <span className="font-medium text-gray-800">{c.category}</span>
+                  <span className="flex items-center gap-2 font-medium text-gray-700">
+                    <ExpenseCategoryIcon category={c.category} />
+                    {c.category}
+                  </span>
                   <span className="text-gray-600 text-right flex items-baseline justify-end gap-3">
                     <span>{signedExpenseFormat(c.total)}</span>
                     <span className="text-gray-400">{!isCredit && pct >= 0.05 ? `${pct.toFixed(1)}%` : ''}</span>
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
                   <div
                     className={`h-full rounded-full ${isCredit ? 'bg-emerald-400/80' : 'bg-red-400/80'}`}
                     style={{ width: `${Math.max(1, Math.min(100, pct))}%` }}
@@ -2344,138 +2585,6 @@ function MonthCategoryBreakdown({
         </ul>
       )}
       <p className="text-xs text-gray-400 mt-3">Total mes: {signedExpenseFormat(total)}</p>
-    </div>
-  );
-}
-
-function CategoryBreakdown({ categories }: { categories: CategoryTotal[] }) {
-  if (categories.length === 0) return null;
-  return (
-    <div>
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-8">Por categoría</h4>
-      <ul className="space-y-2">
-        {categories.map(c => {
-          const isCredit = c.total < 0;
-          return (
-            <li key={c.category} className="space-y-1">
-              <div className="flex items-baseline justify-between text-sm">
-                <span className="font-medium text-gray-800">{c.category}</span>
-                <span className="text-gray-600 text-right flex items-baseline justify-end gap-3">
-                  <span className="whitespace-nowrap">
-                    {signedExpenseFormat(c.averageMonthly, '/mes')}
-                    <span className="text-gray-400 text-xs ml-1">desde {new Date(`${c.firstDate}T00:00:00`).toLocaleDateString('es-ES')}</span>
-                  </span>
-                  <span>{signedExpenseFormat(c.total)}</span>
-                  <span className="text-gray-400">
-                    {!isCredit && c.pct >= 0.05 ? `${c.pct.toFixed(1)}%` : ''}
-                  </span>
-                </span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${isCredit ? 'bg-emerald-400/80' : 'bg-red-400/80'}`}
-                  style={{ width: `${Math.max(1, Math.min(100, Math.abs(c.pct)))}%` }}
-                />
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function signedExpenseFormat(value: number, suffix = ''): ReactNode {
-  if (value > 0) {
-    return (
-      <span className="text-red-600 font-semibold">
-        -{formatCurrency(value)}
-        {suffix}
-      </span>
-    );
-  }
-  if (value < 0) {
-    return (
-      <span className="text-emerald-600 font-semibold">
-        +{formatCurrency(-value)}
-        {suffix}
-      </span>
-    );
-  }
-  return (
-    <span className="text-gray-500 font-semibold">
-      {formatCurrency(0)}
-      {suffix}
-    </span>
-  );
-}
-
-function LastMonthBreakdown({ categories }: { categories: CategoryTotal[] }) {
-  const rows = categories.filter(c => c.lastMonth !== 0);
-  const total = rows.reduce((sum, c) => sum + c.lastMonth, 0);
-  const gross = rows.reduce((sum, c) => sum + (c.lastMonth > 0 ? c.lastMonth : 0), 0);
-  if (rows.length === 0) return null;
-  return (
-    <div>
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-8">
-        Este mes por categoría
-      </h4>
-      <ul className="space-y-2">
-        {rows.map(c => {
-          const pct = c.lastMonth > 0 && gross > 0 ? (c.lastMonth / gross) * 100 : undefined;
-          return (
-            <li key={c.category} className="flex items-center justify-between text-sm">
-              <span className="font-medium text-gray-800">{c.category}</span>
-              <span className="text-gray-600">
-                {signedExpenseFormat(c.lastMonth)}
-                {pct !== undefined && (
-                  <span className="text-gray-400 ml-2">{pct >= 0.05 ? `${pct.toFixed(1)}%` : '<0.1%'}</span>
-                )}
-              </span>
-            </li>
-          );
-        })}
-        <li className="flex items-center justify-between text-sm border-t border-gray-200 pt-2">
-          <span className="font-semibold text-gray-800">Total este mes</span>
-          {signedExpenseFormat(total)}
-        </li>
-      </ul>
-    </div>
-  );
-}
-
-function LastYearBreakdown({ avgByCategory }: { avgByCategory: Record<string, number> }) {
-  const sorted = Object.entries(avgByCategory)
-    .filter(([, avg]) => avg !== 0)
-    .sort((a, b) => b[1] - a[1]);
-  if (sorted.length === 0) return null;
-  const total = sorted.reduce((sum, [, avg]) => sum + avg, 0);
-  const gross = sorted.reduce((sum, [, avg]) => sum + (avg > 0 ? avg : 0), 0);
-  return (
-    <div>
-      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 mt-8">
-        Último año por categoría
-      </h4>
-      <ul className="space-y-2">
-        {sorted.map(([category, avg]) => {
-          const pct = avg > 0 && gross > 0 ? (avg / gross) * 100 : undefined;
-          return (
-            <li key={category} className="flex items-center justify-between text-sm">
-              <span className="font-medium text-gray-800">{category}</span>
-              <span className="text-gray-600">
-                {signedExpenseFormat(avg, '/mes')}
-                {pct !== undefined && (
-                  <span className="text-gray-400 ml-2">{pct >= 0.05 ? `${pct.toFixed(1)}%` : '<0.1%'}</span>
-                )}
-              </span>
-            </li>
-          );
-        })}
-        <li className="flex items-center justify-between text-sm border-t border-gray-200 pt-2">
-          <span className="font-semibold text-gray-800">Total último año</span>
-          {signedExpenseFormat(total, '/mes')}
-        </li>
-      </ul>
     </div>
   );
 }
@@ -2507,7 +2616,7 @@ function Pagination({
         type="button"
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="px-3 py-1 text-xs font-semibold rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        className="px-3 py-1 text-xs font-semibold rounded border border-gray-200 text-gray-600 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
       >
         ← Anterior
       </button>
@@ -2518,7 +2627,7 @@ function Pagination({
         type="button"
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="px-3 py-1 text-xs font-semibold rounded border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+        className="px-3 py-1 text-xs font-semibold rounded border border-gray-200 text-gray-600 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
       >
         Siguiente →
       </button>
@@ -2638,65 +2747,58 @@ function MovementsSection({
             value={search}
             onChange={e => { onSearchChange(e.target.value); setPage(1); }}
             placeholder="Buscar concepto…"
-            className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm w-44 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+            className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm w-44 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
           />
-          <select
+          <Select
             value={filter}
-            onChange={e => { onFilterChange(e.target.value as 'all' | MovementType); setPage(1); }}
-            className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
-          >
-            <option value="all">Todos los tipos</option>
-            {types.map(t => (
-              <option key={t} value={t}>{MOVEMENT_TYPE_LABELS[t]}</option>
-            ))}
-          </select>
-          <select
+            onChange={v => { onFilterChange(v as 'all' | MovementType); setPage(1); }}
+            ariaLabel="Filtrar por tipo"
+            className="w-44"
+            options={[
+              { value: 'all', label: 'Todos los tipos' },
+              ...types.map(t => ({ value: t, label: MOVEMENT_TYPE_LABELS[t] })),
+            ]}
+          />
+          <Select
             value={bankFilter}
-            onChange={e => { onBankFilterChange(e.target.value as 'all' | BankId); setPage(1); }}
-            className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
-          >
-            <option value="all">Todos los bancos</option>
-            {BANKS.map(b => (
-              <option key={b.id} value={b.id}>{b.label}</option>
-            ))}
-          </select>
+            onChange={v => { onBankFilterChange(v as 'all' | BankId); setPage(1); }}
+            ariaLabel="Filtrar por banco"
+            className="w-44"
+            options={[
+              { value: 'all', label: 'Todos los bancos' },
+              ...BANKS.map(b => ({ value: b.id, label: b.label })),
+            ]}
+          />
         </div>
       </div>
 
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 py-2 px-3 rounded-lg bg-gray-900 text-white">
+        <div className="flex flex-wrap items-center gap-3 py-2 px-3 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900">
           <span className="text-sm font-semibold">
             {selected.size} seleccionado{selected.size === 1 ? '' : 's'}
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-300">Cambiar tipo a:</span>
-            <select
+            <span className="text-xs text-gray-500">Cambiar tipo a:</span>
+            <Select
               value=""
-              onChange={e => {
-                if (e.target.value) {
-                  applyBulk(e.target.value as MovementType);
-                  e.target.value = '';
-                }
-              }}
-              className="px-2.5 py-1.5 border border-gray-600 rounded-lg text-sm bg-gray-800 text-white focus:outline-none focus:ring-2 focus:ring-white/20"
-            >
-              <option value="">Elegir tipo…</option>
-              {ALL_MOVEMENT_TYPES.map(t => (
-                <option key={t} value={t}>{MOVEMENT_TYPE_LABELS[t]}</option>
-              ))}
-            </select>
+              placeholder="Elegir tipo…"
+              ariaLabel="Cambiar tipo de los movimientos"
+              className="w-44"
+              onChange={v => applyBulk(v as MovementType)}
+              options={ALL_MOVEMENT_TYPES.map(t => ({ value: t, label: MOVEMENT_TYPE_LABELS[t] }))}
+            />
           </div>
           <button
             type="button"
             onClick={() => { onRequestBulkDelete([...selected]); clearSelection(); }}
-            className="px-3 py-1.5 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 transition-colors cursor-pointer"
+            className="px-3 py-1.5 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700 transition-colors cursor-pointer"
           >
             Eliminar
           </button>
           <button
             type="button"
             onClick={clearSelection}
-            className="ml-auto px-3 py-1.5 rounded-lg border border-gray-600 text-sm font-semibold text-gray-200 hover:bg-gray-700 transition-colors cursor-pointer"
+            className="ml-auto px-3 py-1.5 rounded-xl border border-gray-600 text-sm font-semibold text-gray-200 hover:bg-zinc-700 transition-colors cursor-pointer"
           >
             Limpiar
           </button>
@@ -2731,7 +2833,7 @@ function MovementsSection({
               ),
               align: 'left',
             },
-            { title: 'Banco', align: 'left', muted: true },
+            { title: 'Banco', align: 'left' },
             { title: 'Tipo', align: 'left', className: 'min-w-[160px]' },
             { title: 'Concepto', align: 'left' },
             {
@@ -2744,7 +2846,7 @@ function MovementsSection({
                 />
               ),
             },
-            { title: 'Eliminar', align: 'left', muted: true },
+            { title: '', align: 'left', muted: true },
           ]}
           rows={shown.map(m => [
             {
@@ -2762,15 +2864,14 @@ function MovementsSection({
             { content: <span className="text-gray-500">{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
             {
               content: (
-                <select
+                <Select
                   value={m.type}
-                  onChange={e => onChangeType(m.id, e.target.value as MovementType)}
-                  className="max-w-[140px] w-full px-2 py-1 border border-gray-200 rounded-md text-xs bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
-                >
-                  {ALL_MOVEMENT_TYPES.map(t => (
-                    <option key={t} value={t}>{MOVEMENT_TYPE_LABELS[t]}</option>
-                  ))}
-                </select>
+                  size="xs"
+                  ariaLabel={`Tipo de ${m.concept}`}
+                  className="w-[140px]"
+                  onChange={v => onChangeType(m.id, v as MovementType)}
+                  options={ALL_MOVEMENT_TYPES.map(t => ({ value: t, label: MOVEMENT_TYPE_LABELS[t] }))}
+                />
               ),
             },
             {
@@ -2796,9 +2897,9 @@ function MovementsSection({
                 <span className={
                   m.amount >= 0
                     ? 'text-emerald-700'
-                    : 'text-gray-800'
+                    : 'text-gray-700'
                 }>
-                  {signedAmount(
+                  {formatSigned(
                     m.type === 'interest'
                       ? interestNetAmount(m)
                       : m.amount
@@ -2854,29 +2955,43 @@ function monthlyExpenseSlice(points: Array<{ month: string; total: number }>) {
   return points.slice(-24);
 }
 
-/** Datos para la gráfica «Gastos por mes», filtrando por categoría cuando se elige una. */
+/** Datos para la gráfica «Gastos por mes», filtrando por categoría cuando se elige una.
+ *  Se adjunta el ingreso y la capacidad de ahorro de cada mes para el hover. */
 function monthlyExpenseChartData(
   data: ReturnType<typeof computeExpenses>,
   category: string,
+  incomeByMonth: Map<string, number>,
 ) {
-  const points = category === 'all' ? data.monthly : data.monthlyByCategory[category] ?? [];
-  return monthlyChartData(monthlyExpenseSlice(points));
+  const raw = category === 'all' ? data.monthly : data.monthlyByCategory[category] ?? [];
+  // Se rellena todo el rango de actividad de gastos (meses con 0) hasta el mes
+  // en curso incluido, de modo que los meses sin gasto en la categoría
+  // seleccionada (o el mes actual sin movimientos) no desaparezcan del eje.
+  const points = fillMonthly(raw, data.monthly[0]?.month, currentMonthKey());
+  return monthlyChartData(monthlyExpenseSlice(points)).map(p => ({
+    ...p,
+    income: incomeByMonth.get(p.month) ?? 0,
+    savings: (incomeByMonth.get(p.month) ?? 0) - p.total,
+  }));
 }
 
 function monthTooltipRecharts() {
   return (
     <RechartsTooltip
       cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+      wrapperStyle={{ zIndex: 20 }}
       content={
         <ChartTooltip
-          renderContent={payload => (
-            <>
-              <p className="font-semibold text-gray-900">
-                {String(payload[0]?.payload?.label ?? '')}
-              </p>
-              <p className="text-gray-700">{formatCurrency(Number(payload[0]?.value ?? 0))}</p>
-            </>
-          )}
+          renderContent={payload => {
+            const p = payload[0]?.payload;
+            return (
+              <IncomeExpenseTooltip
+                label={String(p?.label ?? '')}
+                income={Number(p?.income ?? 0)}
+                expenses={Number(p?.total ?? 0)}
+                savings={Number(p?.savings ?? 0)}
+              />
+            );
+          }}
         />
       }
     />
@@ -2887,23 +3002,18 @@ function incomeTooltipRecharts() {
   return (
     <RechartsTooltip
       cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+      wrapperStyle={{ zIndex: 20 }}
       content={
         <ChartTooltip
           renderContent={payload => {
             const p = payload[0]?.payload;
-            const incomeTotal = Number(p?.total ?? 0);
-            const expenses = Number(p?.expenses ?? 0);
-            const savings = Number(p?.savings ?? 0);
             return (
-              <>
-                <p className="font-semibold text-gray-900">{String(p?.label ?? '')}</p>
-                <p className="text-emerald-700">Ingresos: +{formatCurrency(incomeTotal)}</p>
-                <p className="text-red-600">Gastos: -{formatCurrency(expenses)}</p>
-                <p className={`font-semibold ${savings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                  Capacidad de ahorro: {savings >= 0 ? '+' : ''}
-                  {formatCurrency(savings)}
-                </p>
-              </>
+              <IncomeExpenseTooltip
+                label={String(p?.label ?? '')}
+                income={Number(p?.total ?? 0)}
+                expenses={Number(p?.expenses ?? 0)}
+                savings={Number(p?.savings ?? 0)}
+              />
             );
           }}
         />

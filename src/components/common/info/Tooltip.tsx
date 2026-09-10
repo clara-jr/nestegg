@@ -56,7 +56,7 @@ export function Tooltip({ text, children, className }: { text: string; children:
             top: pos.top,
             left: pos.left,
           }}
-          className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs leading-tight whitespace-normal max-w-[min(36rem,calc(100vw-2rem))] break-words shadow-lg z-50 pointer-events-none normal-case tracking-normal font-normal text-left"
+          className="px-3 py-1.5 rounded-xl bg-zinc-100 text-gray-700 border border-gray-200 text-xs leading-tight whitespace-normal max-w-[min(36rem,calc(100vw-2rem))] break-words shadow-lg z-50 pointer-events-none normal-case tracking-normal font-normal text-left"
         >
           {text}
         </span>

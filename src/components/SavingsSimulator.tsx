@@ -5,6 +5,7 @@ import {
   calculateSavings,
   calculateTotalHouseExpenses,
   formatCurrency,
+  formatSigned,
   type SavingsParams,
   type SavingsResult,
 } from '../lib/calculations';
@@ -27,6 +28,7 @@ import {
   CollapsibleFormSection,
   ChartTooltip,
   DistributionSlider,
+  Icon,
   type DistributionPeriod,
 } from './common';
 
@@ -514,7 +516,7 @@ export default function SavingsSimulator() {
         </FormSection>
 
         <CollapsibleFormSection
-          title="Incluir Compra de Casa 🏡"
+          title={<span className="inline-flex items-center gap-2"><Icon name="home" className="h-4 w-4 text-gray-500" />Incluir Compra de Casa</span>}
           isOpen={includeHousePurchase}
           onToggle={() => handleToggleHousePurchase(!includeHousePurchase)}
         >
@@ -575,7 +577,7 @@ export default function SavingsSimulator() {
                 <SummaryCard
                   label="Préstamo Hipotecario Estimado"
                   value={<>{formatCurrency(mortgageGrantedAmount)}{params.baseCost > 0 && <span className="text-sm font-normal text-gray-500"> ({Math.round(mortgageGrantedAmount / params.baseCost * 100)}%)</span>}</>}
-                  className={params.baseCost === 0 ? 'bg-gray-100 !border-gray-200' : undefined}
+                  className={params.baseCost === 0 ? 'bg-zinc-100 !border-gray-200' : undefined}
                   variant="info"
                 />
                 {params.baseCost === 0 && <p className="text-xs text-gray-400">Introduce un coste de casa para activar la hipoteca</p>}
@@ -631,9 +633,9 @@ export default function SavingsSimulator() {
           </ScenarioSection>
 
           <ResultsSection title="Resultados" gridCols="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <ResultsCard label="Total Ahorrado" value={formatCurrency(result.totalSavings)} icon="💰" />
-            <ResultsCard label="Cuenta Remunerada" value={formatCurrency(result.finalSavingsAccount)} icon="🏦" />
-            <ResultsCard label="Inversiones" value={formatCurrency(result.finalInvestments)} icon="📈" />
+            <ResultsCard label="Total Ahorrado" value={formatCurrency(result.totalSavings)} icon="wallet" />
+            <ResultsCard label="Cuenta Remunerada" value={formatCurrency(result.finalSavingsAccount)} icon="bank" />
+            <ResultsCard label="Inversiones" value={formatCurrency(result.finalInvestments)} icon="trendingUp" />
           </ResultsSection>
 
           {(params.baseCost > 0 || params.monthlyContribution > 0 || parsedInitialSavingsAccount.amount > 0 || parsedInitialInvestments.amount > 0) && (
@@ -651,31 +653,32 @@ export default function SavingsSimulator() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis
                       dataKey="year"
-                      tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                      tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
                       tickFormatter={(v: number) => v === 0 ? 'Inicio' : `${v}º`}
                       stroke="#d1d5db"
                     />
                     <YAxis
-                      tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                      tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
                       tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k €`}
                       stroke="#d1d5db"
                     />
                     <RechartsTooltip content={<ChartTooltip renderContent={(payload) => {
                       const { year, contributed, total } = payload[0].payload as { year: number; contributed: number; total: number };
                       return (<>
-                        <p style={{ fontWeight: 700, marginBottom: 4, color: '#111827' }}>{year === 0 ? 'Inicio' : `Año ${year}`}</p>
-                        <p style={{ color: '#22c55e', marginBottom: 2 }}>{formatCurrency(total)}</p>
-                        <p style={{ color: '#6b7280', marginBottom: 2 }}>{formatCurrency(contributed)}</p>
+                        <p style={{ fontWeight: 700, marginBottom: 4, color: '#1b1b18' }}>{year === 0 ? 'Inicio' : `Año ${year}`}</p>
+                        <p style={{ color: '#00bc7d', marginBottom: 2 }}>{formatCurrency(total)}</p>
+                        <p style={{ color: '#706f6c', marginBottom: 2 }}>{formatCurrency(contributed)}</p>
                         <p style={{ color: '#aeb0b4' }}>(+ {formatCurrency(total - contributed)})</p>
                       </>);
                     }} />} />
-                    <Legend wrapperStyle={{ fontFamily: 'Heebo, sans-serif', fontSize: '12px' }} />
-                    <Line type="monotone" dataKey="contributed" name="Aportado" stroke="#6b7280" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="total" name="Total" stroke="#22c55e" strokeWidth={2} dot={false} />
+                    <Legend wrapperStyle={{ fontFamily: 'var(--font-sans)', fontSize: '12px' }} />
+                    <Line type="monotone" dataKey="contributed" name="Aportado" stroke="#706f6c" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="total" name="Total" stroke="#00bc7d" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
               <ScrollableTable
+                bordered={false}
                 columns={[
                   { title: 'Año', align: 'left' },
                   { title: 'Cuenta', align: 'right' },
@@ -692,14 +695,14 @@ export default function SavingsSimulator() {
                     formatCurrency(entry.savingsAccount),
                     formatCurrency(entry.investments),
                     { content: formatCurrency(entry.savingsAccount + entry.investments), className: 'font-semibold text-gray-900' },
-                    { content: entry.yearlyToAccount > 0 ? formatCurrency(entry.yearlyToAccount) : formatCurrency(0), className: entry.yearlyToAccount < 0 ? 'text-red-600' : entry.yearlyToAccount > 0 ? 'text-gray-600' : 'text-gray-400' },
-                    { content: entry.yearlyToInvestment > 0 ? formatCurrency(entry.yearlyToInvestment) : formatCurrency(0), className: entry.yearlyToInvestment < 0 ? 'text-red-600' : entry.yearlyToInvestment > 0 ? 'text-gray-600' : 'text-gray-400' },
-                    { content: entry.yearlyGainsTaxPaid > 0 ? formatCurrency(entry.yearlyGainsTaxPaid) : '-', className: 'text-red-600' },
+                    { content: entry.yearlyToAccount > 0 ? formatSigned(entry.yearlyToAccount) : formatSigned(0), className: entry.yearlyToAccount < 0 ? 'text-red-600' : entry.yearlyToAccount > 0 ? 'text-emerald-600' : 'text-gray-400' },
+                    { content: entry.yearlyToInvestment > 0 ? formatSigned(entry.yearlyToInvestment) : formatSigned(0), className: entry.yearlyToInvestment < 0 ? 'text-red-600' : entry.yearlyToInvestment > 0 ? 'text-emerald-600' : 'text-gray-400' },
+                    { content: entry.yearlyGainsTaxPaid > 0 ? formatSigned(-entry.yearlyGainsTaxPaid) : '-', className: 'text-red-600' },
                   ])}
               />
               <NoteBanner variant="warning">
-                <strong>⚠️ Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
-                Los intereses de la cuenta remunerada ya están descontados anualmente.
+                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-red-600" /> Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
+                Los impuestos a pagar por los intereses de la cuenta remunerada ya están descontados anualmente.
                 Las plusvalías de inversiones solo tributan al vender, por lo que no se han descontado en la simulación al asumir <i>buy-and-hold</i>;
                 si se vendieran al final del horizonte, se pagarían <strong>{formatCurrency(result.investmentSaleTax)}</strong> en impuestos,
                 con lo que el dinero total neto resultante de la simulación sería <strong>{formatCurrency(result.totalSavings - result.investmentSaleTax)}</strong>.

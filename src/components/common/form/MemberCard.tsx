@@ -7,7 +7,7 @@ export interface MemberCardProps {
 
 export function MemberCard({ index, totalMembers, onRemove, children }: Readonly<MemberCardProps>) {
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+    <div className="bg-zinc-100 border border-[#e3e3e0]/70 rounded-xl p-4 space-y-3">
       {totalMembers > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">

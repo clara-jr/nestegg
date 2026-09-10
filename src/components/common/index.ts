@@ -7,6 +7,9 @@ export { SingleRangeSlider, type SingleRangeSliderProps } from './form/SingleRan
 export { CollapsibleFormSection, type CollapsibleFormSectionProps } from './form/CollapsibleFormSection';
 export { MemberCard, type MemberCardProps } from './form/MemberCard';
 export { AddMemberButton, type AddMemberButtonProps } from './form/AddMemberButton';
+export { DateInput, type DateInputProps } from './form/DateInput';
+export { DateRangeFilter, type DateRange, type DateRangePreset } from './form/DateRangeFilter';
+export { Select, type SelectProps, type SelectOption, type SelectGroup } from './form/Select';
 
 export { ResultsContainer } from './results/ResultsContainer';
 export { ResultsCard, type ResultsCardProps } from './results/ResultsCard';
@@ -15,10 +18,21 @@ export { ScenarioSection, type ScenarioSectionProps } from './results/ScenarioSe
 export { ResultsSection, type ResultsSectionProps } from './results/ResultsSection';
 export { CollapsibleSection, type CollapsibleSectionProps } from './results/CollapsibleSection';
 export { ScrollableTable, type ScrollableTableColumn, type ScrollableTableCell, type ScrollableTableRow } from './results/ScrollableTable';
+export { ChartRangeSummary, type ChartRangeSummaryProps } from './results/ChartRangeSummary';
 export { SummaryCard, type SummaryCardProps } from './results/SummaryCard';
+export { ExpenseCategoryIcon } from './results/CategoryIcon';
+export { Icon } from './Icons';
+export {
+  CategoryBreakdown,
+  LastMonthBreakdown,
+  LastYearBreakdown,
+  signedExpenseFormat,
+} from './results/CategoryBreakdownSections';
 
 export { Tooltip } from './info/Tooltip';
 export { ChartTooltip, type ChartTooltipProps } from './info/ChartTooltip';
+export { IncomeExpenseTooltip, type IncomeExpenseTooltipProps } from './info/IncomeExpenseTooltip';
+export { SignedTooltipLine } from './info/IncomeExpenseTooltip';
 export { NoteBanner, type NoteBannerProps } from './info/NoteBanner';
 export { NoteCard, type NoteCardProps } from './info/NoteCard';
 

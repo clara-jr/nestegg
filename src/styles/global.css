@@ -1,11 +1,50 @@
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700&family=Signika:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Signika:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+
+  /* Grises cálidos: nada de negros fríos. Títulos → #1b1b18, textos → #706f6c. */
+  --color-gray-50: #f6f6f6;
+  --color-gray-100: #f6f6f6;
+  --color-gray-200: #e8e8e7;
+  --color-gray-300: #c1c1bd;
+  --color-gray-400: #9b9a95;
+  --color-gray-500: #706f6c;
+  --color-gray-600: #5a5956;
+  --color-gray-700: #464541;
+  --color-gray-800: #302f2b;
+  --color-gray-900: #1b1b18;
+
+  /* Paleta de la marca: verde #00bc7d y rojo #ff637e (con sus derivados). */
+  --color-emerald-50: #e6f9f3;
+  --color-emerald-100: #c9f3e4;
+  --color-emerald-200: #9ce8cf;
+  --color-emerald-300: #55dcb4;
+  --color-emerald-400: #24cf9c;
+  --color-emerald-500: #06c68c;
+  --color-emerald-600: #00bc7d;
+  --color-emerald-700: #009c68;
+  --color-emerald-800: #007d54;
+  --color-emerald-900: #03603f;
+
+  --color-red-50: #fff0f3;
+  --color-red-100: #ffe0e6;
+  --color-red-200: #ffbdc9;
+  --color-red-300: #ff94a9;
+  --color-red-400: #ff7b91;
+  --color-red-500: #ff6e86;
+  --color-red-600: #ff637e;
+  --color-red-700: #e04661;
+  --color-red-800: #b82c47;
+  --color-red-900: #8e2136;
+}
 
 @layer base {
   html,
   body {
     @apply antialiased;
-    font-family: 'Heebo', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-family: var(--font-sans);
   }
 
   h1,

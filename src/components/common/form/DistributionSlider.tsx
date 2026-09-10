@@ -26,7 +26,7 @@ export function DistributionSlider({
   const displayPeriods = sameForAll ? [periods[0]].filter(Boolean) : periods;
 
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3">
+    <div className="bg-zinc-100 border border-[#e3e3e0]/70 rounded-xl px-4 py-3 space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">{title}</p>
         {showSameForAllToggle && (
@@ -55,7 +55,7 @@ export function DistributionSlider({
             max="100"
             value={period.pct}
             onChange={(e) => onChange(period.index, Number(e.target.value))}
-            className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-gray-700"
+            className="w-full h-1.5 rounded-xl appearance-none cursor-pointer accent-gray-700"
           />
         </div>
       ))}

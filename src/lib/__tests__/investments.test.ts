@@ -14,6 +14,8 @@ import {
   resolveExpenseCategory,
 } from '../investments';
 import type { Movement } from '../bankImports';
+import { computeJointSummary } from '../joint';
+import type { JointMemberProfile } from '../joint';
 
 let counter = 0;
 
@@ -465,6 +467,7 @@ describe('computeExpenses', () => {
     const summary = computeExpenses(movements);
     expect(summary.monthCount).toBe(2);
     expect(summary.averageMonthly).toBeCloseTo((100 + 13.99) / 2);
+    expect(summary.medianMonthly).toBeCloseTo((100 + 13.99) / 2);
   });
 
   it('separa mes actual y anterior', () => {
@@ -572,5 +575,125 @@ describe('buildConceptCategoryMap / resolveExpenseCategory', () => {
 
   it('cae a las palabras clave cuando no hay concepto aprendido', () => {
     expect(resolveExpenseCategory('NETFLIX.COM', [])).toBe('Suscripciones');
+  });
+});
+
+describe('computeJointSummary', () => {
+  const empty = (): JointMemberProfile => ({
+    profileId: 'empty',
+    name: 'Vacío',
+    color: '#666666',
+    movements: [],
+  });
+
+  it('devuelve un resumen vacío si no hay un segundo perfil con datos', () => {
+    const filled: JointMemberProfile = {
+      profileId: 'fill',
+      name: 'Cargado',
+      color: '#111111',
+      movements: [
+        mk({ type: 'income', date: '2024-01-10', concept: 'NÓMINA', amount: 3000 }),
+        mk({ type: 'expense', date: '2024-03-15', concept: 'MERCADONA', amount: -200, category: 'Alimentación' }),
+      ],
+    };
+    const joint = computeJointSummary([empty(), filled], []);
+    expect(joint.monthly).toEqual([]);
+    expect(joint.members).toEqual([]);
+    expect(joint.totalIncome).toBe(0);
+    expect(joint.totalExpenses).toBe(0);
+    expect(joint.averageMonthlyIncome).toBe(0);
+  });
+
+  it('empieza a contar desde el primer mes con datos de ambos integrantes', () => {
+    const a: JointMemberProfile = {
+      profileId: 'a',
+      name: 'A',
+      color: '#0f766e',
+      movements: [
+        // Ingresos y gastos solo en enero y febrero: enero no cuenta porque B no tenía datos.
+        mk({ type: 'income', date: '2024-01-10', concept: 'NÓMINA', amount: 1000 }),
+        mk({ type: 'income', date: '2024-02-10', concept: 'NÓMINA', amount: 1000 }),
+        mk({ type: 'expense', date: '2024-01-15', concept: 'MERCADONA', amount: -100, category: 'Alimentación' }),
+      ],
+    };
+    const b: JointMemberProfile = {
+      profileId: 'b',
+      name: 'B',
+      color: '#6d28d9',
+      movements: [
+        mk({ type: 'income', date: '2024-02-05', concept: 'SALARIO', amount: 2000 }),
+        mk({ type: 'expense', date: '2024-02-12', concept: 'LIDL', amount: -200, category: 'Alimentación' }),
+        mk({ type: 'expense', date: '2024-03-10', concept: 'IKEA', amount: -300, category: 'Vivienda' }),
+      ],
+    };
+    const joint = computeJointSummary([a, b], []);
+
+    expect(joint.monthly.map(p => p.month)).not.toContain('2024-01');
+    expect(joint.monthly.map(p => p.month)).toEqual(['2024-02', '2024-03']);
+    // El ingreso de enero, cuyos datos solo tiene A, no cuenta en lo conjunto.
+    expect(joint.totalIncome).toBeCloseTo(1000 + 2000);
+    expect(joint.totalExpenses).toBeCloseTo(200 + 300);
+    expect(joint.currentMonthIncome).toBe(0);
+  });
+
+  it('calcula las medias del hogar sobre el rango de la ventana conjunta', () => {
+    const a: JointMemberProfile = {
+      profileId: 'a',
+      name: 'A',
+      color: '#0f766e',
+      movements: [
+        mk({ type: 'income', date: '2024-02-10', concept: 'NÓMINA', amount: 1000 }),
+      ],
+    };
+    const b: JointMemberProfile = {
+      profileId: 'b',
+      name: 'B',
+      color: '#6d28d9',
+      movements: [
+        mk({ type: 'income', date: '2024-02-05', concept: 'SALARIO', amount: 2000 }),
+        mk({ type: 'expense', date: '2024-02-12', concept: 'LIDL', amount: -200, category: 'Alimentación' }),
+        mk({ type: 'expense', date: '2024-03-10', concept: 'IKEA', amount: -300, category: 'Vivienda' }),
+      ],
+    };
+    const joint = computeJointSummary([a, b], []);
+
+    // Gastos en febrero y marzo, dentro de un rango de 2 meses → media 250.
+    expect(joint.averageMonthlyExpenses).toBeCloseTo((200 + 300) / 2);
+    // Ingresos solo en febrero → media = total (un único mes de rango).
+    expect(joint.averageMonthlyIncome).toBeCloseTo(3000);
+    expect(joint.averageMonthlySavings).toBeCloseTo(3000 - 250);
+
+    // Medianas y último año (meses del hogar terminados: feb y mar).
+    expect(joint.medianMonthlyIncome).toBeCloseTo(1500);
+    expect(joint.medianMonthlyExpenses).toBeCloseTo(250);
+    expect(joint.medianMonthlySavings).toBeCloseTo(1250);
+    expect(joint.lastYearAvgIncome).toBeCloseTo(1500);
+    expect(joint.lastYearAvgExpenses).toBeCloseTo(250);
+    expect(joint.lastYearAvgSavings).toBeCloseTo(1250);
+  });
+
+  it('suma los meses con actividad de todos los perfiles', () => {
+    const a: JointMemberProfile = {
+      profileId: 'a',
+      name: 'A',
+      color: '#0f766e',
+      movements: [mk({ type: 'income', date: '2024-02-05', concept: 'NÓMINA', amount: 2000 })],
+    };
+    const b: JointMemberProfile = {
+      profileId: 'b',
+      name: 'B',
+      color: '#6d28d9',
+      movements: [
+        mk({ type: 'income', date: '2024-02-10', concept: 'SALARIO', amount: 1500 }),
+        mk({ type: 'expense', date: '2024-02-12', concept: 'MERCADONA', amount: -300, category: 'Alimentación' }),
+      ],
+    };
+    const joint = computeJointSummary([a, b], []);
+
+    expect(joint.totalIncome).toBeCloseTo(3500);
+    expect(joint.totalExpenses).toBeCloseTo(300);
+    expect(joint.totalSavings).toBeCloseTo(3200);
+    expect(joint.averageMonthlyExpenses).toBeCloseTo(300);
+    expect(joint.monthly.some(p => p.month === '2024-02')).toBe(true);
   });
 });

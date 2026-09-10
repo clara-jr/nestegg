@@ -362,6 +362,14 @@ export function completedMonths(points: MonthPoint[]): MonthPoint[] {
   return points.filter(p => p.month < cur);
 }
 
+/** Mediana aritmética de un conjunto de valores (0 si está vacío). */
+export function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
 // ---------------------------------------------------------------------------
 // Intereses
 // ---------------------------------------------------------------------------
@@ -668,7 +676,9 @@ export function computeBankBreakdown(movements: Movement[]): BankBreakdownEntry[
     .sort((a, b) => b.balance - a.balance);
 }
 
-function monthSpan(monthly: MonthPoint[]): number {
+/** Número de meses completo entre el primero y el último de una serie
+ *  mensual, incluyendo los huecos intermedios (meses sin actividad). */
+export function monthSpan(monthly: MonthPoint[]): number {
   if (monthly.length === 0) return 0;
   const first = monthly[0].month;
   const last = monthly[monthly.length - 1].month;
@@ -677,32 +687,55 @@ function monthSpan(monthly: MonthPoint[]): number {
   return (ly - fy) * 12 + (lm - fm) + 1;
 }
 
+/** Rellena una serie mensual con los meses intermedios sin actividad (total 0)
+ *  entre su primer y último mes (o entre el rango que se indique). Útil para
+ *  las gráficas, para que los meses con cifra 0 no desaparezcan del eje. */
+export function fillMonthly(
+  points: Array<{ month: string; total: number }>,
+  start?: string,
+  end?: string,
+): Array<{ month: string; total: number }> {
+  const first = start ?? points[0]?.month;
+  const last = end ?? points[points.length - 1]?.month;
+  if (!first || !last || last < first) return points;
+  const byMonth = new Map(points.map(p => [p.month, p.total]));
+  const [fy, fm] = first.split('-').map(Number);
+  const [ly, lm] = last.split('-').map(Number);
+  const out: Array<{ month: string; total: number }> = [];
+  for (let i = 0; i <= (ly - fy) * 12 + (lm - fm); i++) {
+    const d = new Date(Date.UTC(fy, fm - 1 + i, 1));
+    const month = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    out.push({ month, total: byMonth.get(month) ?? 0 });
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------------
 // Gastos
 // ---------------------------------------------------------------------------
 
 export const EXPENSE_CATEGORY_LIST = [
-  'Otros',
   'Alimentación',
+  'Animales',
+  'Donaciones',
+  'Educación',
+  'Electrónica',
+  'Excluido',
+  'Gimnasio',
+  'Ocio y cultura',
+  'Otros',
+  'Peluquería y cosmética',
+  'Regalos',
   'Restaurantes y delivery',
-  'Transporte',
-  'Vivienda',
+  'Ropa',
+  'Salud',
+  'Seguros',
   'Suministros e Internet',
   'Suscripciones',
-  'Ropa',
-  'Electrónica',
-  'Ocio y cultura',
-  'Salud',
-  'Gimnasio',
-  'Animales',
-  'Peluquería y cosmética',
-  'Viajes',
-  'Educación',
-  'Seguros',
-  'Donaciones',
-  'Regalos',
   'Trabajo',
-  'Excluido',
+  'Transporte',
+  'Viajes',
+  'Vivienda',
 ] as const;
 
 export type ExpenseCategory = (typeof EXPENSE_CATEGORY_LIST)[number];
@@ -803,6 +836,16 @@ export interface CategoryTotal {
   averageMonthly: number;
   firstDate: string;
   lastMonth: number;
+  /** Aportación de cada integrante a la categoría (solo vista conjunta). */
+  byMember?: CategoryMemberTotal[];
+}
+
+export interface CategoryMemberTotal {
+  profileId: string;
+  name: string;
+  color: string;
+  total: number;
+  averageMonthly: number;
 }
 
 export interface ExpensesSummary {
@@ -811,6 +854,8 @@ export interface ExpensesSummary {
   /** Gasto mensual desglosado por categoría: categoría → serie mensual. */
   monthlyByCategory: Record<string, MonthPoint[]>;
   averageMonthly: number;
+  /** Mediana del gasto mensual (meses terminados). */
+  medianMonthly: number;
   monthCount: number;
   currentMonth: number;
   previousMonth: number;
@@ -911,6 +956,7 @@ export function computeExpenses(expenseMovements: Movement[]): ExpensesSummary {
     monthly,
     monthlyByCategory,
     averageMonthly: span > 0 ? completedTotal / span : 0,
+    medianMonthly: median(completed.map(p => p.total)),
     monthCount: span,
     currentMonth: counted
       .filter(m => m.date.startsWith(current))
@@ -967,4 +1013,109 @@ export function computeIncome(incomeMovements: Movement[]): IncomeSummary {
       .filter(m => m.date.startsWith(previousMonthKey))
       .reduce((sum, m) => sum + Math.abs(m.amount), 0),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Serie diaria
+// ---------------------------------------------------------------------------
+
+/** Días (YYYY-MM-DD) de un mes, en orden. */
+export function daysOfMonth(month: string): string[] {
+  const [y, m] = month.split('-').map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const out: string[] = [];
+  for (let d = 1; d <= last; d++) {
+    out.push(`${month}-${String(d).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** Meses calendario entre fromMonth y toMonth (ambos inclusivos). */
+export function monthsBetween(fromMonth: string, toMonth: string): string[] {
+  const [fy, fm] = fromMonth.split('-').map(Number);
+  const [ty, tm] = toMonth.split('-').map(Number);
+  const out: string[] = [];
+  for (let i = 0; i <= (ty - fy) * 12 + (tm - fm); i++) {
+    const d = new Date(Date.UTC(fy, fm - 1 + i, 1));
+    out.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** Media de una serie mensual dentro de [fromMonth, toMonth] (meses incluidos),
+ *  contando con 0 los meses sin actividad (mismo criterio que el resto de
+ *  medias de la app). */
+export function averageInRange(
+  series: Array<{ month: string; total: number }>,
+  fromMonth: string,
+  toMonth: string,
+): number {
+  const byMonth = new Map(series.map(p => [p.month, p.total]));
+  const months = monthsBetween(fromMonth, toMonth);
+  let sum = 0;
+  for (const key of months) sum += byMonth.get(key) ?? 0;
+  return months.length > 0 ? sum / months.length : 0;
+}
+
+/** Etiqueta corta de un día (p. ej. «05 ene»). */
+export function formatDay(date: string): string {
+  const iso = date.length === 10 ? date : `${date}-01`;
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+}
+
+export interface DailyPoint {
+  date: string;
+  income: number;
+  expenses: number;
+  savings: number;
+}
+
+export const DAY_FILTER = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Mes de un valor de filtro (puede ser «YYYY-MM» o «YYYY-MM-DD»). */
+export function rangeMonth(value: string): string {
+  return value.slice(0, 7);
+}
+
+/** Día inicial efectivo de un filtro: un mes se abre en su día 1. */
+export function rangeFromDay(value: string): string {
+  return DAY_FILTER.test(value) ? value : `${value}-01`;
+}
+
+/** Día final efectivo de un filtro: un mes se cierra en su último día. */
+export function rangeToDay(value: string): string {
+  if (DAY_FILTER.test(value)) return value;
+  const days = daysOfMonth(value);
+  return days[days.length - 1];
+}
+
+/** Serie diaria de un mes (todos los días, rellenando con 0) replicando las
+ *  reglas de computeIncome (los ingresos suman su valor absoluto) y de
+ *  computeExpenses (los gastos suman, las devoluciones restan y se excluye la
+ *  categoría «Excluido»). Si se pasa `category`, solo cuentan los gastos de esa
+ *  categoría (devoluciones incluidas, restadas). */
+export function computeDailySeries(
+  month: string,
+  incomeMovements: Movement[],
+  expenseMovements: Movement[],
+  category: string | null = null,
+): DailyPoint[] {
+  const incomeByDay = new Map<string, number>();
+  for (const m of incomeMovements) {
+    if (m.date.startsWith(month)) {
+      incomeByDay.set(m.date, (incomeByDay.get(m.date) ?? 0) + Math.abs(m.amount));
+    }
+  }
+  const expensesByDay = new Map<string, number>();
+  for (const m of expenseMovements) {
+    if (!m.date.startsWith(month)) continue;
+    if (category ? (m.category ?? 'Otros') !== category : (m.category ?? 'Otros') === EXCLUDED_CATEGORY) continue;
+    const value = (m.type === 'refund' ? -1 : 1) * Math.abs(m.amount);
+    expensesByDay.set(m.date, (expensesByDay.get(m.date) ?? 0) + value);
+  }
+  return daysOfMonth(month).map(date => {
+    const income = incomeByDay.get(date) ?? 0;
+    const expenses = expensesByDay.get(date) ?? 0;
+    return { date, income, expenses, savings: income - expenses };
+  });
 }

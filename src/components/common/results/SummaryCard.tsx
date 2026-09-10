@@ -22,13 +22,13 @@ const variantStyles = {
     subtitle: 'text-red-600',
   },
   neutral: {
-    container: 'bg-gray-50 border-gray-200',
+    container: 'bg-zinc-100 border-[#e3e3e0]/70',
     label: 'text-gray-600',
     value: 'text-gray-500',
     subtitle: 'text-gray-500',
   },
   info: {
-    container: 'bg-gray-50 border-gray-200',
+    container: 'bg-zinc-100 border-[#e3e3e0]/70',
     label: 'text-gray-600',
     value: 'text-gray-900',
     subtitle: 'text-gray-500',
@@ -39,7 +39,7 @@ export function SummaryCard({ label, value, subtitle, variant = 'neutral', class
   const styles = variantStyles[variant];
 
   return (
-    <article className={`rounded-lg px-4 py-3 border flex flex-col justify-center ${styles.container}${className ? ` ${className}` : ''}`}>
+    <article className={`rounded-xl px-3 sm:px-4 py-3 border flex flex-col justify-center ${styles.container}${className ? ` ${className}` : ''}`}>
       <p className={`text-xs font-semibold uppercase tracking-wider mb-1 ${styles.label}`}>{label}</p>
       <p className={`text-lg font-bold ${styles.value}`}>{value}</p>
       {subtitle && <p className={`text-xs mt-1 ${styles.subtitle}`}>{subtitle}</p>}

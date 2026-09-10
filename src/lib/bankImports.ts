@@ -495,6 +495,21 @@ export function paypalDuplicateIds(movements: Movement[]): Set<string> {
   return hidden;
 }
 
+/**
+ * Reclasifica de forma derivada como «Traspaso» los cargos de otras cuentas que
+ * duplican un movimiento de PayPal (mismo importe y dentro de la ventana de
+ * fechas). El tipo se sobrescribe sin tocar el almacén, así que si se elimina
+ * el fichero de PayPal esos movimientos vuelven a su tipo original (Gasto)
+ * automáticamente. Todas las vistas (individual y conjunta) deben usar esta
+ * misma derivación para que las cifras mensuales coincidan.
+ */
+export function reclassifyPaypalDuplicates(movements: Movement[]): Movement[] {
+  if (!movements.some(m => m.bank === 'paypal')) return movements;
+  const transfers = paypalDuplicateIds(movements);
+  if (transfers.size === 0) return movements;
+  return movements.map(m => (transfers.has(m.id) ? { ...m, type: 'transfer' as const } : m));
+}
+
 // ---------------------------------------------------------------------------
 // Órdenes fragmentadas (Trade Republic parte una orden en dos filas)
 // ---------------------------------------------------------------------------

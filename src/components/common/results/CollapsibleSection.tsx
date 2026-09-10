@@ -13,7 +13,7 @@ export function CollapsibleSection({ title, isOpen, onToggle, headerRight, child
     <section className="-mx-6 sm:-mx-8 border-t border-gray-200 first:border-t-0 first:pt-0">
       <button
         onClick={onToggle}
-        className="py-5 w-full px-6 sm:px-8 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-200"
+        className="py-5 w-full px-6 sm:px-8 flex items-center justify-between hover:bg-zinc-100 transition-colors border-b border-gray-200"
       >
         <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider">{title}</h3>
         <div className="flex items-center gap-3">

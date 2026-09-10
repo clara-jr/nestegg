@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 
 export interface ScrollableTableColumn {
   title: React.ReactNode;
@@ -17,6 +17,7 @@ export type ScrollableTableRow = Array<React.ReactNode | ScrollableTableCell>;
 export interface ScrollableTableProps {
   columns: ScrollableTableColumn[];
   rows: ScrollableTableRow[];
+  bordered?: boolean;
 }
 
 function isCellObject(cell: React.ReactNode | ScrollableTableCell): cell is ScrollableTableCell {
@@ -31,17 +32,73 @@ function getCellClassName(cell: React.ReactNode | ScrollableTableCell): string |
   return isCellObject(cell) ? cell.className : undefined;
 }
 
-export function ScrollableTable({ columns, rows }: Readonly<ScrollableTableProps>) {
+export function ScrollableTable({ columns, rows, bordered = true }: Readonly<ScrollableTableProps>) {
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  const bodyScrollRef = useRef<HTMLDivElement>(null);
+  const bodyTableRef = useRef<HTMLTableElement>(null);
+  const [colWidths, setColWidths] = useState<number[]>([]);
+
+  const measure = () => {
+    const headerScroll = headerScrollRef.current;
+    const bodyTable = bodyTableRef.current;
+    if (!headerScroll || !bodyTable) return;
+    const firstRow = bodyTable.rows[0];
+    if (!firstRow) return;
+    const widths = Array.from(firstRow.cells).map((cell) => cell.getBoundingClientRect().width);
+    setColWidths((prev) => {
+      if (prev.length === widths.length && prev.every((w, i) => Math.abs(w - widths[i]) < 0.5)) return prev;
+      return widths;
+    });
+    const headerTable = headerScroll.querySelector('table');
+    if (headerTable) {
+      headerTable.style.width = `${bodyTable.getBoundingClientRect().width}px`;
+    }
+  };
+
+  useLayoutEffect(() => {
+    measure();
+  }, [rows]);
+
+  useLayoutEffect(() => {
+    const el = bodyScrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => measure());
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [rows]);
+
+  const syncHeaderScroll = () => {
+    const body = bodyScrollRef.current;
+    const header = headerScrollRef.current;
+    if (body && header) header.scrollLeft = body.scrollLeft;
+  };
+
   return (
-    <div className="relative">
-      <div className="overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain">
-        <table className="w-full min-w-full mb-3">
-          <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
+    <div
+      className={`relative overflow-hidden bg-[#fdfdfe] ${
+        bordered ? 'rounded-xl border border-[#e3e3e0]/70' : ''
+      }`}
+    >
+      <div ref={headerScrollRef} className="overflow-hidden">
+        <table
+          className="w-full min-w-full"
+          style={{ tableLayout: 'fixed' }}
+        >
+          <colgroup>
+            {columns.map((col, i) => (
+              <col key={i} style={colWidths[i] ? { width: `${colWidths[i]}px` } : undefined} />
+            ))}
+          </colgroup>
+          <thead className="bg-[#fdfdfe]">
+            <tr>
               {columns.map((col, i) => (
                 <th
                   key={i}
-                  className={`px-6 sm:px-8 py-3 text-xs font-bold uppercase tracking-wider sticky top-0 bg-gray-50 z-10 ${
+                  className={`px-6 sm:px-8 py-3 text-xs font-bold uppercase tracking-wider bg-[#fdfdfe] border-b border-gray-200 ${
                     col.align === 'left' ? 'text-left' : 'text-right'
                   } ${col.muted ? 'text-gray-500' : 'text-gray-900'} ${col.className ?? ''}`}
                 >
@@ -50,9 +107,17 @@ export function ScrollableTable({ columns, rows }: Readonly<ScrollableTableProps
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+        </table>
+      </div>
+      <div
+        ref={bodyScrollRef}
+        onScroll={syncHeaderScroll}
+        className="overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain"
+      >
+        <table ref={bodyTableRef} className="w-full min-w-full mb-3">
+          <tbody>
             {rows.map((row, ri) => (
-              <tr key={ri} className="hover:bg-gray-50 transition-colors">
+              <tr key={ri} className="hover:bg-zinc-100 transition-colors">
                 {row.map((cell, ci) => {
                   const col = columns[ci];
                   return (
@@ -71,7 +136,7 @@ export function ScrollableTable({ columns, rows }: Readonly<ScrollableTableProps
           </tbody>
         </table>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-white from-50% to-transparent pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[#fdfdfe] from-50% to-transparent pointer-events-none" />
     </div>
   );
 }

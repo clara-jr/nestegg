@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DATA_CHANGED_EVENT } from './profiles';
 
 type Listener = () => void;
 
@@ -79,12 +80,19 @@ export function useLocalStorage<T>(
 
   useEffect(() => {
     let active = true;
-    try {
-      const item = localStorage.getItem(key);
-      if (item !== null && active) setStored(JSON.parse(item));
-    } catch {}
+    const read = () => {
+      try {
+        const item = localStorage.getItem(key);
+        if (item !== null && active) setStored(JSON.parse(item));
+      } catch {}
+    };
+    read();
     if (active) setHydrated(true);
-    return () => { active = false; };
+    window.addEventListener(DATA_CHANGED_EVENT, read);
+    return () => {
+      active = false;
+      window.removeEventListener(DATA_CHANGED_EVENT, read);
+    };
   }, [key]);
 
   const setValue = (value: T | ((prev: T) => T)) => {

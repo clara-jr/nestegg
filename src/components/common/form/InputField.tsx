@@ -41,7 +41,7 @@ export function InputField({ label, value, onChange, type = 'number', step, hint
             onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
             step={step}
             disabled
-            className={`px-3.5 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all text-sm bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed w-full disabled:pointer-events-none`}
+            className={`px-3.5 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all text-sm bg-zinc-100 border-gray-200 text-gray-400 cursor-not-allowed w-full disabled:pointer-events-none`}
           />
         </Tooltip>
       ) : (
@@ -53,12 +53,12 @@ export function InputField({ label, value, onChange, type = 'number', step, hint
           onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
           step={step}
           disabled={disabled}
-          className={`px-3.5 py-2.5 border rounded-lg focus:outline-none focus:ring-2 transition-all text-sm ${
+          className={`px-3.5 py-2.5 border rounded-xl focus:outline-none focus:ring-2 transition-all text-sm ${
             disabled
-              ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+              ? 'bg-zinc-100 border-gray-200 text-gray-400 cursor-not-allowed'
               : error
-                ? 'bg-white border-red-400 text-gray-900 focus:ring-red-400'
-                : 'bg-white border-gray-300 text-gray-900 focus:ring-gray-500 focus:border-transparent'
+                ? 'bg-[#fdfdfe] border-red-400 text-gray-900 focus:ring-red-400'
+                : 'bg-[#fdfdfe] border-gray-300 text-gray-900 focus:ring-gray-500 focus:border-transparent'
           }`}
         />
       )}

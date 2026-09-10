@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
-import { calculateNetSalary, calculateTax, formatCurrency } from '../lib/calculations';
+import { calculateNetSalary, calculateTax, formatCurrency, formatSigned } from '../lib/calculations';
 import {
   buildPensionSchedule,
   calculateAllRetirementAges,
@@ -36,6 +36,7 @@ import {
   ResultsCard,
   DistributionSlider,
   SingleRangeSlider,
+  Icon,
   type DistributionPeriod,
 } from './common';
 
@@ -776,18 +777,18 @@ export default function RetirementSimulator() {
           <ResultsSection>
             <div className="space-y-4 sm:col-span-2 lg:col-span-4">
               <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Sin Pensión</h4>
+                <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Sin Pensión</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <ResultsCard
                     label="Edad mínima de jubilación"
                     value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithoutPension ? `${earliestWithoutPension.retirementAge} años` : 'No alcanzable')}
-                    icon="🧓"
+                    icon="user"
                   />
                   {params.members.some(m => m.currentSalary > 0) && (
                   <ResultsCard
                     label={earliestWithoutPension ? `Ahorro necesario a los ${earliestWithoutPension.retirementAge} años` : 'Ahorro sin pensión'}
                     value={earliestWithoutPension ? formatCurrency(earliestWithoutPension.requiredSavingsWithoutPension) : '—'}
-                    icon="💰"
+                    icon="wallet"
                   />
                   )}
                 </div>
@@ -798,7 +799,7 @@ export default function RetirementSimulator() {
                 )}
               </div>
               <div>
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
                   Con Pensión
                   {earliestWithPension && ` (${formatCurrency(earliestWithPension.memberPensions.reduce((a, b) => a + b, 0))}/mes${params.members.length > 1 ? ' total' : ''})`}
                 </h4>
@@ -806,13 +807,13 @@ export default function RetirementSimulator() {
                   <ResultsCard
                     label="Edad mínima de jubilación"
                     value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithPension ? `${earliestWithPension.retirementAge} años` : 'No alcanzable')}
-                    icon="🧓"
+                    icon="user"
                   />
                   {params.members.some(m => m.currentSalary > 0) && (
                   <ResultsCard
                     label={earliestWithPension ? `Ahorro necesario a los ${earliestWithPension.retirementAge} años` : 'Ahorro con pensión'}
                     value={earliestWithPension ? formatCurrency(earliestWithPension.requiredSavingsWithPension) : '—'}
-                    icon="💰"
+                    icon="wallet"
                   />
                   )}
                 </div>
@@ -832,12 +833,12 @@ export default function RetirementSimulator() {
               isOpen={showDetail}
               onToggle={() => setShowDetail(!showDetail)}
               headerRight={bothAchievable ? (
-                <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5" onClick={(e) => e.stopPropagation()}>
+                <div className="flex gap-1 bg-zinc-100 rounded-xl p-0.5" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => setViewMode('sin-pension')}
                     className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded-md transition-all uppercase tracking-wider ${
                       viewMode === 'sin-pension'
-                        ? 'bg-gray-900 text-white shadow-sm'
+                        ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
@@ -847,7 +848,7 @@ export default function RetirementSimulator() {
                     onClick={() => setViewMode('con-pension')}
                     className={`cursor-pointer px-3 py-1.5 text-xs font-semibold rounded-md transition-all uppercase tracking-wider ${
                       viewMode === 'con-pension'
-                        ? 'bg-gray-900 text-white shadow-sm'
+                        ? 'bg-white text-gray-900 shadow-sm'
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
@@ -870,21 +871,21 @@ export default function RetirementSimulator() {
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis
                         dataKey="age"
-                        tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                        tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
                         tickFormatter={(v: number) => `${v} años`}
                         stroke="#d1d5db"
                         type="number"
                         domain={['dataMin', 'dataMax']}
                       />
                       <YAxis
-                        tick={{ fontSize: 12, fill: '#6b7280', fontFamily: 'Heebo, sans-serif' }}
+                        tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
                         tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k €`}
                         stroke="#d1d5db"
                       />
                        <RechartsTooltip content={<ChartTooltip renderContent={(payload) => {
                          const age = (payload[0]?.payload?.age as number) ?? NaN;
                          return (<>
-                           <p style={{ fontWeight: 700, marginBottom: 4, color: '#111827' }}>{age} años</p>
+                           <p style={{ fontWeight: 700, marginBottom: 4, color: '#1b1b18' }}>{age} años</p>
                            {payload.map((entry, i) => (
                              <p key={i} style={{ color: entry.color, marginBottom: i < payload.length - 1 ? 2 : 0 }}>
                                {entry.dataKey === 'total' ? 'Total: ' : 'Mínimo: '}{formatCurrency(entry.value)}
@@ -892,10 +893,10 @@ export default function RetirementSimulator() {
                            ))}
                          </>);
                        }} />} />
-                      <Legend wrapperStyle={{ fontFamily: 'Heebo, sans-serif', fontSize: '12px' }} />
-                      <Line type="monotone" dataKey="total" name="Total ahorrado" stroke="#111827" strokeWidth={2} dot={false} />
+                      <Legend wrapperStyle={{ fontFamily: 'var(--font-sans)', fontSize: '12px' }} />
+                      <Line type="monotone" dataKey="total" name="Total ahorrado" stroke="#1b1b18" strokeWidth={2} dot={false} />
                       {minimumPath.length > 0 && (
-                        <Line type="monotone" dataKey="minimumTotal" name="Ahorro mínimo" stroke="#9ca3af" strokeWidth={2} strokeDasharray="6 3" dot={false} />
+                        <Line type="monotone" dataKey="minimumTotal" name="Ahorro mínimo" stroke="#9b9a95" strokeWidth={2} strokeDasharray="6 3" dot={false} />
                       )}
                     </LineChart>
                   </ResponsiveContainer>
@@ -903,6 +904,7 @@ export default function RetirementSimulator() {
               )}
 
               <ScrollableTable
+                bordered={false}
                 columns={[
                   { title: 'Edad', align: 'left' },
                   ...(viewMode === 'con-pension' ? [{ title: 'Pensión Est.', align: 'right' as const }] : []),
@@ -972,25 +974,26 @@ export default function RetirementSimulator() {
                         : '—',
                     className: r.requiredSavings < 0 ? 'text-gray-400' : r.achievable ? 'text-emerald-600' : 'text-red-600',
                   },
-                  { content: formatCurrency(r.gastosMensuales).replace('€', '€/mes'), className: 'text-gray-600 whitespace-nowrap' },
+                  { content: formatSigned(-r.gastosMensuales).replace('€', '€/mes'), className: 'text-gray-600 whitespace-nowrap' },
                   formatCurrency(r.cuenta),
                   formatCurrency(r.inversiones),
                   { content: formatCurrency(r.total), className: 'font-semibold text-gray-900' },
-                  { content: formatCurrency(r.aCuenta), className: r.aCuenta < 0 ? 'text-red-600' : r.aCuenta > 0 ? 'text-gray-600' : 'text-gray-400' },
-                  { content: formatCurrency(r.aInversiones), className: r.aInversiones < 0 ? 'text-red-600' : r.aInversiones > 0 ? 'text-gray-600' : 'text-gray-400' },
-                  { content: r.impuestos > 0 ? formatCurrency(r.impuestos) : '—', className: 'text-red-600' },
+                  { content: formatSigned(r.aCuenta), className: r.aCuenta < 0 ? 'text-red-600' : r.aCuenta > 0 ? 'text-emerald-600' : 'text-gray-400' },
+                  { content: formatSigned(r.aInversiones), className: r.aInversiones < 0 ? 'text-red-600' : r.aInversiones > 0 ? 'text-emerald-600' : 'text-gray-400' },
+                  { content: r.impuestos > 0 ? formatSigned(-r.impuestos) : '—', className: 'text-red-600' },
                 ])}
               />
               <NoteBanner variant="info">
-                ℹ️ La columna <strong>Necesario</strong> indica el ahorro necesario al <strong>final</strong> de ese año para poder jubilarse. La columna <strong>Total</strong> refleja el ahorro total al <strong>final</strong> del año, tras las aportaciones, inversiones o retiradas realizadas durante el mismo.
+                <Icon name="info" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-blue-600" />
+                La columna <strong>Necesario</strong> indica el ahorro necesario al <strong>final</strong> de ese año para poder jubilarse. La columna <strong>Total</strong> refleja el ahorro total al <strong>final</strong> del año, tras las aportaciones, inversiones o retiradas realizadas durante el mismo.
                 Si el <strong>Total</strong> supera lo <strong>Necesario</strong>, significa que se puede comenzar la jubilación al completar ese año.
                 {params.members.length > 1 && (
                   <> La columna <strong>Edad</strong> corresponde a la edad del <strong>Integrante 1</strong>. El resto de integrantes se jubilan el mismo año con edades distintas (reflejadas en el resumen).</>
                 )}
               </NoteBanner>
               <NoteBanner variant="warning">
-                <strong>⚠️ Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
-                Los intereses de la cuenta remunerada ya están descontados anualmente.
+                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-red-600" /> Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
+                Los impuestos a pagar por los intereses de la cuenta remunerada ya están descontados anualmente.
                 Las plusvalías de las inversiones solo tributan al vender; en la columna <strong>Impuestos</strong> se refleja tanto el impuesto anual sobre intereses como el impuesto sobre plusvalías al retirar durante la jubilación.
               </NoteBanner>
             </CollapsibleSection>

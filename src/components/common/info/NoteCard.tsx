@@ -11,7 +11,7 @@ export function NoteCard({ children, variant = 'warning' }: Readonly<NoteCardPro
     : 'bg-blue-50 border-blue-200 text-blue-800';
 
   return (
-    <div className={`mb-8 rounded-lg border px-4 py-3 ${colors}`}>
+    <div className={`mb-8 rounded-xl border px-4 py-3 ${colors}`}>
       <p className="text-xs leading-relaxed">{children}</p>
     </div>
   );
