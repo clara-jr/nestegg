@@ -559,15 +559,15 @@ describe('cleanConcept', () => {
 describe('buildConceptCategoryMap / resolveExpenseCategory', () => {
   it('aprende la categoría de un concepto existente para uno nuevo', () => {
     const existing: Movement[] = [
-      mk({ type: 'expense', concept: 'Fecha de operación: 01-01-2025 MERCADONA', category: 'Alimentación', categoryAuto: true }),
+      mk({ type: 'expense', amount: 0, concept: 'Fecha de operación: 01-01-2025 MERCADONA', category: 'Alimentación', categoryAuto: true }),
     ];
     expect(resolveExpenseCategory('Fecha de operación: 02-02-2025 MERCADONA', existing)).toBe('Alimentación');
   });
 
   it('las ediciones manuales tienen prioridad sobre las automáticas', () => {
     const existing: Movement[] = [
-      mk({ type: 'expense', concept: 'COREXYZ TIENDA', category: 'Otros', categoryAuto: true }),
-      mk({ type: 'expense', concept: 'Fecha de operación: 03-03-2025 COREXYZ TIENDA', category: 'Ropa', categoryAuto: false }),
+      mk({ type: 'expense', amount: 0, concept: 'COREXYZ TIENDA', category: 'Otros', categoryAuto: true }),
+      mk({ type: 'expense', amount: 0, concept: 'Fecha de operación: 03-03-2025 COREXYZ TIENDA', category: 'Ropa', categoryAuto: false }),
     ];
     const map = buildConceptCategoryMap(existing);
     expect(map.get('COREXYZ TIENDA')).toBe('Ropa');

@@ -7,7 +7,7 @@ import {
   resetPriceCaches,
 } from '../prices';
 
-type FetchMock = (url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+type FetchMock = (url: string) => { ok: boolean; status: number; json: () => Promise<unknown> };
 
 function stubFetch(mock: FetchMock) {
   const calls: string[] = [];

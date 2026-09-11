@@ -23,6 +23,7 @@ import {
   setActiveProfileId,
   setProfileData,
 } from '../profiles';
+import type { BackupPayload } from '../profiles';
 
 describe('profileStorageKey', () => {
   it('namespaces raw keys under a profile', () => {
@@ -243,7 +244,7 @@ describe('backup and restore', () => {
   });
 
   it('recreates a missing profile when restoring an individual backup', () => {
-    const backup = {
+    const backup: BackupPayload = {
       app: 'nestegg',
       version: 2,
       kind: 'profile',
@@ -260,7 +261,7 @@ describe('backup and restore', () => {
   it('restores a profile copy into a chosen profile when a target is forced', () => {
     ensureInitialized();
     const p = createProfile('Destino');
-    const backup = {
+    const backup: BackupPayload = {
       app: 'nestegg',
       version: 2,
       kind: 'profile',
@@ -291,7 +292,7 @@ describe('backup and restore', () => {
     setProfileData(other.id, 'nestegg-investments-v1', { files: [], movements: [{ id: 'sobra' }] });
     localStorage.setItem('savings-params', JSON.stringify({ cushion: 1 }));
 
-    const backup = {
+    const backup: BackupPayload = {
       app: 'nestegg',
       version: 2,
       kind: 'profile',
