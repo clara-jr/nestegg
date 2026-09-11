@@ -56,7 +56,7 @@ export default function ProfileSelector() {
                 title={`Ver ${p.name}`}
                 className={`inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full text-sm font-medium cursor-pointer border ${
                   p.id === activeId
-                    ? 'bg-zinc-100 text-gray-900 border-gray-300'
+                    ? 'bg-zinc-100 text-gray-900 border-gray-200'
                     : 'bg-[#fdfdfe] border-gray-200 text-gray-700 hover:bg-zinc-100'
                 }`}
               >
