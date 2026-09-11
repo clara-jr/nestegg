@@ -59,8 +59,10 @@ import {
 } from '../lib/investments';
 import { fetchPrices, type PriceRequest } from '../lib/prices';
 import { dispatchDataChanged, useProfileLocalStorage, useProfiles } from '../lib/profiles';
+import { useFontsReady } from '../lib/fonts';
 import ProfileSelector from './ProfileSelector';
 import JointSimulator from './JointSimulator';
+import { SimulatorLoading } from './common/layout/SimulatorLoading';
 import {
   CategoryBreakdown,
   ChartRangeSummary,
@@ -141,13 +143,14 @@ function pnlColor(value: number): string {
 
 export default function InvestmentsSimulator() {
   const { profiles } = useProfiles();
-  const [store, setStore] = useProfileLocalStorage<InvestmentsStore>('nestegg-investments-v1', {
+  const [store, setStore, storeReady] = useProfileLocalStorage<InvestmentsStore>('nestegg-investments-v1', {
     files: [],
     movements: [],
   });
   const [priceMap, setPriceMap] = useProfileLocalStorage<PriceMap>('nestegg-prices-v1', {});
   // Parámetros declarados por el usuario para cada depósito a plazo (TIR + duración).
   const [plazoConfigs, setPlazoConfigs] = useProfileLocalStorage<Record<string, PlazoFijoConfig>>('nestegg-plazos-v1', {});
+  const fontsReady = useFontsReady();
   const [bank, setBank] = useState<BankId>(ORDERED_BANKS[0].id);
   const [tab, setTab] = useState<SectionTab>('portfolio');
   // «Convivencia» solo existe cuando hay más de un perfil; si se elimina el
@@ -664,6 +667,14 @@ export default function InvestmentsSimulator() {
       return [{ holding: h, entry }];
     });
   }, [portfolio.holdings, orderedHoldings, priceMap]);
+
+  if (!fontsReady || !storeReady) {
+    return (
+      <SimulatorLayout>
+        <SimulatorLoading />
+      </SimulatorLayout>
+    );
+  }
 
   return (
     <SimulatorLayout>
@@ -1600,7 +1611,7 @@ function AccountSection({
               type="monotone"
               dataKey="total"
               name="En cuenta"
-              stroke="#00bc7d"
+stroke="#00bc7d"
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}

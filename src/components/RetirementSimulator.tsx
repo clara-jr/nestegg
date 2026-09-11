@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { calculateNetSalary, calculateTax, formatCurrency, formatSigned } from '../lib/calculations';
+import { useFontsReady } from '../lib/fonts';
 import {
   buildPensionSchedule,
   calculateAllRetirementAges,
@@ -37,6 +38,7 @@ import {
   DistributionSlider,
   SingleRangeSlider,
   Icon,
+  SimulatorLoading,
   type DistributionPeriod,
 } from './common';
 
@@ -76,6 +78,8 @@ export default function RetirementSimulator() {
   const [sameDistributionForAll, setSameDistributionForAll] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('con-pension');
   const [showDetail, setShowDetail] = useState(false);
+
+  const fontsReady = useFontsReady();
 
   const storageReadyRef = useRef(storageReady);
   useEffect(() => { storageReadyRef.current = storageReady; });
@@ -606,7 +610,7 @@ export default function RetirementSimulator() {
     index: p.index,
   }));
 
-  return (
+  return storageReady && fontsReady ? (
     <SimulatorLayout>
       <FormContainer>
         <FormSection title="Datos Personales" cols="single">
@@ -1000,6 +1004,10 @@ export default function RetirementSimulator() {
           )}
         </ResultsContainer>
       )}
+    </SimulatorLayout>
+  ) : (
+    <SimulatorLayout>
+      <SimulatorLoading />
     </SimulatorLayout>
   );
 }

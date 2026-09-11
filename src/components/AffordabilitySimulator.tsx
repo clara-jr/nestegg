@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { formatCurrency } from '../lib/calculations';
 import { calculateAffordability, type AffordabilityParams, type AffordabilityResult } from '../lib/affordability';
 import { getSimulatorData, setSimulatorData, subscribe, useLocalStorage } from '../lib/sharedStore';
+import { useFontsReady } from '../lib/fonts';
 import {
   SimulatorLayout,
   FormContainer,
@@ -19,6 +20,7 @@ import {
   SingleRangeSlider,
   NoteCard,
   Icon,
+  SimulatorLoading,
 } from './common';
 
 export default function AffordabilitySimulator() {
@@ -41,6 +43,8 @@ export default function AffordabilitySimulator() {
   const familyLoanMonthlyPayment = hasFamilyLoan
     ? params.familyLoanAmount / (params.familyLoanDurationYears * 12)
     : 0;
+
+  const fontsReady = useFontsReady();
 
   const result = useMemo<AffordabilityResult>(() => calculateAffordability(params), [params]);
 
@@ -113,7 +117,7 @@ export default function AffordabilitySimulator() {
 
   const hasSalary = params.members.some(m => m.annualGrossSalary > 0);
 
-  return (
+  return storageReady && fontsReady ? (
     <SimulatorLayout>
       <FormContainer>
         <FormSection title="Ingresos" cols="single">
@@ -259,6 +263,10 @@ export default function AffordabilitySimulator() {
           } {hasSalary && `El ratio de esfuerzo (${params.debtToIncomeRatio}%) se aplica sobre el ingreso neto mensual${params.members.length > 1 ? ' conjunto' : ''} de ${formatCurrency(result.totalNetMonthlyIncome)}.`}
         </NoteCard>
       </ResultsContainer>
+    </SimulatorLayout>
+  ) : (
+    <SimulatorLayout>
+      <SimulatorLoading />
     </SimulatorLayout>
   );
 }

@@ -10,6 +10,7 @@ import {
   type SavingsResult,
 } from '../lib/calculations';
 import { getSimulatorData, setSimulatorData, subscribe, useLocalStorage } from '../lib/sharedStore';
+import { useFontsReady } from '../lib/fonts';
 import {
   SimulatorLayout,
   FormContainer,
@@ -29,6 +30,7 @@ import {
   ChartTooltip,
   DistributionSlider,
   Icon,
+  SimulatorLoading,
   type DistributionPeriod,
 } from './common';
 
@@ -97,6 +99,8 @@ export default function SavingsSimulator() {
   const [showDetail, setShowDetail] = useState(false);
   const [sameDistributionForAll, setSameDistributionForAll] = useState(false);
   const [includeHousePurchase, setIncludeHousePurchase] = useState(false);
+
+  const fontsReady = useFontsReady();
 
   const storageReadyRef = React.useRef(storageReady);
   React.useEffect(() => { storageReadyRef.current = storageReady; });
@@ -436,7 +440,7 @@ export default function SavingsSimulator() {
     index: i,
   }));
 
-  return (
+  return storageReady && fontsReady ? (
     <SimulatorLayout>
       <FormContainer>
         <FormSection title="Horizonte" cols="single">
@@ -711,6 +715,10 @@ export default function SavingsSimulator() {
           )}
         </ResultsContainer>
       )}
+    </SimulatorLayout>
+  ) : (
+    <SimulatorLayout>
+      <SimulatorLoading />
     </SimulatorLayout>
   );
 }
