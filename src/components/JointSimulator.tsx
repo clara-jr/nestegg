@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
-import { formatCurrency, formatSigned } from '../lib/calculations';
+import { formatAxisCurrency, formatCurrency, formatSigned } from '../lib/calculations';
 import { EXPENSE_CATEGORY_LIST, averageInRange, currentMonthKey, formatDay, monthsBetween, rangeFromDay, rangeMonth, rangeToDay } from '../lib/investments';
 import type { Movement } from '../lib/bankImports';
 import { reclassifyPaypalDuplicates } from '../lib/bankImports';
@@ -413,7 +413,7 @@ export default function JointSimulator() {
               <ComposedChart data={chartDataFinal} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                 <CartesianGrid stroke="#ececea" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9b9a95' }} interval={isDaily ? 2 : 'preserveStartEnd'} />
-                <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => formatCurrency(v)} />
+                <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => formatAxisCurrency(v)} />
                 <RechartsTooltip
                   wrapperStyle={{ zIndex: 20 }}
                   content={

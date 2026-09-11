@@ -294,6 +294,16 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+/** Versión compacta para ejes de gráficas: evita etiquetas largas que
+ *  se parten y salen por arriba del gráfico en pantallas pequeñas. */
+export function formatAxisCurrency(value: number): string {
+  const abs = Math.abs(value);
+  const nf = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 });
+  if (abs >= 1_000_000) return `${nf.format(value / 1_000_000)}M €`;
+  if (abs >= 1_000) return `${nf.format(value / 1_000)}k €`;
+  return `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0 }).format(value)} €`;
+}
+
 /** Formatea una cantidad mostrando siempre el signo (+ para positivos,
  *  − para negativos, ninguno para cero). Pensado para saldos y resultados. */
 export function formatSigned(value: number): string {

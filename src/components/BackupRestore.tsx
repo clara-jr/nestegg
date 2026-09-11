@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Modal, Select, Tooltip, Icon } from './common';
+import { Modal, Select, Icon } from './common';
 import {
   DATA_CHANGED_EVENT,
   PROFILE_CHANGED_EVENT,
@@ -557,16 +557,14 @@ export default function BackupRestore() {
           </div>
         </Modal>
 
-        <Tooltip text="Copiar o restaurar datos">
-          <button
-            type="button"
-            onClick={() => { setOpen(o => !o); setFeedback(null); }}
-            aria-label="Copia de seguridad de tus datos"
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-zinc-100 border border-gray-200 text-gray-900 hover:bg-zinc-200 cursor-pointer"
-          >
-            <Icon name="floppy" className="h-6 w-6" />
-          </button>
-        </Tooltip>
+        <button
+          type="button"
+          onClick={() => { setOpen(o => !o); setFeedback(null); }}
+          aria-label="Copia de seguridad de tus datos"
+          className="w-12 h-12 flex items-center justify-center rounded-full bg-zinc-100 border border-gray-200 text-gray-900 hover:bg-zinc-200 cursor-pointer"
+        >
+          <Icon name="floppy" className="h-6 w-6" />
+        </button>
       </div>
     </>
   );

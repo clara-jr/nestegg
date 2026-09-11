@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
-import { calculateNetSalary, calculateTax, formatCurrency, formatSigned } from '../lib/calculations';
+import { calculateNetSalary, calculateTax, formatAxisCurrency, formatCurrency, formatSigned } from '../lib/calculations';
 import { useFontsReady } from '../lib/fonts';
 import {
   buildPensionSchedule,
@@ -883,7 +883,7 @@ export default function RetirementSimulator() {
                       />
                       <YAxis
                         tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
-                        tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k €`}
+                        tickFormatter={(v: number) => formatAxisCurrency(v)}
                         stroke="#d1d5db"
                       />
                        <RechartsTooltip content={<ChartTooltip renderContent={(payload) => {

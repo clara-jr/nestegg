@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { formatCurrency, formatSigned } from '../lib/calculations';
+import { formatAxisCurrency, formatCurrency, formatSigned } from '../lib/calculations';
 import {
   BANKS,
   MOVEMENT_TYPE_LABELS,
@@ -1899,7 +1899,7 @@ function IncomeSection({
           <BarChart data={chartRows} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
             <CartesianGrid stroke="#ececea" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9b9a95' }} interval={isDaily ? 2 : 'preserveStartEnd'} />
-            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => `${v} €`} />
+            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => formatAxisCurrency(v)} />
             {incomeTooltipRecharts()}
               <Bar
                 dataKey="total"
@@ -2312,7 +2312,7 @@ function ExpensesSection({
           <BarChart data={chartRows} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
             <CartesianGrid stroke="#ececea" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9b9a95' }} interval={isDaily ? 2 : 'preserveStartEnd'} />
-            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => `${v} €`} />
+            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => formatAxisCurrency(v)} />
             {monthTooltipRecharts()}
             <Bar
               dataKey="total"

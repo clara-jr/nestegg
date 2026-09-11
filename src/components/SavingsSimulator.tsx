@@ -4,6 +4,7 @@ import {
   calculateMortgageGrantedAmount,
   calculateSavings,
   calculateTotalHouseExpenses,
+  formatAxisCurrency,
   formatCurrency,
   formatSigned,
   type SavingsParams,
@@ -663,7 +664,7 @@ export default function SavingsSimulator() {
                     />
                     <YAxis
                       tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
-                      tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k €`}
+                      tickFormatter={(v: number) => formatAxisCurrency(v)}
                       stroke="#d1d5db"
                     />
                     <RechartsTooltip content={<ChartTooltip renderContent={(payload) => {
