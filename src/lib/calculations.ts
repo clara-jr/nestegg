@@ -294,6 +294,13 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+/** Formatea una cantidad mostrando siempre el signo (+ para positivos,
+ *  − para negativos, ninguno para cero). Pensado para saldos y resultados. */
+export function formatSigned(value: number): string {
+  if (value > 0) return `+${formatCurrency(value)}`;
+  return formatCurrency(value);
+}
+
 export function calculateNetSalary(annualGross: number): number {
   if (annualGross <= 0) return 0;
   let tax = 0;

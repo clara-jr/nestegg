@@ -32,7 +32,7 @@ export function SingleRangeSlider({
   const hasRangeLabels = minLabel !== undefined && maxLabel !== undefined;
 
   return (
-    <div className={`bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 space-y-3${fullWidth ? ' md:col-span-2' : ''}`}>
+    <div className={`bg-zinc-100 border border-[#e3e3e0]/70 rounded-xl px-4 py-3 space-y-3${fullWidth ? ' md:col-span-2' : ''}`}>
       <div className="space-y-2">
         {hasRangeLabels ? (
           <>
@@ -55,7 +55,7 @@ export function SingleRangeSlider({
           max={max}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full h-1.5 rounded-lg appearance-none cursor-pointer accent-gray-700"
+          className="w-full h-1.5 rounded-xl appearance-none cursor-pointer accent-gray-700"
         />
       </div>
       {description && <p className="text-xs text-gray-500">{description}</p>}

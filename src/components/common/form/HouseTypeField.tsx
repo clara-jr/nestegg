@@ -9,7 +9,7 @@ export function HouseTypeField({ isNewBuild, onChange }: Readonly<HouseTypeField
       <legend className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Tipo de vivienda</legend>
       <p className="text-xs text-gray-500">Obra nueva 11.2% · A reformar 6.5%</p>
       <div className="flex gap-2">
-        <label className="flex items-center gap-2 cursor-pointer py-2 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors text-xs font-medium text-gray-900">
+        <label className="flex items-center gap-2 cursor-pointer py-2 px-3 rounded-xl border border-gray-300 bg-[#fdfdfe] hover:bg-zinc-100 transition-colors text-xs font-medium text-gray-900">
           <input
             type="radio"
             name="houseType"
@@ -19,7 +19,7 @@ export function HouseTypeField({ isNewBuild, onChange }: Readonly<HouseTypeField
           />
           Obra nueva
         </label>
-        <label className="flex items-center gap-2 cursor-pointer py-2 px-3 rounded-lg border border-gray-300 bg-white hover:bg-gray-50 transition-colors text-xs font-medium text-gray-900">
+        <label className="flex items-center gap-2 cursor-pointer py-2 px-3 rounded-xl border border-gray-300 bg-[#fdfdfe] hover:bg-zinc-100 transition-colors text-xs font-medium text-gray-900">
           <input
             type="radio"
             name="houseType"

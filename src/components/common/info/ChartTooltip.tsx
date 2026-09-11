@@ -19,7 +19,7 @@ const TOOLTIP_STYLE = {
   borderRadius: '8px',
   padding: '8px 12px',
   fontSize: '12px',
-  fontFamily: 'Heebo, sans-serif',
+  fontFamily: 'var(--font-sans)',
 } as const;
 
 export function ChartTooltip({ active, payload, renderContent }: Readonly<ChartTooltipProps>) {

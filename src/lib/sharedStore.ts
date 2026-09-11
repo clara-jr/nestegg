@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { DATA_CHANGED_EVENT } from './profiles';
 
 type Listener = () => void;
 
@@ -70,14 +71,28 @@ export function subscribe(fn: Listener) {
   return () => listeners.delete(fn);
 }
 
-export function useLocalStorage<T>(key: string, initial: T | (() => T)): [T, (value: T | ((prev: T) => T)) => void] {
+export function useLocalStorage<T>(
+  key: string,
+  initial: T | (() => T),
+): [T, (value: T | ((prev: T) => T)) => void, boolean] {
   const [stored, setStored] = useState<T>(() => (initial instanceof Function ? initial() : initial));
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const item = localStorage.getItem(key);
-      if (item !== null) setStored(JSON.parse(item));
-    } catch {}
+    let active = true;
+    const read = () => {
+      try {
+        const item = localStorage.getItem(key);
+        if (item !== null && active) setStored(JSON.parse(item));
+      } catch {}
+    };
+    read();
+    if (active) setHydrated(true);
+    window.addEventListener(DATA_CHANGED_EVENT, read);
+    return () => {
+      active = false;
+      window.removeEventListener(DATA_CHANGED_EVENT, read);
+    };
   }, [key]);
 
   const setValue = (value: T | ((prev: T) => T)) => {
@@ -90,5 +105,5 @@ export function useLocalStorage<T>(key: string, initial: T | (() => T)): [T, (va
     });
   };
 
-  return [stored, setValue];
+  return [stored, setValue, hydrated];
 }

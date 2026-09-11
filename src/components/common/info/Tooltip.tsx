@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-export function Tooltip({ text, children }: { text: string; children: React.ReactNode }) {
+export function Tooltip({ text, children, className }: { text: string; children: React.ReactNode; className?: string }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLSpanElement>(null);
@@ -45,7 +45,7 @@ export function Tooltip({ text, children }: { text: string; children: React.Reac
       onClick={() => setOpen(!open)}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
-      className="relative inline-flex items-center cursor-pointer"
+      className={`relative inline-flex items-center ${className ?? 'cursor-pointer'}`}
     >
       {children}
       {open && (
@@ -56,7 +56,7 @@ export function Tooltip({ text, children }: { text: string; children: React.Reac
             top: pos.top,
             left: pos.left,
           }}
-          className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs leading-tight whitespace-normal max-w-[min(36rem,calc(100vw-2rem))] break-words shadow-lg z-50 pointer-events-none normal-case tracking-normal font-normal text-left"
+          className="px-3 py-1.5 rounded-xl bg-zinc-100 text-gray-700 border border-gray-200 text-xs leading-tight whitespace-normal max-w-[min(36rem,calc(100vw-2rem))] break-words shadow-lg z-50 pointer-events-none normal-case tracking-normal font-normal text-left"
         >
           {text}
         </span>

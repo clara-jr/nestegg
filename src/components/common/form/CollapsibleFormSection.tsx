@@ -1,7 +1,7 @@
 import React from 'react';
 
 export interface CollapsibleFormSectionProps {
-  title: string;
+  title: React.ReactNode;
   isOpen: boolean;
   onToggle: () => void;
   children: React.ReactNode;
@@ -13,7 +13,7 @@ export function CollapsibleFormSection({ title, isOpen, onToggle, children }: Re
       <button
         type="button"
         onClick={onToggle}
-        className={`flex items-center gap-2 w-full text-left font-['Signika',_sans-serif]`}
+        className={`flex items-center gap-2 w-full text-left font-['Signika',_sans-serif] cursor-pointer`}
       >
         <span className="text-base font-bold text-gray-900 uppercase tracking-wider">{title}</span>
         <svg

@@ -7,7 +7,7 @@ export interface MemberCardProps {
 
 export function MemberCard({ index, totalMembers, onRemove, children }: Readonly<MemberCardProps>) {
   return (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+    <div className="bg-zinc-100 border border-[#e3e3e0]/70 rounded-xl p-4 space-y-3">
       {totalMembers > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-gray-900 uppercase tracking-wider">
@@ -17,7 +17,7 @@ export function MemberCard({ index, totalMembers, onRemove, children }: Readonly
             <button
               type="button"
               onClick={onRemove}
-              className="text-red-600 hover:text-red-800 cursor-pointer"
+              className="text-red-600 hover:text-red-700 cursor-pointer"
               title="Eliminar integrante"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

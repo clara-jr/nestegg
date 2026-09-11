@@ -2,10 +2,12 @@
 import SavingsSimulator from '../components/SavingsSimulator';
 import RetirementSimulator from '../components/RetirementSimulator';
 import AffordabilitySimulator from '../components/AffordabilitySimulator';
+import InvestmentsSimulator from '../components/InvestmentsSimulator';
+import BackupRestore from '../components/BackupRestore';
 import '../styles/global.css';
 
 const title = 'NestEgg';
-const description = 'Planifica tus finanzas personales: simula la evolución de tus ahorros e inversiones, calcula cuándo jubilarte y descubre qué casa puedes permitirte.';
+const description = 'Planifica tus finanzas personales: analiza tus movimientos bancarios, simula tus ahorros e inversiones, descubre qué casa puedes permitirte y planifica tu jubilación.';
 ---
 
 <!doctype html>
@@ -17,35 +19,46 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
     <meta name="viewport" content="width=device-width" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:image" content="https://clara-jr.github.io/nestegg/thumbnail.png" />
-    <meta property="og:image:width" content="674" />
-    <meta property="og:image:height" content="470" />
-    <meta property="og:image:type" content="image/png" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://clara-jr.github.io/nestegg/" />
+    <meta property="og:site_name" content="NestEgg" />
+    <meta property="og:locale" content="es_ES" />
+    <meta property="og:image" content="https://clara-jr.github.io/nestegg/thumbnail.png" />
+    <meta property="og:image:width" content="395" />
+    <meta property="og:image:height" content="289" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content="NestEgg — simuladores de finanzas personales" />
     <meta property="twitter:card" content="summary_large_image" />
     <meta property="twitter:site" content="@clear_is_me" />
     <meta property="twitter:creator" content="@clear_is_me" />
     <meta property="twitter:title" content={title} />
     <meta property="twitter:description" content={description} />
     <meta property="twitter:image" content="https://clara-jr.github.io/nestegg/thumbnail.png" />
+    <meta property="twitter:image:alt" content="NestEgg — simuladores de finanzas personales" />
     <link rel="icon" type="image/svg+xml" href="/nestegg/favicon.svg" />
     <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Signika:wght@400;500;600;700&display=swap"
+    />
   </head>
-  <body class="bg-gradient-to-br from-white via-gray-50 to-white min-h-screen">
+  <body class="bg-[#fdfdfe] min-h-screen">
     <nav class="flex justify-center px-3 sm:px-4 lg:px-8 pt-10 pb-2">
       <div class="mx-auto max-w-6xl w-full flex items-center justify-center">
-        <div class="relative w-full max-w-xl sm:max-w-3xl" id="nav-container">
+        <div class="relative w-full max-w-xl sm:max-w-3xl lg:max-w-5xl" id="nav-container">
           <!-- Mobile trigger -->
-          <button id="nav-mobile-trigger" class="cursor-pointer flex sm:hidden items-center gap-2.5 w-full px-4 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-900 cursor-pointer">
-            <span id="nav-mobile-icon" class="text-lg flex-shrink-0">💰</span>
+          <button id="nav-mobile-trigger" class="cursor-pointer flex sm:hidden items-center gap-2.5 w-full px-4 py-3 bg-[#fdfdfe] border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 cursor-pointer">
+            <span id="nav-mobile-icon" class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>
             <span id="nav-mobile-label">Simulador de Ahorros</span>
             <svg id="nav-mobile-arrow" class="w-4 h-4 text-gray-400 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
             </svg>
           </button>
-          <div id="nav-mobile-menu" class="hidden sm:hidden absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+          <div id="nav-mobile-menu" class="hidden sm:hidden absolute left-0 right-0 top-full mt-2 bg-[#fdfdfe] border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
             <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="savings">
-              <span class="text-lg flex-shrink-0">💰</span>
+              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>
               <div class="text-left">
                 <p class="text-sm font-semibold">Simulador de Ahorros</p>
                 <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Proyecta tu patrimonio, hipoteca e inversiones al detalle.</p>
@@ -53,7 +66,7 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
             </button>
             <div class="border-t border-gray-100"></div>
             <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="retirement">
-              <span class="text-lg flex-shrink-0">🏖️</span>
+              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
               <div class="text-left">
                 <p class="text-sm font-semibold">Calculadora de Jubilación</p>
                 <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Planifica cuándo jubilarte gestionando tus ahorros.</p>
@@ -61,34 +74,49 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
             </button>
             <div class="border-t border-gray-100"></div>
             <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="affordability">
-              <span class="text-lg flex-shrink-0">🏡</span>
+              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
               <div class="text-left">
                 <p class="text-sm font-semibold">Calculadora de Hogar</p>
                 <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Descubre qué casa te puedes permitir.</p>
               </div>
             </button>
+            <div class="border-t border-gray-100"></div>
+            <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="investments">
+              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span>
+              <div class="text-left">
+                <p class="text-sm font-semibold">Agregador de Finanzas</p>
+                <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Importa extractos y analiza tu cartera y capacidad de ahorro.</p>
+              </div>
+            </button>
           </div>
           <!-- Desktop tabs -->
-          <div class="hidden sm:flex bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden divide-x divide-gray-200">
+          <div class="hidden sm:flex bg-[#fdfdfe] border border-gray-200 rounded-xl overflow-hidden divide-x divide-gray-200">
             <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="savings">
-              <span class="text-lg flex-shrink-0">💰</span>
+              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>
               <div>
                 <p class="text-sm font-semibold">Simulador de Ahorros</p>
                 <p class="text-xs mt-0.5 leading-relaxed">Proyecta tu patrimonio, hipoteca e inversiones al detalle.</p>
               </div>
             </button>
             <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="retirement">
-              <span class="text-lg mt-0.5 flex-shrink-0">🏖️</span>
+              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
               <div>
                 <p class="text-sm font-semibold">Calculadora de Jubilación</p>
                 <p class="text-xs mt-0.5 leading-relaxed">Planifica cuándo jubilarte gestionando tus ahorros.</p>
               </div>
             </button>
             <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="affordability">
-              <span class="text-lg mt-0.5 flex-shrink-0">🏡</span>
+              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
               <div>
                 <p class="text-sm font-semibold">Calculadora de Hogar</p>
                 <p class="text-xs mt-0.5 leading-relaxed">Descubre qué casa te puedes permitir.</p>
+              </div>
+            </button>
+            <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="investments">
+              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span>
+              <div>
+                <p class="text-sm font-semibold">Agregador de Finanzas</p>
+                <p class="text-xs mt-0.5 leading-relaxed">Importa extractos y analiza tu cartera y capacidad de ahorro.</p>
               </div>
             </button>
           </div>
@@ -104,11 +132,16 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
     <div id="tab-affordability" class="tab-content hidden">
       <AffordabilitySimulator client:load />
     </div>
+    <div id="tab-investments" class="tab-content hidden">
+      <InvestmentsSimulator client:load />
+    </div>
+    <BackupRestore client:load />
     <script>
       const contents = {
         savings: document.getElementById('tab-savings'),
         retirement: document.getElementById('tab-retirement'),
         affordability: document.getElementById('tab-affordability'),
+        investments: document.getElementById('tab-investments'),
       };
       const tabBtns = document.querySelectorAll('.tab-btn');
       const mobileTrigger = document.getElementById('nav-mobile-trigger');
@@ -127,13 +160,13 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
         localStorage.setItem('nestegg-tab', tab);
         tabBtns.forEach(btn => {
           const isActive = (btn as HTMLElement).dataset.tab === tab;
-          btn.classList.toggle('bg-gray-100', isActive);
-          btn.classList.toggle('hover:bg-gray-200', isActive);
-          btn.classList.toggle('hover:bg-gray-50', !isActive);
+          btn.classList.toggle('bg-zinc-100', isActive);
+          btn.classList.toggle('hover:bg-zinc-100', isActive);
+          btn.classList.toggle('hover:bg-zinc-100', !isActive);
           btn.classList.toggle('text-gray-900', !isActive && !btn.closest('#nav-mobile-menu'));
           const desc = btn.querySelector('p:last-child');
           if (btn.closest('#nav-mobile-menu')) {
-            btn.classList.toggle('bg-gray-50', isActive);
+            btn.classList.toggle('bg-zinc-100', isActive);
             btn.classList.toggle('text-gray-900', true);
           } else {
             if (isActive) {
@@ -152,6 +185,7 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
         Object.entries(contents).forEach(([key, el]) => {
           el?.classList.toggle('hidden', key !== tab);
         });
+        window.dispatchEvent(new CustomEvent('nestegg-tab-changed', { detail: { tab } }));
         closeMobile();
       }
 
@@ -176,5 +210,12 @@ const description = 'Planifica tus finanzas personales: simula la evolución de 
       const savedTab = localStorage.getItem('nestegg-tab') || 'savings';
       switchTab(savedTab);
     </script>
+    <footer class="flex flex-col items-center gap-1 px-3 sm:px-4 lg:px-8 py-10">
+      <p class="text-xs text-gray-500 text-center">
+        <svg class="inline-block w-3.5 h-3.5 text-gray-400 align-[-2px] mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>Todos los datos se procesan y almacenan localmente en tu navegador. Nada se envía a ningún servidor.</span>
+      </p>
+      <p class="text-xs text-gray-500 mt-2">© 2026 NestEgg · Todos los derechos reservados</p>
+    </footer>
   </body>
 </html>
