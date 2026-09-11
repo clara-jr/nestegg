@@ -17,7 +17,7 @@ export function MemberCard({ index, totalMembers, onRemove, children }: Readonly
             <button
               type="button"
               onClick={onRemove}
-              className="text-red-600 hover:text-red-800 cursor-pointer"
+              className="text-red-600 hover:text-red-700 cursor-pointer"
               title="Eliminar integrante"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

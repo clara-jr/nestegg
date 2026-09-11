@@ -992,7 +992,7 @@ export default function RetirementSimulator() {
                 )}
               </NoteBanner>
               <NoteBanner variant="warning">
-                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-red-600" /> Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
+                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-amber-600" /> Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
                 Los impuestos a pagar por los intereses de la cuenta remunerada ya están descontados anualmente.
                 Las plusvalías de las inversiones solo tributan al vender; en la columna <strong>Impuestos</strong> se refleja tanto el impuesto anual sobre intereses como el impuesto sobre plusvalías al retirar durante la jubilación.
               </NoteBanner>

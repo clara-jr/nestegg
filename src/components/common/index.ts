@@ -1,4 +1,5 @@
 export { InputField, type InputFieldProps } from './form/InputField';
+export { NumberInput } from './form/NumberInput';
 export { FormSection, type FormSectionProps } from './form/FormSection';
 export { FormContainer } from './form/FormContainer';
 export { HouseTypeField, type HouseTypeFieldProps } from './form/HouseTypeField';

@@ -5,6 +5,7 @@ export interface ScrollableTableColumn {
   align?: 'left' | 'right';
   muted?: boolean;
   className?: string;
+  minWidth?: number;
 }
 
 export interface ScrollableTableCell {
@@ -44,7 +45,9 @@ export function ScrollableTable({ columns, rows, bordered = true }: Readonly<Scr
     if (!headerScroll || !bodyTable) return;
     const firstRow = bodyTable.rows[0];
     if (!firstRow) return;
-    const widths = Array.from(firstRow.cells).map((cell) => cell.getBoundingClientRect().width);
+    const widths = Array.from(firstRow.cells).map((cell, i) =>
+      Math.round(Math.max(cell.getBoundingClientRect().width, columns[i]?.minWidth ?? 0)),
+    );
     setColWidths((prev) => {
       if (prev.length === widths.length && prev.every((w, i) => Math.abs(w - widths[i]) < 0.5)) return prev;
       return widths;
@@ -98,6 +101,7 @@ export function ScrollableTable({ columns, rows, bordered = true }: Readonly<Scr
               {columns.map((col, i) => (
                 <th
                   key={i}
+                  style={col.minWidth ? { minWidth: `${col.minWidth}px` } : undefined}
                   className={`px-6 sm:px-8 py-3 text-xs font-bold uppercase tracking-wider bg-[#fdfdfe] border-b border-gray-200 ${
                     col.align === 'left' ? 'text-left' : 'text-right'
                   } ${col.muted ? 'text-gray-500' : 'text-gray-900'} ${col.className ?? ''}`}
@@ -112,7 +116,7 @@ export function ScrollableTable({ columns, rows, bordered = true }: Readonly<Scr
       <div
         ref={bodyScrollRef}
         onScroll={syncHeaderScroll}
-        className="overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain"
+        className="custom-scroll overflow-x-auto overflow-y-auto max-h-[420px] overscroll-contain"
       >
         <table ref={bodyTableRef} className="w-full min-w-full mb-3">
           <tbody>
@@ -123,6 +127,7 @@ export function ScrollableTable({ columns, rows, bordered = true }: Readonly<Scr
                   return (
                     <td
                       key={ci}
+                      style={col.minWidth ? { minWidth: `${col.minWidth}px` } : undefined}
                       className={`px-6 sm:px-8 py-2.5 text-sm ${
                         col.align === 'left' ? 'text-left' : 'text-right'
                       } ${getCellClassName(cell) ?? (col.muted ? 'text-gray-500' : 'text-gray-700')}`}
@@ -136,7 +141,6 @@ export function ScrollableTable({ columns, rows, bordered = true }: Readonly<Scr
           </tbody>
         </table>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[#fdfdfe] from-50% to-transparent pointer-events-none" />
     </div>
   );
 }

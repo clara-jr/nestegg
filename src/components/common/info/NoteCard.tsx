@@ -7,8 +7,8 @@ export interface NoteCardProps {
 
 export function NoteCard({ children, variant = 'warning' }: Readonly<NoteCardProps>) {
   const colors = variant === 'warning'
-    ? 'bg-amber-50 border-amber-200 text-amber-800'
-    : 'bg-blue-50 border-blue-200 text-blue-800';
+    ? 'bg-amber-50 border-amber-200 text-amber-700'
+    : 'bg-blue-50 border-blue-200 text-blue-700';
 
   return (
     <div className={`mb-8 rounded-xl border px-4 py-3 ${colors}`}>

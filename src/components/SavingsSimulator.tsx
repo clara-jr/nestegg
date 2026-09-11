@@ -439,6 +439,14 @@ export default function SavingsSimulator() {
   return (
     <SimulatorLayout>
       <FormContainer>
+        <FormSection title="Horizonte" cols="single">
+          <InputField
+            label="Años a Simular"
+            value={params.timeHorizonYears}
+            onChange={(v) => handleInputChange('timeHorizonYears', v)}
+          />
+        </FormSection>
+
         <FormSection title="Ahorros Iniciales" cols="double">
           <InputField
             label="Ahorros Totales Iniciales (€)"
@@ -596,14 +604,6 @@ export default function SavingsSimulator() {
               />
             </FormSection>
         </CollapsibleFormSection>
-
-        <FormSection title="Horizonte" cols="single">
-          <InputField
-            label="Años a Simular"
-            value={params.timeHorizonYears}
-            onChange={(v) => handleInputChange('timeHorizonYears', v)}
-          />
-        </FormSection>
       </FormContainer>
 
       {result && (
@@ -701,7 +701,7 @@ export default function SavingsSimulator() {
                   ])}
               />
               <NoteBanner variant="warning">
-                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-red-600" /> Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
+                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-amber-600" /> Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
                 Los impuestos a pagar por los intereses de la cuenta remunerada ya están descontados anualmente.
                 Las plusvalías de inversiones solo tributan al vender, por lo que no se han descontado en la simulación al asumir <i>buy-and-hold</i>;
                 si se vendieran al final del horizonte, se pagarían <strong>{formatCurrency(result.investmentSaleTax)}</strong> en impuestos,

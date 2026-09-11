@@ -1,8 +1,10 @@
 import { formatSigned } from '../../../lib/calculations';
 
+const isZero = (v: number) => Math.abs(v) < 0.005;
+
 function ZeroValue({ suffix }: { suffix: string }) {
   return (
-    <span className="font-semibold text-gray-400">
+    <span className="font-semibold text-gray-500">
       {formatSigned(0)}
       {suffix}
     </span>
@@ -38,7 +40,7 @@ export function ChartRangeSummary({ income, expenses, savings, perDay, categoryO
         </p>
         <div className="flex items-center justify-between gap-3">
           <span className="text-gray-500">{categoryLabel || 'Gastos'}</span>
-          {expenses === 0 ? (
+          {isZero(expenses) ? (
             <ZeroValue suffix={suffix} />
           ) : (
             <span className={`font-semibold ${expenses < 0 ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -58,7 +60,7 @@ export function ChartRangeSummary({ income, expenses, savings, perDay, categoryO
       </p>
       <div className="flex items-center justify-between gap-3">
         <span className="text-gray-500">Ingresos</span>
-        {income === 0 ? (
+        {isZero(income) ? (
           <ZeroValue suffix={suffix} />
         ) : (
           <span className="font-semibold text-emerald-600">
@@ -69,7 +71,7 @@ export function ChartRangeSummary({ income, expenses, savings, perDay, categoryO
       </div>
       <div className="flex items-center justify-between gap-3">
         <span className="text-gray-500">Gastos</span>
-        {expenses === 0 ? (
+        {isZero(expenses) ? (
           <ZeroValue suffix={suffix} />
         ) : (
           <span className={`font-semibold ${expenses < 0 ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -80,10 +82,10 @@ export function ChartRangeSummary({ income, expenses, savings, perDay, categoryO
       </div>
       <div className="flex items-center justify-between gap-3">
         <span className="text-gray-500">Ahorro</span>
-        {savings === 0 ? (
+        {isZero(savings) ? (
           <ZeroValue suffix={suffix} />
         ) : (
-          <span className={`font-semibold ${savings > 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <span className="font-semibold text-gray-900">
             {formatSigned(savings)}
             {suffix}
           </span>

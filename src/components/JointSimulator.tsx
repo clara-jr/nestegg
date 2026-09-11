@@ -67,7 +67,7 @@ function IncomeExpenseValue({ income, expenses, savings, perMonth = false }: { i
         <span className="text-sm text-red-600 font-bold whitespace-nowrap">{formatSigned(-expenses)}{suffix}</span>
       </div>
       <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
-        <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">Capacidad de ahorro</span>
+        <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">Ahorro</span>
         <span className={`text-sm font-bold whitespace-nowrap ${savings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatSigned(savings)}{suffix}</span>
       </div>
     </div>
@@ -264,7 +264,7 @@ export default function JointSimulator() {
     if (jointView === 'income') {
       return (
         <>
-          <p className="font-semibold text-gray-900">{label}</p>
+          <p className="mb-1 font-semibold text-gray-900">{label}</p>
           <SignedTooltipLine label="Ingresos" value={Number(p?.income ?? 0)} />
         </>
       );
@@ -272,7 +272,7 @@ export default function JointSimulator() {
     if (jointView === 'expenses') {
       return (
         <>
-          <p className="font-semibold text-gray-900">{label}</p>
+          <p className="mb-1 font-semibold text-gray-900">{label}</p>
           <SignedTooltipLine label="Gastos" value={-Number(p?.expenses ?? 0)} />
         </>
       );
@@ -280,7 +280,7 @@ export default function JointSimulator() {
     if (isCategoryView) {
       return (
         <>
-          <p className="font-semibold text-gray-900">{label}</p>
+          <p className="mb-1 font-semibold text-gray-900">{label}</p>
           <SignedTooltipLine label={String(selectedCategory)} value={-Number(p?.total ?? 0)} />
         </>
       );
@@ -291,7 +291,6 @@ export default function JointSimulator() {
         income={Number(p?.income ?? 0)}
         expenses={Number(p?.expenses ?? 0)}
         savings={Number(p?.savings ?? 0)}
-        savingsColor="dark"
       />
     );
   };
@@ -424,19 +423,19 @@ export default function JointSimulator() {
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 {jointView === 'all' && (
                   <>
-                    <Bar dataKey="income" name="Ingresos" fill="#00bc7d" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="expenses" name="Gastos" fill="#ff637e" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="income" name="Ingresos" fill="#00bc7d" radius={[3, 3, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="expenses" name="Gastos" fill="#ff637e" radius={[3, 3, 0, 0]} maxBarSize={40} />
                     {!isDaily && <Line dataKey="savings" name="Ahorro" stroke="#464541" type="monotone" strokeWidth={2} dot={false} />}
                   </>
                 )}
                 {jointView === 'income' && (
-                  <Bar dataKey="income" name="Ingresos" fill="#00bc7d" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="income" name="Ingresos" fill="#00bc7d" radius={[3, 3, 0, 0]} maxBarSize={40} />
                 )}
                 {jointView === 'expenses' && (
-                  <Bar dataKey="expenses" name="Gastos" fill="#ff637e" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="expenses" name="Gastos" fill="#ff637e" radius={[3, 3, 0, 0]} maxBarSize={40} />
                 )}
                 {isCategoryView && selectedCategory && (
-                  <Bar dataKey="total" name={selectedCategory} fill="#ff637e" radius={[3, 3, 0, 0]} />
+                  <Bar dataKey="total" name={selectedCategory} fill="#ff637e" radius={[3, 3, 0, 0]} maxBarSize={40} />
                 )}
               </ComposedChart>
             </ResponsiveContainer>

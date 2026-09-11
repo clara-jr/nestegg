@@ -74,7 +74,7 @@ import {
   LastMonthBreakdown,
   LastYearBreakdown,
   Modal,
-  NoteCard,
+  NumberInput,
   ResultsContainer,
   ScenarioSection,
   ScrollableTable,
@@ -119,6 +119,8 @@ const BANK_LABELS: Record<BankId, string> = Object.fromEntries(
   BANKS.map(b => [b.id, b.label])
 ) as Record<BankId, string>;
 
+const ORDERED_BANKS = [...BANKS].sort((a, b) => a.label.localeCompare(b.label, 'es'));
+
 function fmtMonthLabel(month: string): string {
   const [y, m] = month.split('-').map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
@@ -146,7 +148,7 @@ export default function InvestmentsSimulator() {
   const [priceMap, setPriceMap] = useProfileLocalStorage<PriceMap>('nestegg-prices-v1', {});
   // Parámetros declarados por el usuario para cada depósito a plazo (TIR + duración).
   const [plazoConfigs, setPlazoConfigs] = useProfileLocalStorage<Record<string, PlazoFijoConfig>>('nestegg-plazos-v1', {});
-  const [bank, setBank] = useState<BankId>('trade-republic');
+  const [bank, setBank] = useState<BankId>(ORDERED_BANKS[0].id);
   const [tab, setTab] = useState<SectionTab>('portfolio');
   // «Convivencia» solo existe cuando hay más de un perfil; si se elimina el
   // segundo, se vuelve a la sección Cartera.
@@ -261,6 +263,7 @@ export default function InvestmentsSimulator() {
 
   const totalCapital = portfolio.summary.currentValue + cashBalance;
   const totalBenefit = portfolio.summary.totalBenefit + interest.total;
+  const benefitPct = meaningfulPct(totalBenefit, totalCapital);
 
   const handleBankChange = (value: string) => {
     setBank(value as BankId);
@@ -676,7 +679,7 @@ export default function InvestmentsSimulator() {
                 fullWidth
                 ariaLabel="Banco de origen"
                 onChange={handleBankChange}
-                options={BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={18} /> }))}
+                options={ORDERED_BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={18} /> }))}
               />
               <span className="block text-xs text-gray-500 mt-1">
                 {BANKS.find(b => b.id === bank)?.hint}
@@ -842,7 +845,7 @@ export default function InvestmentsSimulator() {
               />
               <SummaryCard
                 label="Beneficio Total"
-                value={`${formatSigned(totalBenefit)} (${totalBenefit > 0 ? '+' : ''}${((totalBenefit / totalCapital) * 100).toFixed(2)}%)`}
+                value={`${formatSigned(totalBenefit)}${benefitPct !== null ? ` (${formatSignedPct(benefitPct)})` : ''}`}
                 variant={
                   totalBenefit > 0.005 ? 'positive' : totalBenefit < -0.005 ? 'negative' : 'neutral'
                 }
@@ -936,11 +939,7 @@ export default function InvestmentsSimulator() {
             </div>
           </>
         )}
-        <NoteCard variant="info" >
-          <Icon name="lock" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-gray-500" />
-          Todos los datos se procesan y almacenan localmente en tu navegador.
-          Nada se envía a ningún servidor.
-        </NoteCard>
+
       </ResultsContainer>
 
       <Modal
@@ -1099,6 +1098,7 @@ function PortfolioSection({
   type PortfolioSort = 'annual' | 'tipo' | 'latente' | 'recibido' | 'total';
   const [portfolioSort, setPortfolioSort] = useState<PortfolioSort>('annual');
   const [portfolioDir, setPortfolioDir] = useState<'asc' | 'desc'>('desc');
+  const valuePct = meaningfulPct(summary.currentValue - summary.investedCost, summary.investedCost);
 
   // Clave de composición estable (keys alfabéticos): solo cambia cuando entra
   // o sale un producto, nunca al editar precios.
@@ -1195,7 +1195,7 @@ function PortfolioSection({
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
         <SummaryCard label="Invertido" value={formatCurrency(summary.investedCost)} variant="info" />
-        <SummaryCard label="Valor Actual" value={formatCurrency(summary.currentValue)} variant="info" subtitle={`${summary.currentValue - summary.investedCost > 0 ? '+' : ''}${((summary.currentValue - summary.investedCost) / summary.investedCost * 100).toFixed(2)}%`} />
+        <SummaryCard label="Valor Actual" value={formatCurrency(summary.currentValue)} variant="info" subtitle={valuePct !== null ? formatSignedPct(valuePct) : undefined} />
         <SummaryCard label="Latente" value={formatSigned(summary.unrealized)} variant={summary.unrealized >= 0 ? 'positive' : 'negative'} subtitle="Pendiente de vender" />
         <SummaryCard label="Recibido" value={formatSigned(summary.realized)} variant={summary.realized >= 0 ? 'positive' : 'negative'} subtitle="Ventas" />
         <SummaryCard label="Dividendos" value={formatSigned(summary.dividends)} subtitle={undefined} />
@@ -1214,15 +1214,16 @@ function PortfolioSection({
               />
             ),
             align: 'left',
+            minWidth: 120,
           },
           //{ title: 'Días' },
-          { title: 'Partic.' },
-          { title: 'P. medio' },
-          { title: 'P. actual', align: 'left' },
-          { title: 'TIR %' },
-          { title: 'Duración' },
-          { title: 'Invertido' },
-          { title: 'Valor' },
+          { title: 'Partic.', minWidth: 105 },
+          { title: 'P. medio', minWidth: 150 },
+          { title: 'P. actual', align: 'left', minWidth: 170 },
+          { title: 'TIR %', minWidth: 110 },
+          { title: 'Duración', minWidth: 130 },
+          { title: 'Invertido', minWidth: 135 },
+          { title: 'Valor', minWidth: 135 },
           {
             title: (
               <SortableHeader
@@ -1232,6 +1233,7 @@ function PortfolioSection({
                 onClick={() => handlePortfolioSort('latente', 'desc')}
               />
             ),
+            minWidth: 145,
           },
           {
             title: (
@@ -1242,8 +1244,9 @@ function PortfolioSection({
                 onClick={() => handlePortfolioSort('recibido', 'desc')}
               />
             ),
+            minWidth: 150,
           },
-          { title: 'Dividendos' },
+          { title: 'Dividendos', minWidth: 150 },
           {
             title: (
               <SortableHeader
@@ -1253,6 +1256,7 @@ function PortfolioSection({
                 onClick={() => handlePortfolioSort('total', 'desc')}
               />
             ),
+            minWidth: 130,
           },
           {
             title: (
@@ -1263,6 +1267,7 @@ function PortfolioSection({
                 onClick={() => handlePortfolioSort('annual', 'desc')}
               />
             ),
+            minWidth: 145,
           },
         ]}
         rows={sortedRows.map(({ holding: h, entry }) => {
@@ -1304,15 +1309,11 @@ function PortfolioSection({
                             : 'Sin precio guardado; se usa el precio medio'
                         }
                       >
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          aria-label={`Precio actual de ${h.name}`}
-                          value={entry?.value ?? ''}
+                        <NumberInput
+                          value={String(entry?.value ?? '')}
                           placeholder={h.avgPrice.toFixed(2)}
-                          onChange={e => onSetPrice(h.key, h.ticker, e.target.value)}
-                          className="w-24 px-2 py-1 border border-gray-200 rounded-md text-sm text-right text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                          onChange={onSetPrice.bind(null, h.key, h.ticker)}
+                          className="w-24"
                         />
                       </Tooltip>
                     ),
@@ -1320,15 +1321,12 @@ function PortfolioSection({
             isPF && h.investedCost > 0
               ? {
                   content: (
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      aria-label={`TIR anual de ${h.name}`}
+                    <NumberInput
                       value={plazoCfg?.rate ? String(plazoCfg.rate) : ''}
                       placeholder="% anual"
-                      onChange={e => onSetPlazoConfig(h.key, { rate: Number.parseFloat(e.target.value.replace(',', '.')) })}
-                      className="w-20 px-2 py-1 border border-gray-200 rounded-md text-sm text-right text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                      onChange={v => onSetPlazoConfig(h.key, { rate: Number.parseFloat(v.replace(',', '.')) })}
+                      step={0.5}
+                      className="w-20"
                     />
                   ),
                 }
@@ -1336,15 +1334,11 @@ function PortfolioSection({
             isPF && h.investedCost > 0
               ? {
                   content: (
-                    <input
-                      type="number"
-                      step="any"
-                      min="0"
-                      aria-label={`Duración de ${h.name}`}
+                    <NumberInput
                       value={plazoCfg?.months ? String(plazoCfg.months) : ''}
                       placeholder="meses"
-                      onChange={e => onSetPlazoConfig(h.key, { months: Number.parseFloat(e.target.value.replace(',', '.')) })}
-                      className="w-20 px-2 py-1 border border-gray-200 rounded-md text-sm text-right text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
+                      onChange={v => onSetPlazoConfig(h.key, { months: Number.parseFloat(v.replace(',', '.')) })}
+                      className="w-20"
                     />
                   ),
                 }
@@ -1403,6 +1397,24 @@ function formatQuantity(value: number): string {
 
 function formatPct(value: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+}
+
+/** Variación porcentual de `value` sobre `base`. Devuelve `null` si la base es 0
+ *  o el resultado no es un número finito (evita mostrar NaN%/Infinity%). */
+function pctChange(value: number, base: number): number | null {
+  if (!Number.isFinite(value) || !Number.isFinite(base) || Math.abs(base) < 1e-9) return null;
+  const p = (value / base) * 100;
+  return Number.isFinite(p) ? p : null;
+}
+
+function formatSignedPct(p: number | null): string {
+  return p === null ? '—' : `${p > 0 ? '+' : ''}${p.toFixed(2)}%`;
+}
+
+/** Igual que `pctChange` pero considera 0% como "sin dato" (devuelve `null`). */
+function meaningfulPct(value: number, base: number): number | null {
+  const p = pctChange(value, base);
+  return p !== null && Math.abs(p) >= 1e-9 ? p : null;
 }
 
 /** Días transcurridos desde una fecha ISO hasta hoy. */
@@ -1524,6 +1536,7 @@ function AccountSection({
       </p>
     );
   }
+  const cashPct = meaningfulPct(account.totalInterest, cashBalance - account.totalInterest);
 
   return (
     <section className="space-y-4 pb-6">
@@ -1533,7 +1546,7 @@ function AccountSection({
           label="Efectivo en Cuenta"
           value={formatCurrency(cashBalance)}
           variant="info"
-          subtitle={`+${((cashBalance/(cashBalance - account.totalInterest) - 1) * 100).toFixed(2)}%`}
+          subtitle={cashPct !== null ? formatSignedPct(cashPct) : undefined}
         />
         <SummaryCard
           label="Intereses"
@@ -1881,6 +1894,7 @@ function IncomeSection({
                 dataKey="total"
                 radius={[3, 3, 0, 0]}
                 name="Ingresos"
+                maxBarSize={40}
                 onClick={handleBarClick}
                 className="cursor-pointer"
                 background={{ fill: 'transparent', stroke: 'none', cursor: 'pointer' }}
@@ -1903,7 +1917,7 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
         </div>
       </div>
 
-      <div>
+      <div className="space-y-4">
         <div className="flex items-center justify-between gap-3 my-4 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Detalle de ingresos{selectedMonth
@@ -1941,7 +1955,7 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
             />
           </div>
         )}
-        <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl mb-3">
+        <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl">
           {shown.map(m => (
             <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
               <div className="min-w-0">
@@ -2293,6 +2307,7 @@ function ExpensesSection({
               dataKey="total"
               radius={[3, 3, 0, 0]}
               name={chartCategory === 'all' ? 'Gastos' : chartCategory}
+              maxBarSize={40}
               onClick={handleBarClick}
               className="cursor-pointer"
               background={{ fill: 'transparent', stroke: 'none', cursor: 'pointer' }}
@@ -2330,7 +2345,7 @@ function ExpensesSection({
         <LastMonthBreakdown categories={data.byCategory} />
       </div>
 
-      <div>
+      <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 my-4 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Detalle de gastos
@@ -2364,7 +2379,7 @@ function ExpensesSection({
               className="w-44"
               options={[
                 { value: 'all', label: 'Todos los bancos' },
-                ...BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
+                ...ORDERED_BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
               ]}
             />
           </div>
@@ -2392,7 +2407,7 @@ function ExpensesSection({
             <button
               type="button"
               onClick={clearSelection}
-              className="ml-auto px-3 py-1.5 rounded-xl border border-gray-300 text-sm font-semibold text-gray-500 hover:bg-zinc-200 transition-colors cursor-pointer"
+              className="ml-auto px-3 py-1.5 rounded-xl bg-[#fdfdfe] text-sm font-semibold text-gray-900 hover:bg-zinc-200 transition-colors cursor-pointer"
             >
               Limpiar
             </button>
@@ -2512,21 +2527,25 @@ function SortableHeader({
       <span className="flex flex-col gap-[3px]">
         <svg
           width="12"
-          height="7"
-          viewBox="0 0 12 7"
+          height="6"
+          viewBox="0 0 24 12"
           aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
           className={active && dir === 'asc' ? 'text-gray-900' : 'text-gray-300 group-hover:text-gray-400'}
         >
-          <path d="M6 0 12 7H0z" fill="currentColor" />
+          <path strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" d="M4 9l8-8 8 8" />
         </svg>
         <svg
           width="12"
-          height="7"
-          viewBox="0 0 12 7"
+          height="6"
+          viewBox="0 0 24 12"
           aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
           className={active && dir === 'desc' ? 'text-gray-900' : 'text-gray-300 group-hover:text-gray-400'}
         >
-          <path d="M0 0h12L6 7z" fill="currentColor" />
+          <path strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" d="M4 3l8 8 8-8" />
         </svg>
       </span>
     </button>
@@ -2675,6 +2694,7 @@ function MovementsSection({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [movSortKey, setMovSortKey] = useState<'date' | 'amount'>('date');
   const [movSortDir, setMovSortDir] = useState<'asc' | 'desc'>('desc');
+  const [pendingDelete, setPendingDelete] = useState<Movement | null>(null);
 
   const sortedMovements = useMemo(() => {
     const dir = movSortDir === 'asc' ? 1 : -1;
@@ -2773,7 +2793,7 @@ function MovementsSection({
             className="w-44"
             options={[
               { value: 'all', label: 'Todos los bancos' },
-              ...BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
+              ...ORDERED_BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
             ]}
           />
         </div>
@@ -2797,7 +2817,7 @@ function MovementsSection({
           </div>
           <button
             type="button"
-            onClick={() => { onRequestBulkDelete([...selected]); clearSelection(); }}
+            onClick={() => onRequestBulkDelete([...selected])}
             className="px-3 py-1.5 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700 transition-colors cursor-pointer"
           >
             Eliminar
@@ -2805,7 +2825,7 @@ function MovementsSection({
           <button
             type="button"
             onClick={clearSelection}
-            className="ml-auto px-3 py-1.5 rounded-xl border border-gray-600 text-sm font-semibold text-gray-200 hover:bg-zinc-700 transition-colors cursor-pointer"
+            className="ml-auto px-3 py-1.5 rounded-xl bg-[#fdfdfe] text-sm font-semibold text-gray-900 hover:bg-zinc-200 transition-colors cursor-pointer"
           >
             Limpiar
           </button>
@@ -2919,7 +2939,7 @@ function MovementsSection({
                 <Tooltip text="Eliminar movimiento">
                   <button
                     type="button"
-                    onClick={() => onDelete(m.id)}
+                    onClick={() => setPendingDelete(m)}
                     aria-label="Eliminar movimiento"
                     className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
                   >
@@ -2937,6 +2957,41 @@ function MovementsSection({
         />
       )}
       <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+      <Modal
+        open={pendingDelete !== null}
+        onClose={() => setPendingDelete(null)}
+        title="Eliminar movimiento"
+      >
+        <p className="text-sm text-gray-700 leading-relaxed">
+          ¿Eliminar el movimiento{' '}
+          <span className="font-semibold text-gray-900">“{pendingDelete?.concept ?? ''}”</span>
+          {pendingDelete
+            ? ` del ${new Date(`${pendingDelete.date}T00:00:00`).toLocaleDateString('es-ES')}`
+            : ''}?
+        </p>
+        <p className="text-sm text-gray-500 leading-relaxed mt-2">
+          Esta acción no se puede deshacer.
+        </p>
+        <div className="flex flex-wrap justify-end gap-2 pt-5">
+          <button
+            type="button"
+            onClick={() => setPendingDelete(null)}
+            className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (pendingDelete) onDelete(pendingDelete.id);
+              setPendingDelete(null);
+            }}
+            className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
+          >
+            Eliminar
+          </button>
+        </div>
+      </Modal>
     </section>
   );
 }

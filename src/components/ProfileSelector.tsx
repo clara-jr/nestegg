@@ -46,7 +46,7 @@ export default function ProfileSelector() {
   return (
     <>
       <section className="bg-[#fdfdfe] border border-gray-200 rounded-2xl p-4 sm:p-5">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap-reverse items-center gap-3">
           <div className="flex flex-wrap items-center gap-2">
             {profiles.map(p => (
               <button
@@ -92,7 +92,7 @@ export default function ProfileSelector() {
                separado; los cambios afectan solo al perfil activo. Las calculadoras (ahorro,
                jubilación y hogar) son compartidas.</>
             : <>Crea más perfiles para separar los extractos de cada integrante y desbloquear la
-               sección «Convivencia». Las calculadoras son compartidas.</>}
+               sección «Convivencia». Los simuladores y calculadoras son compartidos.</>}
         </p>
       </section>
 
