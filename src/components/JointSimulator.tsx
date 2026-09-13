@@ -368,7 +368,7 @@ export default function JointSimulator() {
           </div>
 
           <div>
-            <div className="flex flex-wrap items-center gap-3 mb-2 mt-8">
+            <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
               <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
                 Ingresos, gastos y ahorro conjunto por mes
               </h4>
@@ -410,10 +410,10 @@ export default function JointSimulator() {
             </div>
             <div className="relative">
             <ResponsiveContainer width="100%" height={260}>
-              <ComposedChart data={chartDataFinal} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+              <ComposedChart data={chartDataFinal} margin={{ top: 5, right: 10, left: 4, bottom: 5 }}>
                 <CartesianGrid stroke="#ececea" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9b9a95' }} interval={isDaily ? 2 : 'preserveStartEnd'} />
-                <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => formatAxisCurrency(v)} />
+                <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={54} tickFormatter={v => formatAxisCurrency(v)} />
                 <RechartsTooltip
                   wrapperStyle={{ zIndex: 20 }}
                   content={
@@ -496,8 +496,8 @@ export default function JointSimulator() {
 
       {hasData && (
       <div>
-        <div className="flex items-center justify-between mb-2 mt-8">
-          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Categorías de gasto conjuntas</h4>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3 mt-8">
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Categorías de gasto conjuntas</h4>
           <span className="text-xs font-semibold text-gray-500">{config.jointCategories.length} seleccionadas</span>
         </div>
           {config.jointCategories.length === 0 && (
@@ -537,12 +537,12 @@ export default function JointSimulator() {
       {hasData && config.jointCategories.length > 0 && (
       <div>
         <CategoryBreakdown categories={summary.categoryBreakdown} />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-0">
           <LastYearBreakdown avgByCategory={summary.last12ByCategory} />
           <LastMonthBreakdown categories={summary.categoryBreakdown} />
         </div>
         {summary.jointTotal > 0 && (
-          <div className="flex items-center justify-between mb-2 mt-8">
+          <div className="flex items-center justify-between mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Aportación a los gastos conjuntos</h4>
           {/*summary.jointAverageMonthly > 0 && (
             <span className="text-xs font-semibold text-gray-500">

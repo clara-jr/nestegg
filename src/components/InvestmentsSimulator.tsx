@@ -1872,7 +1872,7 @@ function IncomeSection({
       </div>
 
       <div>
-        <div className="flex items-center gap-3 mb-2 mt-8">
+        <div className="flex items-center gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Ingresos por mes</h4>
           {chartData.length > 0 && (
             <DateRangeFilter
@@ -1896,10 +1896,10 @@ function IncomeSection({
           />
         )}
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={chartRows} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+          <BarChart data={chartRows} margin={{ top: 5, right: 10, left: 4, bottom: 5 }}>
             <CartesianGrid stroke="#ececea" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9b9a95' }} interval={isDaily ? 2 : 'preserveStartEnd'} />
-            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => formatAxisCurrency(v)} />
+            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={54} tickFormatter={v => formatAxisCurrency(v)} />
             {incomeTooltipRecharts()}
               <Bar
                 dataKey="total"
@@ -1929,7 +1929,7 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
       </div>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3 my-4 mt-8">
+        <div className="flex items-start justify-between gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Detalle de ingresos{selectedMonth
               ? ` · ${selectedMonth.length === 10 ? formatDay(selectedMonth) : fmtMonthLabel(selectedMonth)}`
@@ -2265,7 +2265,7 @@ function ExpensesSection({
       </div>
 
       <div>
-        <div className="flex flex-wrap items-center gap-3 mb-2 mt-8">
+        <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Gastos por mes
           </h4>
@@ -2309,10 +2309,10 @@ function ExpensesSection({
           />
         )}
         <ResponsiveContainer width="100%" height={240}>
-          <BarChart data={chartRows} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+          <BarChart data={chartRows} margin={{ top: 5, right: 10, left: 4, bottom: 5 }}>
             <CartesianGrid stroke="#ececea" vertical={false} />
             <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9b9a95' }} interval={isDaily ? 2 : 'preserveStartEnd'} />
-            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={70} tickFormatter={v => formatAxisCurrency(v)} />
+            <YAxis tick={{ fontSize: 11, fill: '#9b9a95' }} width={54} tickFormatter={v => formatAxisCurrency(v)} />
             {monthTooltipRecharts()}
             <Bar
               dataKey="total"
@@ -2348,16 +2348,17 @@ function ExpensesSection({
           onClose={() => setSelectedMonth(null)}
         />
       ) : (
-        <CategoryBreakdown categories={data.byCategory} />
+        <div>
+          <CategoryBreakdown categories={data.byCategory} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-0">
+            <LastYearBreakdown avgByCategory={last12ByCategory} />
+            <LastMonthBreakdown categories={data.byCategory} />
+          </div>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <LastYearBreakdown avgByCategory={last12ByCategory} />
-        <LastMonthBreakdown categories={data.byCategory} />
-      </div>
-
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 my-4 mt-8">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Detalle de gastos
           </h4>
@@ -2576,7 +2577,7 @@ function MonthCategoryBreakdown({
   const total = categories.reduce((sum, c) => sum + c.total, 0);
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-2 mt-8">
+      <div className="flex items-center justify-between gap-3 mb-3 mt-8">
         <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
           Por categoría · {fmtMonthLabel(month)}
         </h4>

@@ -654,7 +654,7 @@ export default function SavingsSimulator() {
                   Aportado vs Total
                 </p>
                 <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                  <LineChart data={chartData} margin={{ top: 5, right: 10, left: 4, bottom: 5 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis
                       dataKey="year"
@@ -663,6 +663,7 @@ export default function SavingsSimulator() {
                       stroke="#d1d5db"
                     />
                     <YAxis
+                      width={56}
                       tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
                       tickFormatter={(v: number) => formatAxisCurrency(v)}
                       stroke="#d1d5db"

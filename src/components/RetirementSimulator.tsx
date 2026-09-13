@@ -883,7 +883,7 @@ export default function RetirementSimulator() {
                     Camino del ahorro desde los {selectedEarliest.retirementAge} años ({viewMode === 'con-pension' ? 'con pensión' : 'sin pensión'})
                   </p>
                   <ResponsiveContainer width="100%" height={280}>
-                    <LineChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                    <LineChart data={chartData} margin={{ top: 5, right: 10, left: 4, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                       <XAxis
                         dataKey="age"
@@ -894,6 +894,7 @@ export default function RetirementSimulator() {
                         domain={['dataMin', 'dataMax']}
                       />
                       <YAxis
+                        width={56}
                         tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
                         tickFormatter={(v: number) => formatAxisCurrency(v)}
                         stroke="#d1d5db"
