@@ -355,6 +355,13 @@ export function currentMonthKey(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/** Suma delta meses a una clave YYYY-MM y devuelve la clave resultante. */
+export function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 /** Filtra una serie mensual dejando solo los meses ya terminados, excluyendo
  *  el mes en curso porque todavía está en marcha y solo aporta datos parciales. */
 export function completedMonths(points: MonthPoint[]): MonthPoint[] {
@@ -1061,6 +1068,12 @@ export function averageInRange(
 export function formatDay(date: string): string {
   const iso = date.length === 10 ? date : `${date}-01`;
   return new Date(`${iso}T00:00:00`).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+}
+
+/** Etiqueta corta de un mes (p. ej. «2026-08» → «ago 26»). */
+export function formatMonth(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
 }
 
 export interface DailyPoint {

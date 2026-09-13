@@ -45,16 +45,19 @@ import {
   currentMonthKey,
   fillMonthly,
   formatDay,
+  formatMonth,
   guessExpenseCategory,
   interestNetAmount,
   rangeFromDay,
   rangeMonth,
   rangeToDay,
   resolveExpenseCategory,
+  shiftMonth,
   type AccountEvolutionPoint,
   type BankBreakdownEntry,
   type CategoryTotal,
   type Holding,
+  type MonthPoint,
   type PlazoFijoConfig,
 } from '../lib/investments';
 import { fetchPrices, type PriceRequest } from '../lib/prices';
@@ -1694,6 +1697,15 @@ function accountTooltip() {
   );
 }
 
+/** Etiqueta del intervalo de los últimos 12 meses calendario ya terminados
+ *  (p. ej. «sep 25 – ago 26»), el mismo criterio que usa la media anual. */
+function last12WindowLabel(monthly: MonthPoint[]): string | null {
+  const completed = completedMonths(monthly);
+  const lastGlobal = completed[completed.length - 1]?.month;
+  if (!lastGlobal) return null;
+  return `${formatMonth(shiftMonth(lastGlobal, -11))} – ${formatMonth(lastGlobal)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Ingresos
 // ---------------------------------------------------------------------------
@@ -1848,7 +1860,7 @@ function IncomeSection({
           label="Media último año"
           value={<>{formatSigned(last12Avg)}/mes</>}
           variant="neutral"
-          subtitle="Últimos 12 meses"
+          subtitle={last12WindowLabel(income.monthly) ?? 'Últimos 12 meses'}
         />
         <SummaryCard
           label="Mes Actual"
@@ -2242,7 +2254,7 @@ function ExpensesSection({
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* <SummaryCard label="Gasto Total" value={formatCurrency(data.total)} variant="negative" /> */}
         <SummaryCard label="Gasto Medio Mensual" value={<>{formatSigned(-data.averageMonthly)}/mes</>} variant="info" subtitle={`Mediana: ${formatSigned(-data.medianMonthly)} · ${data.monthCount} meses`} />
-        <SummaryCard label="Media último año" value={<>{formatSigned(-last12Avg)}/mes</>} variant="neutral" subtitle="Últimos 12 meses" />
+        <SummaryCard label="Media último año" value={<>{formatSigned(-last12Avg)}/mes</>} variant="neutral" subtitle={last12WindowLabel(data.monthly) ?? 'Últimos 12 meses'} />
         <SummaryCard
           label="Mes Actual"
           value={formatSigned(-data.currentMonth)}

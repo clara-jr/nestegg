@@ -27,12 +27,6 @@ export interface DateRangeFilterProps {
   className?: string;
 }
 
-function shiftMonth(month: string, delta: number): string {
-  const [y, m] = month.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
 /** Día inicial (un mes se abre en el día 1) válido para <input type="date">. */
 function dayOf(value: string): string {
   return value.length === 10 ? value : `${value}-01`;
@@ -50,6 +44,12 @@ function lastDayOf(value: string): string {
 function todayISO(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
 const PRESET_LABELS: Array<{ value: DateRangePreset; label: string }> = [
