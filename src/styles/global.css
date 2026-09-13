@@ -133,3 +133,13 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 0 0 2px var(--color-gray-600);
   cursor: pointer;
 }
+
+/* El SVG de las gráficas de Recharts recibe foco al tocar un punto (tabIndex
+   de su capa de accesibilidad) y el navegador dibuja un borde de foco grueso
+   y oscuro alrededor en móvil; se elimina. */
+.recharts-wrapper:focus,
+.recharts-wrapper :focus,
+.recharts-surface:focus,
+.recharts-surface :focus {
+  outline: none;
+}
