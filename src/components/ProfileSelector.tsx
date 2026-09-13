@@ -46,45 +46,23 @@ export default function ProfileSelector() {
   return (
     <>
       <section className="bg-[#fdfdfe] border border-gray-200 rounded-2xl p-4 sm:p-5">
-        <div className="flex flex-wrap-reverse items-center gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {profiles.map(p => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => { if (p.id !== activeId) setActiveProfileId(p.id); }}
-                title={`Ver ${p.name}`}
-                className={`inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full text-sm font-medium cursor-pointer border ${
-                  p.id === activeId
-                    ? 'bg-zinc-100 text-gray-900 border-gray-200'
-                    : 'bg-[#fdfdfe] border-gray-200 text-gray-700 hover:bg-zinc-100'
-                }`}
-              >
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
-                {p.name}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2 ml-auto">
+        <div className="flex flex-wrap items-center gap-2">
+          {profiles.map(p => (
             <button
+              key={p.id}
               type="button"
-              onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
+              onClick={() => { if (p.id !== activeId) setActiveProfileId(p.id); }}
+              title={`Ver ${p.name}`}
+              className={`inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full text-sm font-medium cursor-pointer border ${
+                p.id === activeId
+                  ? 'bg-zinc-100 text-gray-900 border-gray-200'
+                  : 'bg-[#fdfdfe] border-gray-200 text-gray-700 hover:bg-zinc-100'
+              }`}
             >
-              + Nuevo perfil
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: p.color }} />
+              {p.name}
             </button>
-            {activeProfile && (
-              <button
-                type="button"
-                onClick={() => { setEditing({ id: activeProfile.id, name: activeProfile.name, color: activeProfile.color }); setEditName(activeProfile.name); setEditColor(activeProfile.color); }}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
-              >
-                <Icon name="edit" className="h-3.5 w-3.5" />
-                Editar
-              </button>
-            )}
-          </div>
+          ))}
         </div>
         <p className="text-xs text-gray-500 mt-2 leading-relaxed">
           {profiles.length > 1
@@ -94,6 +72,25 @@ export default function ProfileSelector() {
             : <>Crea más perfiles para separar los extractos de cada integrante y desbloquear la
                sección «Convivencia». Los simuladores y calculadoras son compartidos.</>}
         </p>
+        <div className="flex items-center gap-2 justify-end mt-3">
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
+          >
+            + Nuevo perfil
+          </button>
+          {activeProfile && (
+            <button
+              type="button"
+              onClick={() => { setEditing({ id: activeProfile.id, name: activeProfile.name, color: activeProfile.color }); setEditName(activeProfile.name); setEditColor(activeProfile.color); }}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
+            >
+              <Icon name="edit" className="h-3.5 w-3.5" />
+              Editar
+            </button>
+          )}
+        </div>
       </section>
 
       <Modal open={adding} onClose={() => setAdding(false)} title="Nuevo perfil">

@@ -5,7 +5,7 @@ export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank' | 'santander'
 export const BANKS: ReadonlyArray<{ id: BankId; label: string; hint: string }> = [
   { id: 'trade-republic', label: 'Trade Republic', hint: 'CSV exportado por Trade Republic con datetime, type, name, shares, price, amount…' },
   { id: 'myinvestor', label: 'MyInvestor', hint: 'Movimientos de cuenta (CSV obtenido de MyInvestor) o de fondos (XLS exportado por Inversis)' },
-  { id: 'caixabank', label: 'CaixaBank', hint: 'XLS/CDV exportado por CaixaBank con fechas, concepto o movimiento, importe y saldo' },
+  { id: 'caixabank', label: 'CaixaBank', hint: 'XLS/CSV exportado por CaixaBank con fechas, concepto o movimiento, importe y saldo' },
   { id: 'santander', label: 'Santander', hint: 'XLS/XLSX exportado por Santander con fecha operación, fecha valor, concepto, importe y saldo' },
   { id: 'paypal', label: 'PayPal', hint: 'CSV exportado por PayPal con fecha, hora, descripción, nombre, bruto/comisión/neto y saldo' },
   { id: 'revolut', label: 'Revolut', hint: 'CSV exportado por Revolut con tipo, producto, fechas, descripción, importe, comisión, divisa y saldo' },
