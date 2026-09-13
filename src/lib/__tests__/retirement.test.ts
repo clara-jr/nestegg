@@ -2,12 +2,60 @@ import { describe, it, expect } from 'vitest';
 import {
   estimatePension,
   getDistributionPeriodIndex,
+  getFullAgeTableEntry,
+  getFullRetirementAge,
   generateDefaultPeriods,
   getNetMonthlyContribution,
   getPeriodAgeRange,
   buildPensionSchedule,
+  meetsRecentContributionsRequirement,
   type MemberConfig,
 } from '../retirement';
+
+describe('getFullAgeTableEntry', () => {
+  it('clamps years before 2013 to the 2013 entry', () => {
+    const entry = getFullAgeTableEntry(1950);
+    expect(entry.year).toBe(2013);
+    expect(entry.thresholdMonths).toBe(35 * 12 + 3);
+  });
+
+  it('clamps years after 2027 to the final entry (38y6m / 67)', () => {
+    const entry = getFullAgeTableEntry(2050);
+    expect(entry.year).toBe(2027);
+    expect(entry.thresholdMonths).toBe(38 * 12 + 6);
+    expect(entry.otherAgeYears).toBe(67);
+  });
+
+  it('returns the exact entry for 2026', () => {
+    const entry = getFullAgeTableEntry(2026);
+    expect(entry.thresholdMonths).toBe(38 * 12 + 3);
+    expect(entry.otherAgeYears).toBe(66 + 10 / 12);
+  });
+});
+
+describe('getFullRetirementAge', () => {
+  it('retires at 65 with 38y6m+ cotizados (rule from 2027)', () => {
+    // Turning 65 in 2027 → threshold 38y6m. 39 years cotizados → 65.
+    expect(getFullRetirementAge(64, 39, 2026)).toBe(65);
+  });
+
+  it('retires at 67 with fewer than 38y6m cotizados (rule from 2027)', () => {
+    expect(getFullRetirementAge(64, 37, 2026)).toBe(67);
+  });
+
+  it('applies the gradual table for the year the member turns 65', () => {
+    // Turning 65 in 2026 → threshold 38y3m, otherwise 66y10m.
+    expect(getFullRetirementAge(65, 40, 2026)).toBe(65);
+    expect(getFullRetirementAge(65, 5, 2026)).toBe(66 + 10 / 12);
+  });
+
+  it('uses future contributions projected until 65', () => {
+    // 30-year-old with 3 years cotizados: 38 years by 65 → <38y6m → 67.
+    expect(getFullRetirementAge(30, 3, 2026)).toBe(67);
+    // 30-year-old with 5 years cotizados: 40 years by 65 → ≥38y6m → 65.
+    expect(getFullRetirementAge(30, 5, 2026)).toBe(65);
+  });
+});
 
 describe('estimatePension', () => {
   it('returns 0 if retirement age <= current age', () => {
@@ -15,20 +63,19 @@ describe('estimatePension', () => {
     expect(estimatePension(40000, 30, 10, 25)).toBe(0);
   });
 
-  it('estimates pension with exactly 15 years of contributions at full retirement age', () => {
-    // currentAge=30, yearsContributed=0, retirementAge=67 → 37 years total = 100%
-    // Just verify it returns a positive value with early retirement penalty
+  it('estimates pension with contributions accumulated until full retirement age', () => {
+    // currentAge=30, yearsContributed=0, retirementAge=67 → 37 years total
     const pension = estimatePension(40000, 30, 0, 67);
     expect(pension).toBeGreaterThan(0);
-    // 15 years at age 45 with no prior contributions
-    const pension15 = estimatePension(40000, 30, 0, 45);
+    // Exactly 15 years, all in the last 15 before 67 (52 → 67)
+    const pension15 = estimatePension(40000, 52, 0, 67);
     expect(pension15).toBeGreaterThan(0);
   });
 
   it('increases pension for more years of contribution', () => {
-    const pension15 = estimatePension(40000, 30, 15, 45);
-    const pension20 = estimatePension(40000, 30, 20, 50);
-    expect(pension20).toBeGreaterThan(pension15);
+    const short = estimatePension(40000, 40, 0, 67);
+    const long = estimatePension(40000, 40, 10, 67);
+    expect(long).toBeGreaterThan(short);
   });
 
   it('caps pension percentage at 100%', () => {
@@ -42,6 +89,54 @@ describe('estimatePension', () => {
     const pensionAt63 = estimatePension(40000, 25, 20, 63);
     // Earlier retirement should result in lower pension due to penalty
     expect(pensionAt63).toBeLessThanOrEqual(pensionAt67);
+  });
+
+  it('returns 0 without the minimum 15 years of contributions', () => {
+    // 5 cotizados + 9 working years = 14 < 15 → no pension
+    expect(estimatePension(40000, 30, 5, 39)).toBe(0);
+    // Retiring at 67 with only 2 years by then → no pension
+    expect(estimatePension(40000, 65, 0, 67)).toBe(0);
+  });
+
+  it('returns 0 when fewer than 2 years fall in the last 15 before the pension starts', () => {
+    // Retiring at 40 from age 30: no cotización in [50, 65] → no pension
+    expect(estimatePension(40000, 30, 15, 40)).toBe(0);
+    expect(estimatePension(40000, 30, 10, 40)).toBe(0);
+  });
+
+  it('grants a pension exactly at the 15-year minimum (recent cotización)', () => {
+    // 15 years total, all cotizados in the last 15 before 67
+    const pension = estimatePension(40000, 52, 0, 67);
+    expect(pension).toBeGreaterThan(0);
+  });
+
+  it('reduces penalty when retiring at full age 65 with enough contributions', () => {
+    // With 39 years by 65 (2027 rule) full age is 65 → no early penalty
+    const pension = estimatePension(40000, 26, 39, 65, 2026);
+    expect(pension).toBe(Math.round((40000 / 12) * 100) / 100);
+  });
+});
+
+describe('meetsRecentContributionsRequirement', () => {
+  it('passes when recent work overlaps the last 15 years before pension start', () => {
+    // Works 15 years before pension start (52 → 67), full age 67
+    expect(meetsRecentContributionsRequirement(52, 0, 67, 67)).toBe(true);
+    // Works until 63 but pension starts at 67 (window [52, 67]) → 11 years overlap
+    expect(meetsRecentContributionsRequirement(33, 30, 63, 67)).toBe(true);
+  });
+
+  it('fails when the person stopped working long before the pension starts', () => {
+    // Ceases at 40, pension starts at 65 → no overlap with [50, 65]
+    expect(meetsRecentContributionsRequirement(30, 15, 40, 65)).toBe(false);
+    // Ceases at 40, pension starts at 67 → no overlap with [52, 67]
+    expect(meetsRecentContributionsRequirement(30, 15, 40, 67)).toBe(false);
+  });
+
+  it('fails with fewer than 2 years of overlap', () => {
+    // Only 1 year of work within the 15-year window before pension at 67
+    expect(meetsRecentContributionsRequirement(66, 0, 67, 67)).toBe(false);
+    // Exactly 2 years → passes
+    expect(meetsRecentContributionsRequirement(65, 0, 67, 67)).toBe(true);
   });
 });
 
@@ -141,5 +236,24 @@ describe('buildPensionSchedule', () => {
     expect(schedule[1].monthlyAmount).toBeGreaterThan(0);
     expect(schedule[0].startOffset).toBeGreaterThanOrEqual(0);
     expect(schedule[1].startOffset).toBeGreaterThanOrEqual(0);
+  });
+
+  it('returns zero pension for member who does not meet the requirements', () => {
+    // 65-year-old with only 5 years cotizados → no pension (below the 15-year minimum)
+    const members: MemberConfig[] = [
+      { currentAge: 65, currentSalary: 40000, yearsContributed: 5 },
+    ];
+    const scheduleZero = buildPensionSchedule(members, 67);
+    expect(scheduleZero[0].monthlyAmount).toBe(0);
+    expect(scheduleZero[0].startOffset).toBe(0);
+
+    // Retiring at 40 (from age 30) with 15 years cotizados: nothing in the 15
+    // years before the pension starts → no pension
+    const early: MemberConfig[] = [
+      { currentAge: 30, currentSalary: 40000, yearsContributed: 15 },
+    ];
+    const scheduleEarly = buildPensionSchedule(early, 40);
+    expect(scheduleEarly[0].monthlyAmount).toBe(0);
+    expect(scheduleEarly[0].startOffset).toBe(0);
   });
 });

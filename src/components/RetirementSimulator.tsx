@@ -604,6 +604,8 @@ export default function RetirementSimulator() {
   }, [evolvedResults, minimumPath, selectedEarliest, viewMode]);
 
   const totalNet = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
+  const monthlyNetSalary = totalNet / 12;
+  const contributionExceedsSalary = params.monthlyContribution > monthlyNetSalary + 0.01;
   const distributionSliderPeriods: DistributionPeriod[] = visiblePeriods.map(p => ({
     label: sameDistributionForAll ? 'Todos los tramos' : `${p.startAge}–${p.endAge} años`,
     pct: sameDistributionForAll ? (params.distributionPeriods[0] ?? 50) : p.pct,
@@ -679,6 +681,7 @@ export default function RetirementSimulator() {
             value={params.monthlyContribution}
             onChange={(v) => handleInputChange('monthlyContribution', v)}
             hint="Importe destinado íntegramente a cuenta remunerada e inversiones."
+            error={contributionExceedsSalary ? `La aportación mensual no puede superar el salario mensual neto (${formatCurrency(monthlyNetSalary)})` : undefined}
           />
           <DistributionSlider
             periods={distributionSliderPeriods}
@@ -749,7 +752,7 @@ export default function RetirementSimulator() {
         </FormSection>
       </FormContainer>
 
-      {results.length > 0 && (
+      {!contributionExceedsSalary && results.length > 0 && (
         <ResultsContainer>
           <ScenarioSection gridCols="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             <ScenarioCard label="Ahorros Actuales" value={formatCurrency(params.initialSavingsAccount + params.initialInvestments)} />
@@ -798,7 +801,7 @@ export default function RetirementSimulator() {
                 </div>
                 {earliestWithoutPension && params.members.length > 1 && (
                   <div className="mt-2 text-xs text-gray-600">
-                    <p>Edades al jubilarse: {earliestWithoutPension.memberAges.map((age, i) => `M${i + 1}: ${age} años`).join(', ')}</p>
+                    <p>Edades al jubilarse: {earliestWithoutPension.memberAges.map((age, i) => `I${i + 1}: ${age} años`).join(', ')}</p>
                   </div>
                 )}
               </div>
@@ -823,8 +826,17 @@ export default function RetirementSimulator() {
                 </div>
                 {earliestWithPension && params.members.length > 1 && (
                   <div className="mt-2 text-xs text-gray-600 space-y-1">
-                    <p>Edades al jubilarse: {earliestWithPension.memberAges.map((age, i) => `M${i + 1}: ${age} años`).join(', ')}</p>
-                    <p>Pensiones: {earliestWithPension.memberPensions.map((p, i) => `M${i + 1}: ${formatCurrency(p)}/mes`).join(', ')}</p>
+                    <p>Edades al jubilarse: {earliestWithPension.memberAges.map((age, i) => `I${i + 1}: ${age} años`).join(', ')}</p>
+                    <p>Pensiones: {earliestWithPension.memberPensions.map((p, i) => `I${i + 1}: ${formatCurrency(p)}/mes`).join(', ')}</p>
+                  </div>
+                )}
+                {earliestWithPension && earliestWithPension.memberPensions.some(p => p === 0) && (
+                  <div className="mt-2 text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">
+                    {params.members.length > 1 ? (
+                      <>Los integrantes con pensión 0€/mes no cumplen los requisitos de cotización (<strong>mínimo 15 años</strong>, al menos <strong>2 en los 15 anteriores</strong> a la edad de pensión).</>
+                    ) : (
+                      <>No se cumplen los requisitos de cotización (<strong>mínimo 15 años</strong>, al menos <strong>2 en los 15 anteriores</strong> a la edad de pensión): la pensión estimada es 0€/mes.</>
+                    )}
                   </div>
                 )}
               </div>
@@ -940,7 +952,7 @@ export default function RetirementSimulator() {
                           const startAge = selectedEarliest.retirementAge + p.startOffset;
                           if (r.age !== startAge + 1) return null;
                           return (
-                            <Tooltip key={`p-${i}`} text={`Pensión M${i + 1}: ${formatCurrency(p.monthlyAmount)}/mes`}>
+                            <Tooltip key={`p-${i}`} text={`Pensión I${i + 1}: ${formatCurrency(p.monthlyAmount)}/mes`}>
                               <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold leading-none">P</span>
                             </Tooltip>
                           );
@@ -958,7 +970,7 @@ export default function RetirementSimulator() {
                         {r.memberAges.map((ma, i) => {
                           if (ma !== params.residencyAge + 1) return null;
                           return (
-                            <Tooltip key={`r-${i}`} text={params.members.length > 1 ? `Residencia M${i + 1}` : 'Entrada en residencia'}>
+                            <Tooltip key={`r-${i}`} text={params.members.length > 1 ? `Residencia I${i + 1}` : 'Entrada en residencia'}>
                               <span className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold leading-none">R</span>
                             </Tooltip>
                           );

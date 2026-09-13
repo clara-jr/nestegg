@@ -48,14 +48,82 @@ export interface PensionEntry {
   startOffset: number;
 }
 
+export const MIN_CONTRIBUTORY_YEARS = 15;
+
+interface FullAgeEntry {
+  year: number;
+  thresholdMonths: number;
+  otherAgeYears: number;
+}
+
+// Edad ordinaria de jubilación (LGSS, cuadro de aplicación gradual desde 2013).
+// Grupos → 65 años con la cotización indicada; en caso contrario la edad señalada.
+const FULL_AGE_TABLE: FullAgeEntry[] = [
+  { year: 2013, thresholdMonths: 35 * 12 + 3, otherAgeYears: 65 + 1 / 12 },
+  { year: 2014, thresholdMonths: 35 * 12 + 6, otherAgeYears: 65 + 2 / 12 },
+  { year: 2015, thresholdMonths: 35 * 12 + 9, otherAgeYears: 65 + 3 / 12 },
+  { year: 2016, thresholdMonths: 36 * 12, otherAgeYears: 65 + 4 / 12 },
+  { year: 2017, thresholdMonths: 36 * 12 + 3, otherAgeYears: 65 + 5 / 12 },
+  { year: 2018, thresholdMonths: 36 * 12 + 6, otherAgeYears: 65 + 6 / 12 },
+  { year: 2019, thresholdMonths: 36 * 12 + 9, otherAgeYears: 65 + 8 / 12 },
+  { year: 2020, thresholdMonths: 37 * 12, otherAgeYears: 65 + 10 / 12 },
+  { year: 2021, thresholdMonths: 37 * 12 + 3, otherAgeYears: 66 },
+  { year: 2022, thresholdMonths: 37 * 12 + 6, otherAgeYears: 66 + 2 / 12 },
+  { year: 2023, thresholdMonths: 37 * 12 + 9, otherAgeYears: 66 + 4 / 12 },
+  { year: 2024, thresholdMonths: 38 * 12, otherAgeYears: 66 + 6 / 12 },
+  { year: 2025, thresholdMonths: 38 * 12 + 3, otherAgeYears: 66 + 8 / 12 },
+  { year: 2026, thresholdMonths: 38 * 12 + 3, otherAgeYears: 66 + 10 / 12 },
+  { year: 2027, thresholdMonths: 38 * 12 + 6, otherAgeYears: 67 },
+];
+
+export function getFullAgeTableEntry(year: number): FullAgeEntry {
+  const clamped = Math.min(Math.max(year, 2013), 2027);
+  return FULL_AGE_TABLE.find(e => e.year === clamped) ?? FULL_AGE_TABLE[FULL_AGE_TABLE.length - 1];
+}
+
+export function getFullRetirementAge(
+  currentAge: number,
+  yearsContributed: number,
+  currentYear?: number,
+): number {
+  const year = currentYear ?? new Date().getFullYear();
+  const yearTurning65 = year - currentAge + 65;
+  const entry = getFullAgeTableEntry(yearTurning65);
+  const yearsAt65 = yearsContributed + Math.max(0, 65 - currentAge);
+  return yearsAt65 * 12 >= entry.thresholdMonths ? 65 : entry.otherAgeYears;
+}
+
+// Requisito: al menos 2 años cotizados dentro de los 15 inmediatamente anteriores
+// al momento de causar el derecho (= inicio efectivo de la pensión).
+// Se modela la vida laboral como un período continuo desde (currentAge - yearsContributed)
+// hasta retirementAge, y se exige solapamiento >= 2 años con esos 15 años previos.
+export function meetsRecentContributionsRequirement(
+  currentAge: number,
+  yearsContributed: number,
+  retirementAge: number,
+  fullRetirementAge: number,
+): boolean {
+  const pensionStartAge = Math.max(retirementAge, fullRetirementAge);
+  const workStartAge = currentAge - yearsContributed;
+  const windowStart = pensionStartAge - 15;
+  const overlap = Math.max(0, retirementAge - Math.max(workStartAge, windowStart));
+  return overlap >= 2;
+}
+
 export function estimatePension(
   currentSalary: number,
   currentAge: number,
   yearsContributed: number,
   retirementAge: number,
+  currentYear?: number,
 ): number {
   if (retirementAge <= currentAge) return 0;
   const yearsAtRetirement = yearsContributed + Math.max(0, retirementAge - currentAge);
+  if (yearsAtRetirement < MIN_CONTRIBUTORY_YEARS) return 0;
+
+  const fullRetirementAge = getFullRetirementAge(currentAge, yearsContributed, currentYear);
+  if (!meetsRecentContributionsRequirement(currentAge, yearsContributed, retirementAge, fullRetirementAge)) return 0;
+
   const totalMonths = Math.max(0, yearsAtRetirement * 12);
 
   let percentage: number;
@@ -71,7 +139,6 @@ export function estimatePension(
   }
   percentage = Math.min(percentage, 1);
 
-  const fullRetirementAge = yearsAtRetirement >= 38 ? 65 : 67;
   if (retirementAge < fullRetirementAge) {
     const yearsEarly = fullRetirementAge - retirementAge;
     percentage *= Math.max(0.5, 1 - yearsEarly * 0.02);
@@ -379,14 +446,15 @@ export function simulateAccumulationPhase(
 export function buildPensionSchedule(
   memberConfigs: MemberConfig[],
   referenceRetirementAge: number,
+  currentYear?: number,
 ): PensionEntry[] {
   const refCurrentAge = memberConfigs[0].currentAge;
   return memberConfigs.map(m => {
     const ageAtRetirement = m.currentAge + (referenceRetirementAge - refCurrentAge);
-    const yearsAtRetirement = m.yearsContributed + (referenceRetirementAge - refCurrentAge);
-    const fullRetirementAge = yearsAtRetirement >= 38 ? 65 : 67;
+    const pension = estimatePension(m.currentSalary, m.currentAge, m.yearsContributed, ageAtRetirement, currentYear);
+    if (pension <= 0) return { monthlyAmount: 0, startOffset: 0 };
+    const fullRetirementAge = getFullRetirementAge(m.currentAge, m.yearsContributed, currentYear);
     const startOffset = Math.max(0, fullRetirementAge - ageAtRetirement);
-    const pension = estimatePension(m.currentSalary, m.currentAge, m.yearsContributed, ageAtRetirement);
     return { monthlyAmount: pension, startOffset };
   });
 }
