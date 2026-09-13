@@ -864,7 +864,7 @@ export default function InvestmentsSimulator() {
               />
               <SummaryCard
                 label="Capacidad de Ahorro"
-                value={formatSigned(savingsAvg)}
+                value={`${formatSigned(savingsAvg)}/mes`}
                 variant={savingsAvg >= 0 ? 'positive' : 'negative'}
                 subtitle={`Ingresos medios: ${formatSigned(income.averageMonthly)} · Gastos medios: ${formatSigned(-expenses.averageMonthly)}`}
               />
@@ -908,7 +908,6 @@ export default function InvestmentsSimulator() {
               {tab === 'income' && (
                 <IncomeSection
                   income={income}
-                  expAvg={expenses.averageMonthly}
                   expCurrent={expenses.currentMonth}
                   expPrev={expenses.previousMonth}
                   expMonthly={expenses.monthly}
@@ -1701,7 +1700,6 @@ function accountTooltip() {
 
 function IncomeSection({
   income,
-  expAvg,
   expCurrent,
   expPrev,
   expMonthly,
@@ -1709,17 +1707,33 @@ function IncomeSection({
   expenseMovements,
 }: {
   income: ReturnType<typeof computeIncome>;
-  expAvg: number;
   expCurrent: number;
   expPrev: number;
   expMonthly: Array<{ month: string; total: number }>;
   movements: Movement[];
   expenseMovements: Movement[];
 }) {
-  const savingsAvg = income.averageMonthly - expAvg;
   const savingsCurrent = income.currentMonth - expCurrent;
   const savingsPrev = income.previousMonth - expPrev;
   const expByMonth = useMemo(() => new Map(expMonthly.map(p => [p.month, p.total])), [expMonthly]);
+  // Media mensual de los últimos 12 MESES CALENDARIO y dividida entre 12: la
+  // serie global solo contiene meses con movimientos, así que se ancla al
+  // último mes ya terminado y se recorre el calendario (los meses vacíos
+  // cuentan 0). El mes en curso, todavía en marcha, no cuenta.
+  const last12Avg = useMemo(() => {
+    const completed = completedMonths(income.monthly);
+    const lastGlobal = completed[completed.length - 1]?.month;
+    if (!lastGlobal) return 0;
+    const [year, month] = lastGlobal.split('-').map(Number);
+    const byMonth = new Map(income.monthly.map(p => [p.month, p.total]));
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(Date.UTC(year, month - 1 - i, 1));
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      sum += byMonth.get(key) ?? 0;
+    }
+    return sum / 12;
+  }, [income.monthly]);
   // Rellena hasta el mes en curso (no solo hasta el último mes con datos), para
   // que el mes actual aparezca en el eje aunque todavía no tenga movimientos.
   const chartData = useMemo(
@@ -1734,14 +1748,7 @@ function IncomeSection({
     [income.monthly, expByMonth]
   );
 
-  const { incomeMedian, savingsMedian } = useMemo(() => {
-    const completed = completedMonths(income.monthly);
-    const savingsByMonth = completed.map(p => p.total - (expByMonth.get(p.month) ?? 0));
-    return {
-      incomeMedian: median(completed.map(p => p.total)),
-      savingsMedian: median(savingsByMonth),
-    };
-  }, [income.monthly, expByMonth]);
+  const incomeMedian = useMemo(() => median(completedMonths(income.monthly).map(p => p.total)), [income.monthly]);
 
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
@@ -1836,12 +1843,12 @@ function IncomeSection({
     <section className="space-y-4 pb-6">
       <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Ingresos</h3>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <SummaryCard label="Ingreso Medio Mensual" value={formatSigned(income.averageMonthly)} variant="info" subtitle={`Mediana: ${formatSigned(incomeMedian)} · ${income.monthCount} meses`} />
+        <SummaryCard label="Ingreso Medio Mensual" value={<>{formatSigned(income.averageMonthly)}/mes</>} variant="info" subtitle={`Mediana: ${formatSigned(incomeMedian)} · ${income.monthCount} meses`} />
         <SummaryCard
-          label="Capacidad de Ahorro Media"
-          value={formatSigned(savingsAvg)}
-          variant={savingsAvg >= 0 ? 'positive' : 'negative'}
-          subtitle={`Mediana: ${formatSigned(savingsMedian)}`}
+          label="Media último año"
+          value={<>{formatSigned(last12Avg)}/mes</>}
+          variant="neutral"
+          subtitle="Últimos 12 meses"
         />
         <SummaryCard
           label="Mes Actual"
@@ -2231,7 +2238,7 @@ function ExpensesSection({
 
   return (
     <section className="space-y-4 pb-6">
-      <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Seguimiento de gastos</h3>
+      <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Gastos</h3>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* <SummaryCard label="Gasto Total" value={formatCurrency(data.total)} variant="negative" /> */}
         <SummaryCard label="Gasto Medio Mensual" value={<>{formatSigned(-data.averageMonthly)}/mes</>} variant="info" subtitle={`Mediana: ${formatSigned(-data.medianMonthly)} · ${data.monthCount} meses`} />

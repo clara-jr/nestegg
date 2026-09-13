@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 
 export interface SelectOption {
   value: string;
@@ -85,6 +85,40 @@ export function Select({
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Posiciona el menú con posición fija (sale del flujo y de los contenedores
+  // con overflow de las tablas) anclado al botón. Abre hacia arriba cuando no
+  // cabe debajo dentro de la parte visible de la pantalla.
+  const positionMenu = useCallback(() => {
+    const root = ref.current;
+    const menu = menuRef.current;
+    if (!root || !menu) return;
+    const btn = root.querySelector('button');
+    if (!btn) return;
+    const btnRect = btn.getBoundingClientRect();
+    const menuHeight = menu.offsetHeight;
+    const gap = 4;
+    const spaceBelow = window.innerHeight - btnRect.bottom;
+    const spaceAbove = btnRect.top;
+    const upward = menuHeight + gap > spaceBelow && spaceAbove > spaceBelow;
+    menu.style.left = `${btnRect.left}px`;
+    menu.style.width = `${btnRect.width}px`;
+    menu.style.top = upward
+      ? `${Math.max(8, btnRect.top - menuHeight - gap)}px`
+      : `${btnRect.bottom + gap}px`;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    positionMenu();
+    window.addEventListener('scroll', positionMenu, true);
+    window.addEventListener('resize', positionMenu);
+    return () => {
+      window.removeEventListener('scroll', positionMenu, true);
+      window.removeEventListener('resize', positionMenu);
+    };
+  }, [open, positionMenu]);
 
   useEffect(() => {
     if (!open) return;
@@ -115,7 +149,8 @@ export function Select({
   ].join(' ');
 
   const menuClass = [
-    'absolute left-0 top-full mt-1 z-30 w-full max-h-72 overflow-y-auto rounded-xl border p-1 shadow-lg',
+    'fixed z-50 overflow-y-auto rounded-xl border p-1 shadow-lg',
+    size === 'xs' ? 'max-h-40' : 'max-h-72',
     dark ? 'bg-zinc-800 border-gray-600' : 'bg-[#fdfdfe] border-gray-200',
   ].join(' ');
 
@@ -139,7 +174,7 @@ export function Select({
       </button>
 
       {open && (
-        <div role="listbox" className={menuClass}>
+        <div ref={menuRef} role="listbox" className={menuClass}>
           {options.map(o => renderOption(o))}
           {groups?.map(group => (
             <div key={group.label}>

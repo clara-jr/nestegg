@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal, Select, Icon } from './common';
 import {
   DATA_CHANGED_EVENT,
@@ -126,6 +126,21 @@ export default function BackupRestore() {
   const [fileProfileId, setFileProfileId] = useState<string>('');
   const pendingRestore = useRef<RestoreTarget | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const el = panelRef.current;
+      const target = e.target as Node;
+      if (!el) return;
+      if (target !== el && el.contains(target)) return;
+      setOpen(false);
+      setFeedback(null);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, [open]);
 
   const openArranger = (next: 'download' | 'restore') => {
     setScope('all');
@@ -285,10 +300,22 @@ export default function BackupRestore() {
 
   return (
     <>
-      <div className="fixed bottom-4 right-4 z-50 flex items-end gap-2">
+      <div ref={panelRef} className="fixed bottom-4 right-4 z-50 flex items-end gap-2">
         {open && (
           <div className="bg-[#fdfdfe] border border-gray-200 rounded-xl shadow-lg p-4 w-72 text-sm">
-            <p className="font-semibold text-gray-900 mb-1.5">Copia de seguridad</p>
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+              <p className="font-semibold text-gray-900">Copia de seguridad</p>
+              <button
+                type="button"
+                onClick={() => { setOpen(false); setFeedback(null); }}
+                aria-label="Cerrar"
+                className="shrink-0 -m-1 p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                </svg>
+              </button>
+            </div>
             <p className="text-xs text-gray-500 leading-relaxed mb-2">
               Descarga o restaura los datos guardados en este navegador. Puedes elegir entre un solo
               perfil (solo su parte del Agregador de Finanzas) o todos los datos.

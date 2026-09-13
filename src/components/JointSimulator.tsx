@@ -332,6 +332,18 @@ export default function JointSimulator() {
               subtitle={`Mediana: ${formatSigned(summary.medianMonthlySavings)} · ${summary.savingsMonthCount} meses`}
             />
             <SummaryCard
+              label="Media Último Año"
+              value={
+                <IncomeExpenseValue
+                  income={summary.lastYearAvgIncome}
+                  expenses={summary.lastYearAvgExpenses}
+                  savings={summary.lastYearAvgSavings}
+                  perMonth
+                />
+              }
+              variant="neutral"
+            />
+            <SummaryCard
               label="Mes Actual"
               value={
                 <IncomeExpenseValue
@@ -349,18 +361,6 @@ export default function JointSimulator() {
                   income={summary.previousMonthIncome}
                   expenses={summary.previousMonthExpenses}
                   savings={summary.previousMonthIncome - summary.previousMonthExpenses}
-                />
-              }
-              variant="neutral"
-            />
-            <SummaryCard
-              label="Media Último Año"
-              value={
-                <IncomeExpenseValue
-                  income={summary.lastYearAvgIncome}
-                  expenses={summary.lastYearAvgExpenses}
-                  savings={summary.lastYearAvgSavings}
-                  perMonth
                 />
               }
               variant="neutral"
