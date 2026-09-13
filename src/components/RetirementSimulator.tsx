@@ -754,7 +754,7 @@ export default function RetirementSimulator() {
 
       {!contributionExceedsSalary && results.length > 0 && (
         <ResultsContainer>
-          <ScenarioSection gridCols="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <ScenarioSection gridCols="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-3">
             <ScenarioCard label="Ahorros Actuales" value={formatCurrency(params.initialSavingsAccount + params.initialInvestments)} />
             <ScenarioCard label="Rentabilidades" value={`${params.savingsAccountRate}% cuenta · ${params.investmentRate}% inversiones`} />
             <ScenarioCard label="Esperanza de Vida" value={`${params.lifeExpectancy} años`} />

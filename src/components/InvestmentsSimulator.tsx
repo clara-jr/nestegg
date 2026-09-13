@@ -850,7 +850,7 @@ export default function InvestmentsSimulator() {
           </div>
         ) : (
           <>
-            <ScenarioSection title="Resumen de Finanzas" gridCols="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <ScenarioSection title="Resumen de Finanzas" gridCols="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-3">
               <SummaryCard
                 label="Capital Total"
                 value={formatCurrency(totalCapital)}
@@ -1206,7 +1206,7 @@ function PortfolioSection({
         </div>*/}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
+      <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
         <SummaryCard label="Invertido" value={formatCurrency(summary.investedCost)} variant="info" />
         <SummaryCard label="Valor Actual" value={formatCurrency(summary.currentValue)} variant="info" subtitle={valuePct !== null ? formatSignedPct(valuePct) : undefined} />
         <SummaryCard label="Latente" value={formatSigned(summary.unrealized)} variant={summary.unrealized >= 0 ? 'positive' : 'negative'} subtitle="Pendiente de vender" />
@@ -1554,7 +1554,7 @@ function AccountSection({
   return (
     <section className="space-y-4 pb-6">
       <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Evolución de la cuenta</h3>
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-3">
         <SummaryCard
           label="Efectivo en Cuenta"
           value={formatCurrency(cashBalance)}
@@ -1854,7 +1854,7 @@ function IncomeSection({
   return (
     <section className="space-y-4 pb-6">
       <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Ingresos</h3>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-4 gap-3">
         <SummaryCard label="Ingreso Medio Mensual" value={<>{formatSigned(income.averageMonthly)}/mes</>} variant="info" subtitle={`Mediana: ${formatSigned(incomeMedian)} · ${income.monthCount} meses`} />
         <SummaryCard
           label="Media último año"
@@ -2251,7 +2251,7 @@ function ExpensesSection({
   return (
     <section className="space-y-4 pb-6">
       <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Gastos</h3>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* <SummaryCard label="Gasto Total" value={formatCurrency(data.total)} variant="negative" /> */}
         <SummaryCard label="Gasto Medio Mensual" value={<>{formatSigned(-data.averageMonthly)}/mes</>} variant="info" subtitle={`Mediana: ${formatSigned(-data.medianMonthly)} · ${data.monthCount} meses`} />
         <SummaryCard label="Media último año" value={<>{formatSigned(-last12Avg)}/mes</>} variant="neutral" subtitle={last12WindowLabel(data.monthly) ?? 'Últimos 12 meses'} />

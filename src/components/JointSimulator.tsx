@@ -58,15 +58,15 @@ function IncomeExpenseValue({ income, expenses, savings, perMonth = false }: { i
   const suffix = perMonth ? '/mes' : '';
   return (
     <div className="w-full space-y-0.5">
-      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+      <div className="flex items-baseline justify-between gap-2">
         <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">Ingresos</span>
         <span className="text-sm text-emerald-600 font-bold whitespace-nowrap">{formatSigned(income)}{suffix}</span>
       </div>
-      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+      <div className="flex items-baseline justify-between gap-2">
         <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">Gastos</span>
         <span className="text-sm text-red-600 font-bold whitespace-nowrap">{formatSigned(-expenses)}{suffix}</span>
       </div>
-      <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between sm:gap-2">
+      <div className="flex items-baseline justify-between gap-2">
         <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">Ahorro</span>
         <span className={`text-sm font-bold whitespace-nowrap ${savings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatSigned(savings)}{suffix}</span>
       </div>
@@ -312,7 +312,7 @@ export default function JointSimulator() {
 
       {hasData ? (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+          <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
             <SummaryCard
               label="Ingreso Medio Mensual"
               value={formatSigned(summary.averageMonthlyIncome)}
