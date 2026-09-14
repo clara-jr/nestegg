@@ -869,7 +869,25 @@ export interface ExpensesSummary {
   byCategory: CategoryTotal[];
 }
 
-const EXCLUDED_CATEGORY = 'Excluido';
+export const EXCLUDED_CATEGORY = 'Excluido';
+
+/**
+ * Determina si un movimiento es un gasto conjunto.
+ * Si el tipo de cargo ha sido sobreescrito manualmente (isJointAuto === false),
+ * se respeta el valor explícito (isJoint).
+ * Si no está sobreescrito (isJointAuto !== false), se hereda de la categoría:
+ * es conjunto si la categoría está incluida en las categorías conjuntas.
+ */
+export function isMovementJoint(
+  movement: Movement,
+  jointCategories: readonly string[],
+): boolean {
+  if (movement.isJointAuto === false && movement.isJoint !== undefined) {
+    return movement.isJoint;
+  }
+  const category = movement.category ?? 'Otros';
+  return jointCategories.includes(category);
+}
 
 function categoryMonthsSince(firstDate: string): number {
   const first = new Date(`${firstDate}T00:00:00`);

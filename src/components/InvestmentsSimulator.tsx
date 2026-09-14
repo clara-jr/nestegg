@@ -50,6 +50,7 @@ import {
   formatMonth,
   guessExpenseCategory,
   interestNetAmount,
+  isMovementJoint,
   monthsBetween,
   rangeFromDay,
   rangeMonth,
@@ -65,7 +66,14 @@ import {
   type PlazoFijoConfig,
 } from '../lib/investments';
 import { fetchPrices, type PriceRequest } from '../lib/prices';
-import { dispatchDataChanged, useProfileLocalStorage, useProfiles } from '../lib/profiles';
+import {
+  DATA_CHANGED_EVENT,
+  PROFILE_CHANGED_EVENT,
+  dispatchDataChanged,
+  getJointConfig,
+  useProfileLocalStorage,
+  useProfiles,
+} from '../lib/profiles';
 import { useFontsReady } from '../lib/fonts';
 import ProfileSelector from './ProfileSelector';
 import JointSimulator from './JointSimulator';
@@ -193,6 +201,25 @@ export default function InvestmentsSimulator() {
   const [showFileHistory, setShowFileHistory] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[] | null>(null);
   const [editingFile, setEditingFile] = useState<{ id: string; name: string } | null>(null);
+  const [jointConfig, setJointConfig] = useState(() => getJointConfig());
+  const [pendingChargeTypeMovement, setPendingChargeTypeMovement] = useState<{
+    movementId: string;
+    targetValue: 'joint' | 'individual' | 'auto';
+    ids: string[];
+    concept: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const refresh = () => setJointConfig(getJointConfig());
+    window.addEventListener(DATA_CHANGED_EVENT, refresh);
+    window.addEventListener(PROFILE_CHANGED_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    return () => {
+      window.removeEventListener(DATA_CHANGED_EVENT, refresh);
+      window.removeEventListener(PROFILE_CHANGED_EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+    };
+  }, []);
 
   const priceOf = (key: string, ticker?: string, isin?: string): number | undefined => {
     if (!key) return undefined;
@@ -512,6 +539,72 @@ export default function InvestmentsSimulator() {
   const bulkUpdateType = (movementIds: string[], type: MovementType) => {
     if (movementIds.length === 0) return;
     applyType(movementIds, type);
+  };
+
+  const applyChargeType = (movementIds: string[], isJoint: boolean) => {
+    setStore(prev => ({
+      ...prev,
+      movements: prev.movements.map(m =>
+        movementIds.includes(m.id)
+          ? { ...m, isJoint, isJointAuto: false }
+          : m
+      ),
+    }));
+  };
+
+  const applyResetChargeType = (movementIds: string[]) => {
+    setStore(prev => ({
+      ...prev,
+      movements: prev.movements.map(m =>
+        movementIds.includes(m.id)
+          ? { ...m, isJoint: undefined, isJointAuto: true }
+          : m
+      ),
+    }));
+  };
+
+  const applyChargeTypeValue = (movementIds: string[], targetValue: 'joint' | 'individual' | 'auto') => {
+    if (targetValue === 'auto') {
+      applyResetChargeType(movementIds);
+    } else {
+      applyChargeType(movementIds, targetValue === 'joint');
+    }
+  };
+
+  const updateChargeType = (movementId: string, targetValue: 'joint' | 'individual' | 'auto') => {
+    const target = store.movements.find(m => m.id === movementId);
+    if (!target) return;
+    const key = cleanConcept(target.concept);
+    const sameConceptIds = store.movements
+      .filter(m => key && cleanConcept(m.concept) === key && (m.type === 'expense' || m.type === 'refund'))
+      .map(m => m.id);
+    if (sameConceptIds.length > 1) {
+      setPendingChargeTypeMovement({
+        movementId,
+        targetValue,
+        ids: sameConceptIds,
+        concept: cleanConcept(target.concept),
+      });
+    } else {
+      applyChargeTypeValue([movementId], targetValue);
+    }
+  };
+
+  const confirmChargeTypeAll = () => {
+    if (!pendingChargeTypeMovement) return;
+    applyChargeTypeValue(pendingChargeTypeMovement.ids, pendingChargeTypeMovement.targetValue);
+    setPendingChargeTypeMovement(null);
+  };
+
+  const confirmChargeTypeOne = () => {
+    if (!pendingChargeTypeMovement) return;
+    applyChargeTypeValue([pendingChargeTypeMovement.movementId], pendingChargeTypeMovement.targetValue);
+    setPendingChargeTypeMovement(null);
+  };
+
+  const bulkUpdateChargeType = (movementIds: string[], targetValue: 'joint' | 'individual' | 'auto') => {
+    if (movementIds.length === 0) return;
+    applyChargeTypeValue(movementIds, targetValue);
   };
 
   const applyDeleteMovements = (movementIds: string[]) => {
@@ -933,8 +1026,11 @@ export default function InvestmentsSimulator() {
                   income={income}
                   movements={visibleMovements.filter(m => m.type === 'expense' || m.type === 'refund')}
                   incomeMovements={visibleMovements.filter(m => m.type === 'income')}
+                  jointCategories={jointConfig.jointCategories}
                   onChangeCategory={updateCategory}
                   onBulkChangeCategory={bulkUpdateCategory}
+                  onChangeChargeType={updateChargeType}
+                  onBulkChangeChargeType={bulkUpdateChargeType}
                 />
               )}
 
@@ -1085,6 +1181,45 @@ export default function InvestmentsSimulator() {
             className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
           >
             Eliminar
+          </button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={pendingChargeTypeMovement !== null}
+        onClose={() => setPendingChargeTypeMovement(null)}
+        title="Cambiar propiedad del gasto"
+      >
+        <p className="text-sm text-gray-700 leading-relaxed">
+          Se han encontrado{' '}
+          <span className="font-semibold text-gray-900">{pendingChargeTypeMovement?.ids.length ?? 0}</span>{' '}
+          movimientos con el concepto «{pendingChargeTypeMovement?.concept}».
+        </p>
+        <p className="text-sm text-gray-700 leading-relaxed mt-2">
+          ¿Quieres cambiar la propiedad de todos a{' '}
+          <span className="font-semibold text-gray-900">
+            {pendingChargeTypeMovement?.targetValue === 'joint'
+              ? 'Conjunto'
+              : pendingChargeTypeMovement?.targetValue === 'individual'
+                ? 'Individual'
+                : 'Según categoría'}
+          </span>{' '}
+          o solo este movimiento?
+        </p>
+        <div className="flex flex-wrap justify-end gap-2 pt-5">
+          <button
+            type="button"
+            onClick={confirmChargeTypeOne}
+            className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
+          >
+            Solo este
+          </button>
+          <button
+            type="button"
+            onClick={confirmChargeTypeAll}
+            className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
+          >
+            Cambiar todos ({pendingChargeTypeMovement?.ids.length})
           </button>
         </div>
       </Modal>
@@ -2091,15 +2226,21 @@ function ExpensesSection({
   income,
   movements,
   incomeMovements,
+  jointCategories,
   onChangeCategory,
   onBulkChangeCategory,
+  onChangeChargeType,
+  onBulkChangeChargeType,
 }: {
   data: ReturnType<typeof computeExpenses>;
   income: ReturnType<typeof computeIncome>;
   movements: Movement[];
   incomeMovements: Movement[];
+  jointCategories: readonly string[];
   onChangeCategory: (id: string, category: string) => void;
   onBulkChangeCategory: (ids: string[], category: string) => void;
+  onChangeChargeType: (id: string, targetValue: 'joint' | 'individual' | 'auto') => void;
+  onBulkChangeChargeType: (ids: string[], targetValue: 'joint' | 'individual' | 'auto') => void;
 }) {
   const [expPage, setExpPage] = useState(1);
   const [expCategory, setExpCategory] = useState<string>('all');
@@ -2623,6 +2764,26 @@ function ExpensesSection({
                 }))}
               />
             </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">Propiedad:</span>
+              <Select
+                value=""
+                placeholder="Elegir propiedad…"
+                ariaLabel="Cambiar propiedad del gasto"
+                className="w-48"
+                onChange={v => {
+                  if (v === 'joint' || v === 'individual' || v === 'auto') {
+                    onBulkChangeChargeType([...selected], v);
+                  }
+                  clearSelection();
+                }}
+                options={[
+                  { value: 'joint', label: 'Conjunto', icon: <Icon name="users" className="w-3.5 h-3.5" /> },
+                  { value: 'individual', label: 'Individual', icon: <Icon name="user" className="w-3.5 h-3.5" /> },
+                  { value: 'auto', label: 'Según categoría' },
+                ]}
+              />
+            </div>
             <button
               type="button"
               onClick={clearSelection}
@@ -2668,8 +2829,6 @@ function ExpensesSection({
               align: 'left',
             },
             { title: 'Concepto', align: 'left' },
-            { title: 'Banco', align: 'left', className: 'min-w-[160px]' },
-            { title: 'Categoría', align: 'left' },
             {
               title: (
                 <SortableHeader
@@ -2680,53 +2839,94 @@ function ExpensesSection({
                 />
               ),
             },
+            { title: 'Banco', align: 'left', className: 'min-w-[160px]' },
+            { title: 'Categoría', align: 'left' },
+            { title: 'Propiedad', align: 'left', minWidth: 175 },
           ]}
-          rows={expShown.map(m => [
-            {
-              content: (
-                <input
-                  type="checkbox"
-                  aria-label={`Seleccionar ${m.concept}`}
-                  checked={selected.has(m.id)}
-                  onChange={() => toggleOne(m.id)}
-                  className="w-4 h-4 accent-gray-900 cursor-pointer"
-                />
-              ),
-            },
-            new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES'),
-            {
-              content: (
-                <span className="flex items-center gap-2">
-                  <ExpenseCategoryIcon category={m.category ?? 'Otros'} />
-                  <span className="block max-w-[420px] whitespace-normal break-words">{m.concept}</span>
-                </span>
-              ),
-            },
-            { content: <span className="inline-flex items-center gap-2 whitespace-nowrap text-gray-500"><BankLogo bank={m.bank} size={18} />{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
-            {
-              content: (
-                <Select
-                  value={m.category ?? 'Otros'}
-                  size="xs"
-                  ariaLabel={`Categoría de ${m.concept}`}
-                  className="w-[170px]"
-                  onChange={v => onChangeCategory(m.id, v)}
-                  options={EXPENSE_CATEGORY_LIST.map(c => ({
-                    value: c,
-                    label: c,
-                    icon: <ExpenseCategoryIcon category={c} size={11} />,
-                  }))}
-                />
-              ),
-            },
-            {
-              content: m.type === 'refund' ? (
-                <span className="text-emerald-600 font-semibold">{formatSigned(m.amount)}</span>
-              ) : (
-                <span className="text-red-600 font-semibold">{formatSigned(m.amount)}</span>
-              ),
-            },
-          ])}
+          rows={expShown.map(m => {
+            const category = m.category ?? 'Otros';
+            const categoryIsJoint = jointCategories.includes(category);
+            const isOverridden = m.isJointAuto === false && m.isJoint !== undefined;
+            const isJoint = isOverridden ? Boolean(m.isJoint) : categoryIsJoint;
+            const selectValue: 'joint' | 'individual' | 'auto' = isOverridden
+              ? m.isJoint ? 'joint' : 'individual'
+              : 'auto';
+            return [
+              {
+                content: (
+                  <input
+                    type="checkbox"
+                    aria-label={`Seleccionar ${m.concept}`}
+                    checked={selected.has(m.id)}
+                    onChange={() => toggleOne(m.id)}
+                    className="w-4 h-4 accent-gray-900 cursor-pointer"
+                  />
+                ),
+              },
+              new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES'),
+              {
+                content: (
+                  <span className="flex items-center gap-2">
+                    <ExpenseCategoryIcon category={category} />
+                    <span className="block max-w-[420px] whitespace-normal break-words">{m.concept}</span>
+                  </span>
+                ),
+              },
+              {
+                content: m.type === 'refund' ? (
+                  <span className="text-emerald-600 font-semibold">{formatSigned(m.amount)}</span>
+                ) : (
+                  <span className="text-red-600 font-semibold">{formatSigned(m.amount)}</span>
+                ),
+              },
+              { content: <span className="inline-flex items-center gap-2 whitespace-nowrap text-gray-500"><BankLogo bank={m.bank} size={18} />{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
+              {
+                content: (
+                  <Select
+                    value={category}
+                    size="xs"
+                    ariaLabel={`Categoría de ${m.concept}`}
+                    className="w-[170px]"
+                    onChange={v => onChangeCategory(m.id, v)}
+                    options={EXPENSE_CATEGORY_LIST.map(c => ({
+                      value: c,
+                      label: c,
+                      icon: <ExpenseCategoryIcon category={c} size={11} />,
+                    }))}
+                  />
+                ),
+              },
+              {
+                content: (
+                  <div className="flex items-center gap-2">
+                    <Tooltip
+                      text={
+                        isJoint
+                          ? `Gasto conjunto (${isOverridden ? 'sobreescrito' : `heredado de «${category}»`})`
+                          : `Gasto individual (${isOverridden ? 'sobreescrito' : `heredado de «${category}»`})`
+                      }
+                    >
+                      <span className={`w-5 h-5 flex items-center justify-center shrink-0 ${isJoint ? 'text-gray-900' : 'text-gray-500'}`}>
+                        <Icon name={isJoint ? 'users' : 'user'} className="w-4 h-4" />
+                      </span>
+                    </Tooltip>
+                    <Select
+                      value={selectValue}
+                      size="xs"
+                      ariaLabel={`Propiedad de ${m.concept}`}
+                      className="w-[135px]"
+                      onChange={v => onChangeChargeType(m.id, v as 'joint' | 'individual' | 'auto')}
+                      options={[
+                        { value: 'joint', label: 'Conjunto' },
+                        { value: 'individual', label: 'Individual' },
+                        { value: 'auto', label: 'Según categoría' },
+                      ]}
+                    />
+                  </div>
+                ),
+              },
+            ];
+          })}
         />
         <Pagination page={expPage} totalPages={expTotalPages} onPageChange={setExpPage} />
         </>

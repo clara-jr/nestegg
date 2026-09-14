@@ -1,6 +1,7 @@
 import type { Movement } from './bankImports';
 import {
   DAYS_PER_MONTH,
+  EXCLUDED_CATEGORY,
   computeDailySeries,
   computeExpenses,
   computeIncome,
@@ -8,6 +9,7 @@ import {
   currentMonthKey,
   dayCount,
   daysOfMonth,
+  isMovementJoint,
   median,
   monthSpan,
   monthsBetween,
@@ -213,16 +215,17 @@ export function computeJointSummary(
   jointCategories: readonly string[],
 ): JointSummary {
   const jointSet = new Set(jointCategories);
+  const signedAbs = (m: Movement) => (m.type === 'refund' ? -1 : 1) * Math.abs(m.amount);
 
   const inputs: MemberInput[] = profiles.map(p => {
     const income = computeIncome(p.movements.filter(m => m.type === 'income'));
     const expenses = computeExpenses(p.movements.filter(m => m.type === 'expense' || m.type === 'refund'));
     const jointMonthly = new Map<string, number>();
-    for (const cat of jointSet) {
-      const series = expenses.monthlyByCategory[cat];
-      if (!series) continue;
-      for (const point of series) {
-        jointMonthly.set(point.month, (jointMonthly.get(point.month) ?? 0) + point.total);
+    for (const m of p.movements) {
+      if ((m.type !== 'expense' && m.type !== 'refund') || (m.category ?? 'Otros') === EXCLUDED_CATEGORY) continue;
+      if (isMovementJoint(m, jointCategories)) {
+        const month = m.date.slice(0, 7);
+        jointMonthly.set(month, (jointMonthly.get(month) ?? 0) + signedAbs(m));
       }
     }
     const firstMonth = p.movements.length > 0
@@ -405,7 +408,7 @@ export function computeJointSummary(
 
   // Serie mensual agregada para el hogar de TODAS las categorías de gasto (no
   // solo las conjuntas), dentro de la ventana de convivencia. Se usa para la
-  // gráfica filtrada por categoría; el desglose conjunto filtra a las marcadas.
+  // gráfica filtrada por categoría; el desglose conjunto filtra a los gastos conjuntos.
   const categoryByMonth = new Map<string, Map<string, number>>();
   for (const m of inputs) {
     for (const [cat, series] of Object.entries(m.expenses.monthlyByCategory)) {
@@ -422,55 +425,74 @@ export function computeJointSummary(
     }
   }
 
-  const jointCategoryByMonth = [...categoryByMonth.entries()].filter(([cat]) => jointSet.has(cat));
+  // Serie mensual y aportación por integrante para cada categoría que tenga
+  // gastos conjuntos (heredados de jointCategories o sobreescritos como conjuntos),
+  // dentro de la ventana de convivencia.
+  const jointCategoryByMonth = new Map<string, Map<string, number>>();
+  const memberByJointCategory = new Map<string, Array<Omit<CategoryMemberTotal, 'averageMonthly'>>>();
 
-  // Aportación por integrante a cada categoría, dentro de la ventana de
-  // convivencia: suma neta (incluye devoluciones) de sus gastos mensuales.
-  const memberByCategory = new Map<string, Array<Omit<CategoryMemberTotal, 'averageMonthly'>>>();
-  for (const m of inputs) {
-    for (const [cat, series] of Object.entries(m.expenses.monthlyByCategory)) {
-      const total = series.reduce((s, p) => (p.month >= windowStart ? s + p.total : s), 0);
+  for (const p of profiles) {
+    const memberCatTotals = new Map<string, number>();
+    for (const m of p.movements) {
+      if ((m.type !== 'expense' && m.type !== 'refund') || (m.category ?? 'Otros') === EXCLUDED_CATEGORY) continue;
+      if (!isMovementJoint(m, jointCategories)) continue;
+
+      const cat = m.category ?? 'Otros';
+      const month = m.date.slice(0, 7);
+      if (month >= windowStart) {
+        let byMonth = jointCategoryByMonth.get(cat);
+        if (!byMonth) {
+          byMonth = new Map<string, number>();
+          jointCategoryByMonth.set(cat, byMonth);
+        }
+        byMonth.set(month, (byMonth.get(month) ?? 0) + signedAbs(m));
+        memberCatTotals.set(cat, (memberCatTotals.get(cat) ?? 0) + signedAbs(m));
+      }
+    }
+    for (const [cat, total] of memberCatTotals) {
       if (total === 0) continue;
-      const arr = memberByCategory.get(cat) ?? [];
-      arr.push({ profileId: m.profileId, name: m.name, color: m.color, total });
-      memberByCategory.set(cat, arr);
+      const arr = memberByJointCategory.get(cat) ?? [];
+      arr.push({ profileId: p.profileId, name: p.name, color: p.color, total });
+      memberByJointCategory.set(cat, arr);
     }
   }
 
   const windowLastCompleted = expenseCompleted.length > 0 ? expenseCompleted[expenseCompleted.length - 1].month : null;
 
-  const grossByCat = [...jointCategoryByMonth].reduce(
-    (acc, [, byMonth]) => acc + Math.max([...byMonth.values()].reduce((s, v) => s + v, 0), 0),
+  const grossByCat = [...jointCategoryByMonth.values()].reduce(
+    (acc, byMonth) => acc + Math.max([...byMonth.values()].reduce((s, v) => s + v, 0), 0),
     0,
   );
 
-  const categoryBreakdown: CategoryTotal[] = jointCategoryByMonth.map(([category, byMonth]) => {
-    const points = [...byMonth.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-    const total = points.reduce((s, [, v]) => s + v, 0);
-    const firstDate = points.length > 0 ? `${points[0][0]}-01` : '';
-    const lastMonth = byMonth.get(current) ?? 0;
-    let averageMonthly = 0;
-    let months = 0;
-    if (windowLastCompleted && firstDate) {
-      const [fy, fm] = firstDate.split('-').map(Number);
-      const [ly, lm] = windowLastCompleted.split('-').map(Number);
-      months = Math.max(1, (ly - fy) * 12 + (lm - fm) + 1);
-      averageMonthly = total / months;
-    }
-    const byMember = (memberByCategory.get(category) ?? []).map(mb => ({
-      ...mb,
-      averageMonthly: months > 0 ? mb.total / months : 0,
-    }));
-    return {
-      category,
-      total,
-      pct: grossByCat > 0 ? (Math.max(total, 0) / grossByCat) * 100 : 0,
-      averageMonthly,
-      firstDate,
-      lastMonth,
-      byMember,
-    };
-  });
+  const categoryBreakdown: CategoryTotal[] = [...jointCategoryByMonth.entries()]
+    .map(([category, byMonth]) => {
+      const points = [...byMonth.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+      const total = points.reduce((s, [, v]) => s + v, 0);
+      const firstDate = points.length > 0 ? `${points[0][0]}-01` : '';
+      const lastMonth = byMonth.get(current) ?? 0;
+      let averageMonthly = 0;
+      let months = 0;
+      if (windowLastCompleted && firstDate) {
+        const [fy, fm] = firstDate.split('-').map(Number);
+        const [ly, lm] = windowLastCompleted.split('-').map(Number);
+        months = Math.max(1, (ly - fy) * 12 + (lm - fm) + 1);
+        averageMonthly = total / months;
+      }
+      const byMember = (memberByJointCategory.get(category) ?? []).map(mb => ({
+        ...mb,
+        averageMonthly: months > 0 ? mb.total / months : 0,
+      }));
+      return {
+        category,
+        total,
+        pct: grossByCat > 0 ? (Math.max(total, 0) / grossByCat) * 100 : 0,
+        averageMonthly,
+        firstDate,
+        lastMonth,
+        byMember,
+      };
+    })
+    .sort((a, b) => b.total - a.total);
 
   // Media mensual de los últimos 12 meses calendario, igual que el desglose
   // individual: la ventana se ancla al último mes terminado de la convivencia.

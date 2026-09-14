@@ -576,7 +576,7 @@ export default function JointSimulator() {
       </div>
       )}
 
-      {hasData && config.jointCategories.length > 0 && (
+      {hasData && (config.jointCategories.length > 0 || summary.categoryBreakdown.length > 0) && (
       <div>
         <CategoryBreakdown categories={summary.categoryBreakdown} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-0">

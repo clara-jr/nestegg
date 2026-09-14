@@ -12,6 +12,7 @@ import {
   cleanConcept,
   buildConceptCategoryMap,
   resolveExpenseCategory,
+  isMovementJoint,
 } from '../investments';
 import type { Movement } from '../bankImports';
 import { computeJointSummary } from '../joint';
@@ -695,5 +696,134 @@ describe('computeJointSummary', () => {
     expect(joint.totalSavings).toBeCloseTo(3200);
     expect(joint.averageMonthlyExpenses).toBeCloseTo(300);
     expect(joint.monthly.some(p => p.month === '2024-02')).toBe(true);
+  });
+
+  it('respeta la sobreescritura de gasto conjunto/individual en movimientos', () => {
+    const a: JointMemberProfile = {
+      profileId: 'a',
+      name: 'A',
+      color: '#0f766e',
+      movements: [
+        mk({ type: 'income', date: '2024-02-05', concept: 'NÓMINA', amount: 2000 }),
+        // Categoría Vivienda (conjunta), pero sobreescrito a individual:
+        mk({
+          type: 'expense',
+          date: '2024-02-10',
+          concept: 'MUEBLE PERSONAL',
+          amount: -200,
+          category: 'Vivienda',
+          isJoint: false,
+          isJointAuto: false,
+        }),
+        // Categoría Restaurantes (no conjunta), pero sobreescrito a conjunto:
+        mk({
+          type: 'expense',
+          date: '2024-02-15',
+          concept: 'CENA JUNTOS',
+          amount: -80,
+          category: 'Restaurantes',
+          isJoint: true,
+          isJointAuto: false,
+        }),
+      ],
+    };
+    const b: JointMemberProfile = {
+      profileId: 'b',
+      name: 'B',
+      color: '#6d28d9',
+      movements: [
+        mk({ type: 'income', date: '2024-02-10', concept: 'SALARIO', amount: 1500 }),
+        // Categoría Vivienda (conjunta), heredado por defecto:
+        mk({
+          type: 'expense',
+          date: '2024-02-12',
+          concept: 'ALQUILER',
+          amount: -800,
+          category: 'Vivienda',
+        }),
+      ],
+    };
+    const joint = computeJointSummary([a, b], ['Vivienda']);
+
+    // Miembro A debe aportar solo 80 a gastos conjuntos (cena), no los 200 de mueble personal.
+    const memberA = joint.members.find(m => m.profileId === 'a');
+    expect(memberA?.totalJoint).toBe(80);
+
+    // Miembro B debe aportar 800 (alquiler, heredado de Vivienda).
+    const memberB = joint.members.find(m => m.profileId === 'b');
+    expect(memberB?.totalJoint).toBe(800);
+
+    expect(joint.jointTotal).toBe(880);
+
+    // Debe incluir en categoryBreakdown tanto Vivienda (800) como Restaurantes (80)
+    const breakdownCats = joint.categoryBreakdown.map(c => c.category);
+    expect(breakdownCats).toContain('Vivienda');
+    expect(breakdownCats).toContain('Restaurantes');
+
+    const viviendaBreakdown = joint.categoryBreakdown.find(c => c.category === 'Vivienda');
+    expect(viviendaBreakdown?.total).toBe(800);
+
+    const restaurantesBreakdown = joint.categoryBreakdown.find(c => c.category === 'Restaurantes');
+    expect(restaurantesBreakdown?.total).toBe(80);
+
+    // last12ByCategory incluye Restaurantes
+    expect(joint.last12ByCategory['Restaurantes']).toBeCloseTo(80 / 12);
+    expect(joint.last12ByCategory['Vivienda']).toBeCloseTo(800 / 12);
+  });
+});
+
+describe('isMovementJoint', () => {
+  it('hereda el tipo de cargo de la categoría si isJointAuto no es false', () => {
+    const m1 = mk({ type: 'expense', amount: -50, category: 'Vivienda' });
+    const m2 = mk({ type: 'expense', amount: -50, category: 'Restaurantes' });
+    const m3 = mk({ type: 'expense', amount: -50, category: 'Vivienda', isJointAuto: true });
+
+    const jointCats = ['Vivienda', 'Suministros e Internet'];
+
+    expect(isMovementJoint(m1, jointCats)).toBe(true);
+    expect(isMovementJoint(m2, jointCats)).toBe(false);
+    expect(isMovementJoint(m3, jointCats)).toBe(true);
+  });
+
+  it('respeta la sobreescritura manual si isJointAuto es false', () => {
+    const mOverriddenIndividual = mk({
+      type: 'expense',
+      amount: -50,
+      category: 'Vivienda',
+      isJoint: false,
+      isJointAuto: false,
+    });
+    const mOverriddenJoint = mk({
+      type: 'expense',
+      amount: -50,
+      category: 'Restaurantes',
+      isJoint: true,
+      isJointAuto: false,
+    });
+
+    const jointCats = ['Vivienda'];
+
+    expect(isMovementJoint(mOverriddenIndividual, jointCats)).toBe(false);
+    expect(isMovementJoint(mOverriddenJoint, jointCats)).toBe(true);
+  });
+
+  it('cambia el tipo heredado al cambiar las categorías conjuntas, pero no el sobreescrito', () => {
+    const inherited = mk({ type: 'expense', amount: -50, category: 'Vivienda', isJointAuto: true });
+    const overridden = mk({ type: 'expense', amount: -50, category: 'Vivienda', isJoint: false, isJointAuto: false });
+
+    // Inicialmente Vivienda es conjunta
+    expect(isMovementJoint(inherited, ['Vivienda'])).toBe(true);
+    expect(isMovementJoint(overridden, ['Vivienda'])).toBe(false);
+
+    // Si Vivienda deja de ser conjunta:
+    // El heredado cambia automáticamente a false.
+    expect(isMovementJoint(inherited, [])).toBe(false);
+    // El sobreescrito no cambia (se mantiene en false).
+    expect(isMovementJoint(overridden, [])).toBe(false);
+
+    // Con sobreescrito a true en categoría que no es conjunta:
+    const overriddenTrue = mk({ type: 'expense', amount: -50, category: 'Ocio', isJoint: true, isJointAuto: false });
+    expect(isMovementJoint(overriddenTrue, [])).toBe(true);
+    expect(isMovementJoint(overriddenTrue, ['Ocio'])).toBe(true);
   });
 });

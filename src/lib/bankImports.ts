@@ -76,6 +76,17 @@ export interface Movement {
    * movimiento de efectivo ya está registrado en el fichero de cuenta.
    */
   fundOperation?: boolean;
+  /**
+   * Indica si el gasto es conjunto (true) o individual (false).
+   * Cuando `isJointAuto !== false`, este valor se hereda de la categoría.
+   * Cuando `isJointAuto === false`, este valor fue sobreescrito por el usuario.
+   */
+  isJoint?: boolean;
+  /**
+   * Indica si el tipo de cargo (conjunto/individual) está heredado de la
+   * categoría (`true`/`undefined`) o fue sobreescrito manualmente (`false`).
+   */
+  isJointAuto?: boolean;
 }
 
 export interface FileMeta {
