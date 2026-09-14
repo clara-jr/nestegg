@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { formatAxisCurrency, formatCurrency, formatSigned } from '../lib/calculations';
-import { EXPENSE_CATEGORY_LIST, averageInRange, currentMonthKey, formatDay, monthsBetween, rangeFromDay, rangeMonth, rangeToDay } from '../lib/investments';
+import { EXPENSE_CATEGORY_LIST, DAY_FILTER, averageInRange, currentMonthKey, formatDay, monthsBetween, rangeFromDay, rangeMonth, rangeToDay } from '../lib/investments';
 import type { Movement } from '../lib/bankImports';
 import { reclassifyPaypalDuplicates } from '../lib/bankImports';
 import {
@@ -12,13 +12,17 @@ import {
   getProfiles,
   saveJointConfig,
 } from '../lib/profiles';
-import { computeJointDailySeries, computeJointSummary, type JointSummary } from '../lib/joint';
+import { averageMonthlyJointInRange, computeJointDailySeries, computeJointSummary, sumJointDailyRange, type JointSummary } from '../lib/joint';
 import {
   CategoryBreakdown,
   ChartRangeSummary,
   ChartTooltip,
-  DateRangeFilter,
+  CustomRangeInputs,
+  PRESET_LABELS,
+  dayOf,
+  useDateRangeFilter,
   type DateRange,
+  type DateRangePreset,
   ExpenseCategoryIcon,
   IncomeExpenseTooltip,
   LastMonthBreakdown,
@@ -202,6 +206,12 @@ export default function JointSimulator() {
   // categoría seleccionada, si hay una), se recorta a los días del intervalo
   // y se rellenan los días sin actividad con 0.
   const isDaily = dateRange ? dateRange.from.slice(0, 7) === dateRange.to.slice(0, 7) : false;
+  // La media del intervalo se calcula por días cuando el rango no supera un mes
+  // o cuando el intervalo personalizado usa fechas con día (para que mover el
+  // inicio dentro de un mes cambie el resultado; la media de un intervalo
+  // personalizado con más de un mes se expresa «por mes», contando solo los
+  // días exactos del intervalo.
+  const perDay = isDaily;
   const dailyData = useMemo(() => {
     if (!isDaily || !dateRange) return [] as typeof chartData;
     const month = rangeMonth(dateRange.from);
@@ -232,18 +242,41 @@ export default function JointSimulator() {
     return { from: completed[0], to: completed[completed.length - 1] };
   }, [summary.monthly]);
 
+  const chartTime = useDateRangeFilter(
+    monthAxis[0] ?? '',
+    monthAxis[monthAxis.length - 1] ?? '',
+    setDateRange,
+    todoBounds.from,
+    todoBounds.to,
+  );
+
   const intervalSummary = useMemo(() => {
-    // En modo diario se usan las filas diarias. En modo mensual se usa la serie
-    // completa dentro del intervalo (no la ventana que la gráfica muestra), para
-    // que las medias coincidan con las de las gráficas individuales en las
-    // mismas condiciones. Sin filtro de tiempo no se cuenta el mes en curso
-    // (aún incompleto); con un intervalo seleccionado sí se incluye lo elegido.
-    if (isDaily && dateRange) {
-      const n = chartDataFinal.length;
-      if (n === 0) return null;
-      const income = chartDataFinal.reduce((s, p) => s + p.income, 0) / n;
-      const expenses = chartDataFinal.reduce((s, p) => s + p.expenses, 0) / n;
-      return { income, expenses, savings: income - expenses };
+    // En modo diario se usa la serie diaria del intervalo exacto, con 0 en los
+    // días sin actividad. Con un intervalo personalizado por días de más de un
+    // mes se cuentan solo los días exactos del intervalo pero la media se
+    // expresa «por mes». Con meses (sin día o sin filtro) se usa la serie
+    // mensual completa dentro del intervalo (no la ventana que la gráfica
+    // muestra), para que las medias coincidan con las de las gráficas
+    // individuales en las mismas condiciones. Sin filtro de tiempo no se cuenta
+    // el mes en curso (aún incompleto); con un intervalo seleccionado sí se
+    // incluye lo elegido.
+    if (dateRange && isDaily) {
+      const { days, income, expenses } = sumJointDailyRange(
+        memberProfiles,
+        rangeFromDay(dateRange.from),
+        rangeToDay(dateRange.to),
+        isCategoryView ? selectedCategory : null,
+      );
+      if (days <= 0) return null;
+      return { income: income / days, expenses: expenses / days, savings: (income - expenses) / days };
+    }
+    if (dateRange && (DAY_FILTER.test(dateRange.from) || DAY_FILTER.test(dateRange.to))) {
+      return averageMonthlyJointInRange(
+        memberProfiles,
+        rangeFromDay(dateRange.from),
+        rangeToDay(dateRange.to),
+        isCategoryView ? selectedCategory : null,
+      );
     }
     const incomeSeries = summary.monthly.map(p => ({ month: p.month, total: p.income }));
     const expenseSeries =
@@ -256,7 +289,7 @@ export default function JointSimulator() {
     const income = averageInRange(incomeSeries, from, to);
     const expenses = averageInRange(expenseSeries, from, to);
     return { income, expenses, savings: income - expenses };
-  }, [isDaily, dateRange, chartDataFinal, summary.monthly, summary.monthlyByCategory, isCategoryView, selectedCategory, todoBounds]);
+  }, [isDaily, dateRange, memberProfiles, isCategoryView, selectedCategory, summary.monthly, summary.monthlyByCategory, todoBounds]);
 
   const renderJointTooltip = (payload: { payload?: Record<string, unknown> }[]) => {
     const p = payload[0]?.payload ?? {};
@@ -367,19 +400,13 @@ export default function JointSimulator() {
             />
           </div>
 
-          <div>
+          <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
               <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
                 Ingresos, gastos y ahorro conjunto por mes
               </h4>
-              <div className="ml-auto flex flex-wrap items-center gap-3">
-                <DateRangeFilter
-                  min={monthAxis[0] ?? ''}
-                  max={monthAxis[monthAxis.length - 1] ?? ''}
-                  defaultFrom={todoBounds.from}
-                  defaultTo={todoBounds.to}
-                  onChange={setDateRange}
-                />
+              <div className="flex-1" />
+              <div className="flex flex-wrap items-center gap-3">
                 <Select
                   value={chartView}
                   onChange={setJointView}
@@ -406,7 +433,22 @@ export default function JointSimulator() {
                       : undefined
                   }
                 />
+                <Select
+                  value={chartTime.preset}
+                  onChange={v => chartTime.selectPreset(v as DateRangePreset)}
+                  ariaLabel="Filtro de tiempo"
+                  className="w-44"
+                  options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+                />
               </div>
+              {chartTime.preset === 'custom' && (
+                <CustomRangeInputs
+                  from={chartTime.customFrom}
+                  to={chartTime.customTo}
+                  min={dayOf(todoBounds.from ?? monthAxis[0] ?? '')}
+                  onChange={chartTime.applyCustom}
+                />
+              )}
             </div>
             <div className="relative">
             <ResponsiveContainer width="100%" height={260}>
@@ -445,7 +487,7 @@ export default function JointSimulator() {
                 income={intervalSummary.income}
                 expenses={intervalSummary.expenses}
                 savings={intervalSummary.savings}
-                perDay={isDaily}
+                perDay={perDay}
                 categoryOnly={isCategoryView}
                 categoryLabel={isCategoryView ? selectedCategory ?? undefined : undefined}
               />
@@ -592,18 +634,17 @@ export default function JointSimulator() {
               <div>
                 <ScrollableTable
                   columns={[
-                    { title: 'Mes', align: 'left' },
-                    ...summary.members.map(m => ({ title: m.name, align: 'right' as const })),
-                    { title: 'Total hogar', align: 'right' },
+                    { title: 'Mes', align: 'left', minWidth: 114 },
+                    ...summary.members.map(m => ({ title: m.name, align: 'right' as const, minWidth: 104 })),
+                    { title: 'Total hogar', align: 'right', minWidth: 104 },
                   ]}
-                  rows={[
-                    ...summary.monthly.map(month => [
+                  rows={[...summary.monthly].reverse().map(month => [
                       { content: fmtMonth(month.month), className: 'text-gray-500' },
                       ...summary.members.map((member, mi) => {
                         const row = memberJointFor(mi, month.month);
                         return {
                           content: (
-                            <div className="flex items-center justify-end gap-1.5">
+                            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                               <span className="text-gray-900">{formatSigned(-(row?.jointExpenses ?? 0))}</span>
                               <span className={`text-xs font-semibold ${(row?.pct ?? 0) >= 50 ? 'text-gray-900' : 'text-gray-400'}`}>
                                 {pct(row?.pct ?? null, 0)}
@@ -617,29 +658,11 @@ export default function JointSimulator() {
                           <span className="font-semibold text-gray-900">{formatSigned(-totalJointFor(month.month))}</span>
                         ),
                       },
-                    ]),
-                    [
-                      { content: <span className="text-gray-500">Media</span>, className: 'text-gray-500' },
-                      ...summary.members.map(member => ({
-                        content: (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className="text-gray-900">{formatSigned(-member.averageMonthlyJoint)}</span>
-                            <span className="text-xs font-semibold text-gray-500">{pct(member.totalPct, 0)}</span>
-                          </div>
-                        ),
-                      })),
-                      {
-                        content: (
-                          <span className="font-semibold text-gray-900">{formatSigned(-summary.jointAverageMonthly)}</span>
-                        ),
-                      },
-                    ],
-                  ]}
+                    ])}
                 />
                 <p className="text-xs text-gray-400 mt-2 leading-relaxed">
                   Cada celda muestra el gasto conjunto aportado por el integrante y su porcentaje
-                  sobre el total del hogar ese mes. La fila «Media» resume el promedio mensual de
-                  cada integrante (solo meses terminados).
+                  sobre el total del hogar ese mes.
                 </p>
               </div>
             </>

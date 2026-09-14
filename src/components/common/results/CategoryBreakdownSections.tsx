@@ -28,14 +28,20 @@ export function signedExpenseFormat(value: number, suffix = ''): ReactNode {
   );
 }
 
-export function CategoryBreakdown({ categories }: { categories: CategoryTotal[] }) {
+export function CategoryBreakdown({ categories, period }: { categories: CategoryTotal[]; period?: string }) {
   const sorted = categories
     .filter(c => c.total !== 0)
     .sort((a, b) => b.total - a.total);
-  if (sorted.length === 0) return null;
   return (
     <div>
-      <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-8">Por categoría</h4>
+      <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-8">
+        Por categoría{period ? ` · ${period}` : ''}
+      </h4>
+      {sorted.length === 0 ? (
+        <p className="text-sm text-gray-400 py-4 text-center border border-gray-100 rounded-xl bg-[#fdfdfe]">
+          {period ? 'No hay gastos en el periodo seleccionado.' : 'No hay gastos registrados.'}
+        </p>
+      ) : (
       <ul className="space-y-3">
         {sorted.map(c => {
           const isCredit = c.total < 0;
@@ -103,6 +109,7 @@ export function CategoryBreakdown({ categories }: { categories: CategoryTotal[] 
           );
         })}
       </ul>
+      )}
     </div>
   );
 }

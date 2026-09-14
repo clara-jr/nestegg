@@ -43,16 +43,20 @@ import {
   computeInterest,
   computePortfolio,
   currentMonthKey,
+  DAY_FILTER,
+  averageMonthlyInRange,
   fillMonthly,
   formatDay,
   formatMonth,
   guessExpenseCategory,
   interestNetAmount,
+  monthsBetween,
   rangeFromDay,
   rangeMonth,
   rangeToDay,
   resolveExpenseCategory,
   shiftMonth,
+  sumDailyRange,
   type AccountEvolutionPoint,
   type BankBreakdownEntry,
   type CategoryTotal,
@@ -70,8 +74,12 @@ import {
   CategoryBreakdown,
   ChartRangeSummary,
   ChartTooltip,
-  DateRangeFilter,
+  CustomRangeInputs,
+  PRESET_LABELS,
+  dayOf,
+  useDateRangeFilter,
   type DateRange,
+  type DateRangePreset,
   ExpenseCategoryIcon,
   FormContainer,
   FormSection,
@@ -933,7 +941,6 @@ export default function InvestmentsSimulator() {
               {tab === 'movements' && (
                 <MovementsSection
                   movements={filteredMovements}
-                  total={filteredMovements.length}
                   types={presentTypes}
                   filter={movementFilter}
                   bankFilter={bankFilter}
@@ -1775,6 +1782,12 @@ function IncomeSection({
   // se acumulan los movimientos de ese mes por día, se recorta a los días del
   // intervalo y se rellenan los días sin actividad con 0.
   const isDaily = dateRange ? dateRange.from.slice(0, 7) === dateRange.to.slice(0, 7) : false;
+  // La media del intervalo se calcula por días cuando el rango no supera un mes
+  // o cuando el intervalo personalizado usa fechas con día (para que mover el
+  // inicio dentro de un mes cambie el resultado; la media de un intervalo
+  // personalizado con más de un mes se expresa «por mes», contando solo los
+  // días exactos del intervalo.
+  const perDay = isDaily;
   const dailyData = useMemo(() => {
     if (!dateRange) return [] as typeof chartData;
     return computeDailySeries(rangeMonth(dateRange.from), movements, expenseMovements, null)
@@ -1795,18 +1808,42 @@ function IncomeSection({
     const completed = [...income.monthly].map(p => p.month).filter(m => m < currentMonthKey()).sort();
     return { from: completed[0], to: completed[completed.length - 1] };
   }, [income.monthly]);
+
+  const incomeTime = useDateRangeFilter(
+    chartData[0]?.month ?? '',
+    chartData[chartData.length - 1]?.month ?? '',
+    setDateRange,
+    todoBounds.from,
+    todoBounds.to,
+  );
   const intervalSummary = useMemo(() => {
-    // En modo diario se usan las filas diarias. En modo mensual se usa la serie
-    // completa dentro del intervalo (no la ventana de 24 meses de la gráfica),
-    // para que las medias coincidan con las de la gráfica de Gastos en las
-    // mismas condiciones. Sin filtro de tiempo no se cuenta el mes en curso
-    // (aún incompleto); con un intervalo seleccionado sí se incluye lo elegido.
-    if (isDaily) {
-      const n = chartRows.length;
-      if (n === 0) return null;
-      const income = chartRows.reduce((s, p) => s + p.total, 0) / n;
-      const expenses = chartRows.reduce((s, p) => s + p.expenses, 0) / n;
-      return { income, expenses, savings: income - expenses };
+    // En modo diario se usa la serie diaria del intervalo exacto, con 0 en los
+    // días sin actividad. Con un intervalo personalizado por días de más de un
+    // mes se cuentan solo los días exactos del intervalo pero la media se
+    // expresa «por mes». Con meses (sin día o sin filtro) se usa la serie
+    // mensual completa dentro del intervalo, para que las medias coincidan con
+    // las de la gráfica de Gastos en las mismas condiciones. Sin filtro de
+    // tiempo no se cuenta el mes en curso (aún incompleto); con un intervalo
+    // seleccionado sí se incluye lo elegido.
+    if (dateRange && isDaily) {
+      const { days, income, expenses } = sumDailyRange(
+        rangeFromDay(dateRange.from),
+        rangeToDay(dateRange.to),
+        movements,
+        expenseMovements,
+        null,
+      );
+      if (days <= 0) return null;
+      return { income: income / days, expenses: expenses / days, savings: (income - expenses) / days };
+    }
+    if (dateRange && (DAY_FILTER.test(dateRange.from) || DAY_FILTER.test(dateRange.to))) {
+      return averageMonthlyInRange(
+        rangeFromDay(dateRange.from),
+        rangeToDay(dateRange.to),
+        movements,
+        expenseMovements,
+        null,
+      );
     }
     const from = dateRange ? rangeMonth(dateRange.from) : todoBounds.from;
     const to = dateRange ? rangeMonth(dateRange.to) : todoBounds.to;
@@ -1814,7 +1851,7 @@ function IncomeSection({
     const avgIncome = averageInRange(income.monthly, from, to);
     const avgExpenses = averageInRange(expMonthly, from, to);
     return { income: avgIncome, expenses: avgExpenses, savings: avgIncome - avgExpenses };
-  }, [isDaily, dateRange, chartRows, income.monthly, expMonthly, todoBounds]);
+  }, [isDaily, dateRange, movements, expenseMovements, income.monthly, expMonthly, todoBounds]);
   const selectedOverview = useMemo(() => {
     if (!selectedMonth) return undefined;
     return chartRows.find(p => p.month === selectedMonth);
@@ -1837,19 +1874,21 @@ function IncomeSection({
     [movements]
   );
   const [page, setPage] = useState(1);
-  const detailMovements = useMemo(
-    () =>
-      selectedMonth
-        ? sorted.filter(m => m.date.startsWith(selectedMonth))
-        : sorted,
-    [sorted, selectedMonth]
-  );
+  const detailMovements = useMemo(() => {
+    if (selectedMonth) return sorted.filter(m => m.date.startsWith(selectedMonth));
+    if (dateRange) {
+      const from = rangeFromDay(dateRange.from);
+      const to = rangeToDay(dateRange.to);
+      return sorted.filter(m => m.date >= from && m.date <= to);
+    }
+    return sorted;
+  }, [sorted, selectedMonth, dateRange]);
   const totalPages = Math.max(1, Math.ceil(detailMovements.length / INCOME_PAGE_SIZE));
   const shown = detailMovements.slice((page - 1) * INCOME_PAGE_SIZE, page * INCOME_PAGE_SIZE);
   // Al cambiar los movimientos (p. ej. editar tipo/categoría) solo se recorta
   // la página actual si queda fuera de rango, en lugar de saltar a la página 1.
   useEffect(() => setPage(p => Math.min(p, Math.max(1, Math.ceil(detailMovements.length / INCOME_PAGE_SIZE)))), [detailMovements.length]);
-  useEffect(() => setPage(1), [selectedMonth]);
+  useEffect(() => setPage(1), [selectedMonth, dateRange]);
 
   return (
     <section className="space-y-4 pb-6">
@@ -1890,18 +1929,30 @@ function IncomeSection({
         />
       </div>
 
-      <div>
-        <div className="flex items-center gap-3 mb-3 mt-8">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Ingresos por mes</h4>
           {chartData.length > 0 && (
-            <DateRangeFilter
-              min={chartData[0].month}
-              max={chartData[chartData.length - 1].month}
-              defaultFrom={todoBounds.from}
-              defaultTo={todoBounds.to}
-              onChange={setDateRange}
-              className="ml-auto"
-            />
+            <>
+              <div className="flex-1" />
+              <div className="flex flex-wrap items-center gap-3">
+                <Select
+                  value={incomeTime.preset}
+                  onChange={v => incomeTime.selectPreset(v as DateRangePreset)}
+                  ariaLabel="Filtro de tiempo"
+                  className="w-44"
+                  options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+                />
+              </div>
+              {incomeTime.preset === 'custom' && (
+                <CustomRangeInputs
+                  from={incomeTime.customFrom}
+                  to={incomeTime.customTo}
+                  min={dayOf(todoBounds.from ?? chartData[0].month)}
+                  onChange={incomeTime.applyCustom}
+                />
+              )}
+            </>
           )}
         </div>
         <div className="relative">
@@ -1911,7 +1962,7 @@ function IncomeSection({
             income={intervalSummary.income}
             expenses={intervalSummary.expenses}
             savings={intervalSummary.savings}
-            perDay={isDaily}
+            perDay={perDay}
           />
         )}
         <ResponsiveContainer width="100%" height={240}>
@@ -1950,11 +2001,18 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Detalle de ingresos{selectedMonth
+            Detalle de ingresos
+            {selectedMonth
               ? ` · ${selectedMonth.length === 10 ? formatDay(selectedMonth) : fmtMonthLabel(selectedMonth)}`
-              : ''}
+              : dateRange
+                ? ` · ${
+                    rangeMonth(dateRange.from) === rangeMonth(dateRange.to)
+                      ? fmtMonthLabel(rangeMonth(dateRange.from))
+                      : `${fmtMonthLabel(rangeMonth(dateRange.from))} – ${fmtMonthLabel(rangeMonth(dateRange.to))}`
+                  }`
+                : ''}
           </h4>
-          {selectedMonth && (
+          {selectedMonth ? (
             <button
               type="button"
               onClick={() => setSelectedMonth(null)}
@@ -1965,7 +2023,18 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
               </svg>
               Ver histórico
             </button>
-          )}
+          ) : dateRange ? (
+            <button
+              type="button"
+              onClick={() => incomeTime.selectPreset('all')}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
+            >
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" className="w-3.5 h-3.5">
+                <path d="M10.5 3.5 6 8l4.5 4.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Ver histórico
+            </button>
+          ) : null}
         </div>
         {selectedMonth && selectedOverview && (
           <div className="grid grid-cols-3 gap-3 mb-4">
@@ -1985,20 +2054,28 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
             />
           </div>
         )}
-        <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl">
-          {shown.map(m => (
-            <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-              <div className="min-w-0">
-                <p className="font-medium text-gray-700 truncate">{m.concept}</p>
-                <p className="inline-flex items-center gap-1.5 text-xs text-gray-400">
-                  {new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES')} · <BankLogo bank={m.bank} size={11} />
-                  {BANK_LABELS[m.bank]}
-                </p>
-              </div>
-              <span className="text-emerald-700 font-semibold whitespace-nowrap">{formatSigned(m.amount)}</span>
-            </li>
-          ))}
-        </ul>
+        {shown.length === 0 ? (
+          <p className="text-sm text-gray-400 py-4 text-center border border-gray-100 rounded-xl bg-[#fdfdfe]">
+            {selectedMonth || dateRange
+              ? 'No hay ingresos en el periodo seleccionado.'
+              : 'No hay ingresos registrados.'}
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl">
+            {shown.map(m => (
+              <li key={m.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-gray-700 truncate">{m.concept}</p>
+                  <p className="inline-flex items-center gap-1.5 text-xs text-gray-400">
+                    {new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES')} · <BankLogo bank={m.bank} size={11} />
+                    {BANK_LABELS[m.bank]}
+                  </p>
+                </div>
+                <span className="text-emerald-700 font-semibold whitespace-nowrap">{formatSigned(m.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
       </div>
     </section>
@@ -2028,6 +2105,7 @@ function ExpensesSection({
   const [expCategory, setExpCategory] = useState<string>('all');
   const [expBank, setExpBank] = useState<'all' | BankId>('all');
   const [expSearch, setExpSearch] = useState('');
+  const [expDateRange, setExpDateRange] = useState<DateRange | null>(null);
   const [expSortKey, setExpSortKey] = useState<'date' | 'amount'>('date');
   const [expSortDir, setExpSortDir] = useState<'asc' | 'desc'>('desc');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -2093,6 +2171,39 @@ function ExpensesSection({
     return byMonth;
   }, [data.monthlyByCategory]);
 
+  const filteredByCategory = useMemo(() => {
+    if (!dateRange) return data.byCategory;
+    const from = rangeFromDay(dateRange.from);
+    const to = rangeToDay(dateRange.to);
+    const signedAbs = (m: Movement) => (m.type === 'refund' ? -1 : 1) * Math.abs(m.amount);
+    const catTotals = new Map<string, { total: number; firstDate: string }>();
+    for (const m of movements) {
+      if (m.date < from || m.date > to) continue;
+      const cat = m.category ?? 'Otros';
+      if (cat === 'Excluido') continue;
+      const entry = catTotals.get(cat) ?? { total: 0, firstDate: m.date };
+      entry.total += signedAbs(m);
+      if (m.date < entry.firstDate) entry.firstDate = m.date;
+      catTotals.set(cat, entry);
+    }
+    const gross = [...catTotals.values()].reduce((s, e) => s + Math.max(e.total, 0), 0);
+    const monthCount = Math.max(1, monthsBetween(rangeMonth(from), rangeMonth(to)).length);
+    const origByCat = new Map(data.byCategory.map(c => [c.category, c]));
+    return [...catTotals.entries()]
+      .map(([cat, { total, firstDate }]) => {
+        const orig = origByCat.get(cat);
+        return {
+          category: cat,
+          total,
+          pct: gross > 0 ? (Math.max(total, 0) / gross) * 100 : 0,
+          averageMonthly: total / monthCount,
+          firstDate,
+          lastMonth: orig?.lastMonth ?? 0,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+  }, [dateRange, movements, data.byCategory]);
+
   const incomeByMonth = useMemo(() => new Map(income.monthly.map(p => [p.month, p.total])), [income.monthly]);
   const expenseChartData = useMemo(
     () => monthlyExpenseChartData(data, chartCategory, incomeByMonth),
@@ -2111,6 +2222,12 @@ function ExpensesSection({
   // seleccionada, si hay una), se recorta a los días del intervalo y se
   // rellenan los días sin actividad con 0.
   const isDaily = dateRange ? dateRange.from.slice(0, 7) === dateRange.to.slice(0, 7) : false;
+  // La media del intervalo se calcula por días cuando el rango no supera un mes
+  // o cuando el intervalo personalizado usa fechas con día (para que mover el
+  // inicio dentro de un mes cambie el resultado; la media de un intervalo
+  // personalizado con más de un mes se expresa «por mes», contando solo los
+  // días exactos del intervalo.
+  const perDay = isDaily;
   const dailyData = useMemo(() => {
     if (!dateRange) return [] as typeof visibleExpenseData;
     const cat = chartCategory === 'all' ? null : chartCategory;
@@ -2132,18 +2249,45 @@ function ExpensesSection({
     const completed = [...data.monthly].map(p => p.month).filter(m => m < currentMonthKey()).sort();
     return { from: completed[0], to: completed[completed.length - 1] };
   }, [data.monthly]);
+
+  const chartTime = useDateRangeFilter(
+    expenseChartData[0]?.month ?? '',
+    expenseChartData[expenseChartData.length - 1]?.month ?? '',
+    setDateRange,
+    todoBounds.from,
+    todoBounds.to,
+  );
   const intervalSummary = useMemo(() => {
-    // En modo diario se usan las filas diarias. En modo mensual se usa la serie
-    // completa dentro del intervalo (no la ventana de 24 meses de la gráfica),
-    // para que las medias coincidan con las de la gráfica de Ingresos en las
-    // mismas condiciones. Sin filtro de tiempo no se cuenta el mes en curso
-    // (aún incompleto); con un intervalo seleccionado sí se incluye lo elegido.
-    if (isDaily) {
-      const n = chartRows.length;
-      if (n === 0) return null;
-      const income = chartRows.reduce((s, p) => s + p.income, 0) / n;
-      const expenses = chartRows.reduce((s, p) => s + p.total, 0) / n;
-      return { income, expenses, savings: income - expenses };
+    // En modo diario se usa la serie diaria del intervalo exacto (y de la
+    // categoría seleccionada, si la hay), con 0 en los días sin actividad. Con
+    // un intervalo personalizado por días de más de un mes se cuentan solo los
+    // días exactos del intervalo pero la media se expresa «por mes». Con meses
+    // (sin día o sin filtro) se usa la serie mensual completa dentro del
+    // intervalo (no la ventana que la gráfica muestra), para que las medias
+    // coincidan con las de la gráfica de Ingresos en las mismas condiciones.
+    // Sin filtro de tiempo no se cuenta el mes en curso (aún incompleto); con
+    // un intervalo seleccionado sí se incluye lo elegido.
+    if (dateRange && isDaily) {
+      const cat = chartCategory === 'all' ? null : chartCategory;
+      const { days, income, expenses } = sumDailyRange(
+        rangeFromDay(dateRange.from),
+        rangeToDay(dateRange.to),
+        incomeMovements,
+        movements,
+        cat,
+      );
+      if (days <= 0) return null;
+      return { income: income / days, expenses: expenses / days, savings: (income - expenses) / days };
+    }
+    if (dateRange && (DAY_FILTER.test(dateRange.from) || DAY_FILTER.test(dateRange.to))) {
+      const cat = chartCategory === 'all' ? null : chartCategory;
+      return averageMonthlyInRange(
+        rangeFromDay(dateRange.from),
+        rangeToDay(dateRange.to),
+        incomeMovements,
+        movements,
+        cat,
+      );
     }
     const expenseSeries = chartCategory === 'all' ? data.monthly : data.monthlyByCategory[chartCategory] ?? [];
     const from = dateRange ? rangeMonth(dateRange.from) : todoBounds.from;
@@ -2152,7 +2296,7 @@ function ExpensesSection({
     const avgIncome = averageInRange(income.monthly, from, to);
     const avgExpenses = averageInRange(expenseSeries, from, to);
     return { income: avgIncome, expenses: avgExpenses, savings: avgIncome - avgExpenses };
-  }, [isDaily, dateRange, chartRows, income.monthly, data.monthly, data.monthlyByCategory, chartCategory, todoBounds]);
+  }, [isDaily, dateRange, incomeMovements, movements, chartCategory, income.monthly, data.monthly, data.monthlyByCategory, todoBounds]);
 
   useEffect(() => {
     if (selectedMonth && !chartRows.some(p => p.month === selectedMonth)) {
@@ -2168,11 +2312,23 @@ function ExpensesSection({
 
   const filteredMovements = useMemo(() => {
     const q = expSearch.trim().toLowerCase();
+    const from = expDateRange ? rangeFromDay(expDateRange.from) : null;
+    const to = expDateRange ? rangeToDay(expDateRange.to) : null;
     return movements
       .filter(m => expCategory === 'all' || (m.category ?? 'Otros') === expCategory)
       .filter(m => expBank === 'all' || m.bank === expBank)
+      .filter(m => !from || m.date >= from)
+      .filter(m => !to || m.date <= to)
       .filter(m => q.length === 0 || m.concept.toLowerCase().includes(q));
-  }, [movements, expCategory, expBank, expSearch]);
+  }, [movements, expCategory, expBank, expSearch, expDateRange]);
+
+  // Límites disponibles para el filtro de tiempo: del primer al último gasto.
+  const expDateBounds = useMemo(() => {
+    const dates = movements.map(m => m.date).sort();
+    return { from: dates[0] ?? '', to: dates[dates.length - 1] ?? '' };
+  }, [movements]);
+
+  const expTime = useDateRangeFilter(expDateBounds.from, expDateBounds.to, range => setExpDateRange(range));
 
   const sortedMovements = useMemo(() => {
     const dir = expSortDir === 'asc' ? 1 : -1;
@@ -2189,7 +2345,7 @@ function ExpensesSection({
   const expTotalPages = Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE));
   const expShown = sortedMovements.slice((expPage - 1) * PAGE_SIZE, expPage * PAGE_SIZE);
 
-  useEffect(() => setExpPage(1), [expCategory, expBank, expSearch, expSortKey, expSortDir]);
+  useEffect(() => setExpPage(1), [expCategory, expBank, expSearch, expDateRange, expSortKey, expSortDir]);
   useEffect(() => setSelected(new Set()), [movements]);
 
   const toggleSort = (key: 'date' | 'amount') => {
@@ -2283,19 +2439,13 @@ function ExpensesSection({
         />
       </div>
 
-      <div>
+      <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Gastos por mes
           </h4>
-          <div className="ml-auto flex flex-wrap items-center gap-3">
-            <DateRangeFilter
-              min={expenseChartData[0]?.month ?? ''}
-              max={expenseChartData[expenseChartData.length - 1]?.month ?? ''}
-              defaultFrom={todoBounds.from}
-              defaultTo={todoBounds.to}
-              onChange={setDateRange}
-            />
+          <div className="flex-1" />
+          <div className="flex flex-wrap items-center gap-3">
             <Select
               value={chartCategory}
               onChange={setChartCategory}
@@ -2313,7 +2463,22 @@ function ExpensesSection({
                   })),
               ]}
             />
+            <Select
+              value={chartTime.preset}
+              onChange={v => chartTime.selectPreset(v as DateRangePreset)}
+              ariaLabel="Filtro de tiempo"
+              className="w-44"
+              options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+            />
           </div>
+          {chartTime.preset === 'custom' && (
+            <CustomRangeInputs
+              from={chartTime.customFrom}
+              to={chartTime.customTo}
+              min={dayOf(todoBounds.from ?? expenseChartData[0]?.month ?? '')}
+              onChange={chartTime.applyCustom}
+            />
+          )}
         </div>
         <div className="relative">
         {/* La caja de medias solo se muestra con un intervalo explicitamente elegido */}
@@ -2322,7 +2487,7 @@ function ExpensesSection({
             income={intervalSummary.income}
             expenses={intervalSummary.expenses}
             savings={intervalSummary.savings}
-            perDay={isDaily}
+            perDay={perDay}
             categoryOnly={chartCategory !== 'all'}
             categoryLabel={chartCategory !== 'all' ? chartCategory : undefined}
           />
@@ -2367,20 +2532,28 @@ function ExpensesSection({
           onClose={() => setSelectedMonth(null)}
         />
       ) : (
-        <div>
-          <CategoryBreakdown categories={data.byCategory} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-0">
-            <LastYearBreakdown avgByCategory={last12ByCategory} />
-            <LastMonthBreakdown categories={data.byCategory} />
-          </div>
-        </div>
+        <CategoryBreakdown
+          categories={filteredByCategory}
+          period={
+            dateRange
+              ? rangeMonth(dateRange.from) === rangeMonth(dateRange.to)
+                ? fmtMonthLabel(rangeMonth(dateRange.from))
+                : `${fmtMonthLabel(rangeMonth(dateRange.from))} – ${fmtMonthLabel(rangeMonth(dateRange.to))}`
+              : undefined
+          }
+        />
       )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-0">
+        <LastYearBreakdown avgByCategory={last12ByCategory} />
+        <LastMonthBreakdown categories={data.byCategory} />
+      </div>
 
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3 mt-8">
+        <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
             Detalle de gastos
           </h4>
+          <div className="flex-1" />
           <div className="flex flex-wrap items-center gap-3">
             <input
               type="search"
@@ -2413,7 +2586,22 @@ function ExpensesSection({
                 ...ORDERED_BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
               ]}
             />
+            <Select
+              value={expTime.preset}
+              onChange={v => expTime.selectPreset(v as DateRangePreset)}
+              ariaLabel="Filtro de tiempo"
+              className="w-44"
+              options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+            />
           </div>
+          {expTime.preset === 'custom' && (
+            <CustomRangeInputs
+              from={expTime.customFrom}
+              to={expTime.customTo}
+              min={expDateBounds.from}
+              onChange={expTime.applyCustom}
+            />
+          )}
         </div>
         {bulkSelectedMovements.length > 0 && (
           <div className="flex flex-wrap items-center gap-3 py-2 px-3 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900">
@@ -2444,6 +2632,16 @@ function ExpensesSection({
             </button>
           </div>
         )}
+        {filteredMovements.length === 0 ? (
+          <p className="text-sm text-gray-400 py-4 text-center border border-gray-100 rounded-xl bg-[#fdfdfe]">
+            {expDateRange
+              ? 'No hay gastos en el periodo seleccionado.'
+              : expSearch || expCategory !== 'all' || expBank !== 'all'
+                ? 'No hay gastos que coincidan con los filtros.'
+                : 'No hay gastos registrados.'}
+          </p>
+) : (
+        <>
         <ScrollableTable
           columns={[
             {
@@ -2531,6 +2729,8 @@ function ExpensesSection({
           ])}
         />
         <Pagination page={expPage} totalPages={expTotalPages} onPageChange={setExpPage} />
+        </>
+        )}
       </div>
     </section>
   );
@@ -2694,7 +2894,6 @@ function Pagination({
 
 function MovementsSection({
   movements,
-  total,
   types,
   filter,
   bankFilter,
@@ -2708,7 +2907,6 @@ function MovementsSection({
   onRequestBulkDelete,
 }: {
   movements: Movement[];
-  total: number;
   types: MovementType[];
   filter: 'all' | MovementType;
   bankFilter: 'all' | BankId;
@@ -2726,10 +2924,23 @@ function MovementsSection({
   const [movSortKey, setMovSortKey] = useState<'date' | 'amount'>('date');
   const [movSortDir, setMovSortDir] = useState<'asc' | 'desc'>('desc');
   const [pendingDelete, setPendingDelete] = useState<Movement | null>(null);
+  const [movDateRange, setMovDateRange] = useState<DateRange | null>(null);
+
+  // Límites disponibles para el filtro de tiempo: del primer al último movimiento.
+  const movDateBounds = useMemo(() => {
+    const dates = movements.map(m => m.date).sort();
+    return { from: dates[0] ?? '', to: dates[dates.length - 1] ?? '' };
+  }, [movements]);
+
+  const movTime = useDateRangeFilter(movDateBounds.from, movDateBounds.to, range => setMovDateRange(range));
 
   const sortedMovements = useMemo(() => {
     const dir = movSortDir === 'asc' ? 1 : -1;
-    const list = [...movements];
+    const from = movDateRange ? rangeFromDay(movDateRange.from) : null;
+    const to = movDateRange ? rangeToDay(movDateRange.to) : null;
+    const list = [...movements]
+      .filter(m => !from || m.date >= from)
+      .filter(m => !to || m.date <= to);
     if (movSortKey === 'amount') {
       // Se ordena por el importe firmado: los valores negativos (gastos,
       // retiradas, compras) y las devoluciones quedan por debajo de 0.
@@ -2738,7 +2949,7 @@ function MovementsSection({
       list.sort((a, b) => a.date.localeCompare(b.date) * dir);
     }
     return list;
-  }, [movements, movSortKey, movSortDir]);
+  }, [movements, movSortKey, movSortDir, movDateRange]);
 
   const totalPages = Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE));
   const shown = sortedMovements.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -2746,8 +2957,8 @@ function MovementsSection({
   // Al cambiar orden/filtro se vuelve a la primera página; al cambiar los
   // movimientos (p. ej. editar tipo/categoría) solo se recorta la página actual
   // si queda fuera de rango, para no saltar a la página 1.
-  useEffect(() => setPage(1), [movSortKey, movSortDir]);
-  useEffect(() => setPage(p => Math.min(p, Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE)))), [movements]);
+  useEffect(() => setPage(1), [movSortKey, movSortDir, movDateRange]);
+  useEffect(() => setPage(p => Math.min(p, Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE)))), [movements, movDateRange]);
 
   const toggleMovSort = (key: 'date' | 'amount') => {
     if (movSortKey === key) {
@@ -2797,7 +3008,7 @@ function MovementsSection({
     <section className="space-y-4 pb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">
-          Todos los movimientos ({total})
+          Todos los movimientos ({sortedMovements.length})
         </h3>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -2827,7 +3038,22 @@ function MovementsSection({
               ...ORDERED_BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
             ]}
           />
+          <Select
+            value={movTime.preset}
+            onChange={v => { movTime.selectPreset(v as DateRangePreset); setPage(1); }}
+            ariaLabel="Filtro de tiempo"
+            className="w-44"
+            options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+          />
         </div>
+        {movTime.preset === 'custom' && (
+          <CustomRangeInputs
+            from={movTime.customFrom}
+            to={movTime.customTo}
+            min={dayOf(movDateBounds.from)}
+            onChange={movTime.applyCustom}
+          />
+        )}
       </div>
 
       {selected.size > 0 && (

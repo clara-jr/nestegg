@@ -28,7 +28,7 @@ export interface DateRangeFilterProps {
 }
 
 /** Día inicial (un mes se abre en el día 1) válido para <input type="date">. */
-function dayOf(value: string): string {
+export function dayOf(value: string): string {
   return value.length === 10 ? value : `${value}-01`;
 }
 
@@ -52,7 +52,7 @@ function shiftMonth(month: string, delta: number): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
-const PRESET_LABELS: Array<{ value: DateRangePreset; label: string }> = [
+export const PRESET_LABELS: Array<{ value: DateRangePreset; label: string }> = [
   { value: 'all', label: 'Sin filtro de tiempo' },
   { value: 'month', label: 'Último mes' },
   { value: '6m', label: 'Últimos 6 meses' },
@@ -60,18 +60,36 @@ const PRESET_LABELS: Array<{ value: DateRangePreset; label: string }> = [
   { value: 'custom', label: 'Personalizado' },
 ];
 
-/** Selector de intervalo de fechas para las gráficas: predefinidos (último
- *  mes, 6 meses, año, todo) o un rango personalizado de meses. */
-export function DateRangeFilter({ min, max, defaultFrom, defaultTo, onChange, className = '' }: DateRangeFilterProps) {
+export interface DateRangeController {
+  preset: DateRangePreset;
+  customFrom: string;
+  customTo: string;
+  selectPreset: (p: DateRangePreset) => void;
+  applyCustom: (from: string, to: string) => void;
+}
+
+/**
+ * Estado compartido del filtro de tiempo (predefinido elegido + fechas
+ * personalizadas), sin acoplar a un marcado concreto. Permite colocar el
+ * selector y las fechas en posiciones distintas del layout (p. ej. que las
+ * fechas de «Personalizado» caigan en una línea propia). Devuelve los
+ * predefinidos anclados al mes CALENDARIO EN CURSO (no al último mes con
+ * datos): "últimos 6 meses" siempre acaba en el mes actual aunque aún no haya
+ * movimientos, para no desplazar la ventana al mes anterior.
+ */
+export function useDateRangeFilter(
+  min: string,
+  max: string,
+  onChange: (range: DateRange | null) => void,
+  defaultFrom?: string,
+  defaultTo?: string,
+): DateRangeController {
   const [preset, setPreset] = useState<DateRangePreset>('all');
   const [customFrom, setCustomFrom] = useState(dayOf(min));
   const [customTo, setCustomTo] = useState(lastDayOf(max));
 
   const selectPreset = (p: DateRangePreset) => {
     setPreset(p);
-    // Los predefinidos se anclan al mes CALENDARIO EN CURSO (no al último mes
-    // con datos): "últimos 6 meses" siempre acaba en el mes actual aunque aún
-    // no haya movimientos, para no desplazar la ventana al mes anterior.
     if (p === 'all') onChange(null);
     else if (p === 'month') onChange({ from: currentMonthKey(), to: currentMonthKey() });
     else if (p === '6m') onChange({ from: shiftMonth(currentMonthKey(), -5), to: currentMonthKey() });
@@ -89,8 +107,66 @@ export function DateRangeFilter({ min, max, defaultFrom, defaultTo, onChange, cl
   };
 
   const applyCustom = (from: string, to: string) => {
+    setCustomFrom(from);
+    setCustomTo(to);
     onChange({ from, to });
   };
+
+  return { preset, customFrom, customTo, selectPreset, applyCustom };
+}
+
+export interface CustomRangeInputsProps {
+  /** Fecha de inicio (YYYY-MM-DD). */
+  from: string;
+  /** Fecha de fin (YYYY-MM-DD). */
+  to: string;
+  /** Límite inferior para la fecha de inicio. */
+  min: string;
+  /** Límite superior para la fecha de fin (por defecto, hoy). */
+  max?: string;
+  /** Notifica el intervalo corregido (las fechas se mantienen coherentes). */
+  onChange: (from: string, to: string) => void;
+}
+
+/** Par de selectores de fecha (inicio → fin) de «Personalizado». */
+export function CustomRangeInputs({ from, to, min, max, onChange }: CustomRangeInputsProps) {
+  return (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      <DateInput
+        value={from}
+        min={min}
+        max={to}
+        ariaLabel="Fecha inicio"
+        onChange={value => {
+          const nextTo = value > to ? value : to;
+          onChange(value, nextTo);
+        }}
+      />
+      <span className="text-sm text-gray-400">→</span>
+      <DateInput
+        value={to}
+        min={from}
+        max={max ?? todayISO()}
+        ariaLabel="Fecha fin"
+        onChange={value => {
+          const nextFrom = value < from ? value : from;
+          onChange(nextFrom, value);
+        }}
+      />
+    </span>
+  );
+}
+
+/** Selector de intervalo de fechas para las gráficas: predefinidos (último
+ *  mes, 6 meses, año, todo) o un rango personalizado de meses. */
+export function DateRangeFilter({ min, max, defaultFrom, defaultTo, onChange, className = '' }: DateRangeFilterProps) {
+  const { preset, customFrom, customTo, selectPreset, applyCustom } = useDateRangeFilter(
+    min,
+    max,
+    onChange,
+    defaultFrom,
+    defaultTo,
+  );
 
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
@@ -98,37 +174,16 @@ export function DateRangeFilter({ min, max, defaultFrom, defaultTo, onChange, cl
         value={preset}
         onChange={v => selectPreset(v as DateRangePreset)}
         ariaLabel="Filtro de tiempo"
-        className="w-50"
+        className="w-44"
         options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
       />
       {preset === 'custom' && (
-        <>
-          <DateInput
-            value={customFrom}
-            min={dayOf(defaultFrom ?? min)}
-            max={customTo}
-            ariaLabel="Fecha inicio"
-            onChange={from => {
-              const to = from > customTo ? from : customTo;
-              setCustomFrom(from);
-              setCustomTo(to);
-              applyCustom(from, to);
-            }}
-          />
-          <span className="text-sm text-gray-400">→</span>
-          <DateInput
-            value={customTo}
-            min={customFrom}
-            max={todayISO()}
-            ariaLabel="Fecha fin"
-            onChange={to => {
-              const from = to < customFrom ? to : customFrom;
-              setCustomFrom(from);
-              setCustomTo(to);
-              applyCustom(from, to);
-            }}
-          />
-        </>
+        <CustomRangeInputs
+          from={customFrom}
+          to={customTo}
+          min={dayOf(defaultFrom ?? min)}
+          onChange={applyCustom}
+        />
       )}
     </div>
   );

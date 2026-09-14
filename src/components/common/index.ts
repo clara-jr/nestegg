@@ -9,7 +9,17 @@ export { CollapsibleFormSection, type CollapsibleFormSectionProps } from './form
 export { MemberCard, type MemberCardProps } from './form/MemberCard';
 export { AddMemberButton, type AddMemberButtonProps } from './form/AddMemberButton';
 export { DateInput, type DateInputProps } from './form/DateInput';
-export { DateRangeFilter, type DateRange, type DateRangePreset } from './form/DateRangeFilter';
+export {
+  DateRangeFilter,
+  CustomRangeInputs,
+  PRESET_LABELS,
+  dayOf,
+  useDateRangeFilter,
+  type DateRange,
+  type DateRangePreset,
+  type DateRangeController,
+  type CustomRangeInputsProps,
+} from './form/DateRangeFilter';
 export { Select, type SelectProps, type SelectOption, type SelectGroup } from './form/Select';
 
 export { ResultsContainer } from './results/ResultsContainer';

@@ -1,13 +1,17 @@
 import type { Movement } from './bankImports';
 import {
+  DAYS_PER_MONTH,
   computeDailySeries,
   computeExpenses,
   computeIncome,
   completedMonths,
   currentMonthKey,
+  dayCount,
   daysOfMonth,
   median,
   monthSpan,
+  monthsBetween,
+  rangeMonth,
   type CategoryMemberTotal,
   type CategoryTotal,
   type DailyPoint,
@@ -164,6 +168,44 @@ export function computeJointDailySeries(
     }
   }
   return [...byDate.values()];
+}
+
+/** Totales conjuntos de ingresos y gastos de un intervalo de días [from, to]
+ *  usando las series diarias (los días sin movimientos cuentan con 0). */
+export function sumJointDailyRange(
+  profiles: JointMemberProfile[],
+  from: string,
+  to: string,
+  category: string | null = null,
+): { days: number; income: number; expenses: number } {
+  let income = 0;
+  let expenses = 0;
+  for (const month of monthsBetween(rangeMonth(from), rangeMonth(to))) {
+    for (const p of computeJointDailySeries(profiles, month, category)) {
+      if (p.date >= from && p.date <= to) {
+        income += p.income;
+        expenses += p.expenses;
+      }
+    }
+  }
+  return { days: dayCount(from, to), income, expenses };
+}
+
+/** Medias por mes de un intervalo de días [from, to] de la serie conjunta
+ *  (los días sin movimientos cuentan con 0). */
+export function averageMonthlyJointInRange(
+  profiles: JointMemberProfile[],
+  from: string,
+  to: string,
+  category: string | null = null,
+): { income: number; expenses: number; savings: number } {
+  const { days, income, expenses } = sumJointDailyRange(profiles, from, to, category);
+  const months = days / DAYS_PER_MONTH;
+  return {
+    income: months > 0 ? income / months : 0,
+    expenses: months > 0 ? expenses / months : 0,
+    savings: months > 0 ? (income - expenses) / months : 0,
+  };
 }
 
 export function computeJointSummary(

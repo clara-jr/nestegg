@@ -1132,3 +1132,55 @@ export function computeDailySeries(
     return { date, income, expenses, savings: income - expenses };
   });
 }
+
+/** Nº de días del intervalo [from, to] (ambos inclusive). */
+export function dayCount(from: string, to: string): number {
+  const ms = Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`);
+  return Math.floor(ms / 86400000) + 1;
+}
+
+/** Totales de ingresos y gastos de un intervalo de días [from, to] usando las
+ *  series diarias (los días sin movimientos cuentan con 0), para calcular la
+ *  media del intervalo por día. */
+export function sumDailyRange(
+  from: string,
+  to: string,
+  incomeMovements: Movement[],
+  expenseMovements: Movement[],
+  category: string | null = null,
+): { days: number; income: number; expenses: number } {
+  let income = 0;
+  let expenses = 0;
+  for (const month of monthsBetween(rangeMonth(from), rangeMonth(to))) {
+    for (const p of computeDailySeries(month, incomeMovements, expenseMovements, category)) {
+      if (p.date >= from && p.date <= to) {
+        income += p.income;
+        expenses += p.expenses;
+      }
+    }
+  }
+  return { days: dayCount(from, to), income, expenses };
+}
+
+/** Días promedio de un mes (365,25/12) para convertir un intervalo de días en
+ *  meses y expresar las medias «por mes». */
+export const DAYS_PER_MONTH = 365.25 / 12;
+
+/** Medias por mes de un intervalo de días [from, to], usando las series diarias
+ *  (los días sin movimientos cuentan con 0) y convirtiendo el número exacto de
+ *  días en meses. */
+export function averageMonthlyInRange(
+  from: string,
+  to: string,
+  incomeMovements: Movement[],
+  expenseMovements: Movement[],
+  category: string | null = null,
+): { income: number; expenses: number; savings: number } {
+  const { days, income, expenses } = sumDailyRange(from, to, incomeMovements, expenseMovements, category);
+  const months = days / DAYS_PER_MONTH;
+  return {
+    income: months > 0 ? income / months : 0,
+    expenses: months > 0 ? expenses / months : 0,
+    savings: months > 0 ? (income - expenses) / months : 0,
+  };
+}
