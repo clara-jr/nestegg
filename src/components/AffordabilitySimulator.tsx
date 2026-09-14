@@ -256,9 +256,9 @@ export default function AffordabilitySimulator() {
         </ResultsSection>
         <NoteCard variant="warning">
           <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-amber-600" /></strong> {hasSalary && result.constraintType === 'income'
-            ? <><strong>La limitación está en tus ingresos</strong>: la hipoteca máxima que puedes conseguir está limitada por la cuota que eres capaz de pagar mensualmente. La hipoteca máxima (${formatCurrency(result.maxMortgageByIncome)}) y todo tu capital (${formatCurrency(result.availableForHouse)}) determinan el precio máximo de la casa.</>
+            ? (<><strong>La limitación está en tus ingresos</strong>{`: la hipoteca máxima que puedes conseguir está limitada por la cuota que eres capaz de pagar mensualmente. La hipoteca máxima (${formatCurrency(result.maxMortgageByIncome)}) y todo tu capital (${formatCurrency(result.availableForHouse)}) determinan el precio máximo de la casa.`}</>)
             : hasSalary
-              ? <><strong>La limitación está en tu capital</strong>: la hipoteca máxima que puedes conseguir está limitada por los ahorros que tienes para la entrada. El banco te prestará hasta el ${params.ltvRatio ?? 80}% y los ${formatCurrency(result.availableForHouse)} disponibles cubren justo el ${100 - (params.ltvRatio ?? 80)}% de entrada + impuestos (${params.isNewBuild ? '11,2%' : '6,5%'}) + comisión inmobiliaria (${params.realEstatePercentage}%) + reforma.</>
+              ? (<><strong>La limitación está en tu capital</strong>{`: la hipoteca máxima que puedes conseguir está limitada por los ahorros que tienes para la entrada. El banco te prestará hasta el ${params.ltvRatio ?? 80}% y los ${formatCurrency(result.availableForHouse)} disponibles cubren justo el ${100 - (params.ltvRatio ?? 80)}% de entrada + impuestos (${params.isNewBuild ? '11,2%' : '6,5%'}) + comisión inmobiliaria (${params.realEstatePercentage}%) + reforma.`}</>)
               : 'Introduce al menos un salario para obtener un desglose detallado.'
           } {hasSalary && `El ratio de esfuerzo (${params.debtToIncomeRatio}%) se aplica sobre el ingreso neto mensual${params.members.length > 1 ? ' conjunto' : ''} de ${formatCurrency(result.totalNetMonthlyIncome)}.`}
         </NoteCard>
