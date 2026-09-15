@@ -9,7 +9,8 @@ import {
   currentMonthKey,
   dayCount,
   daysOfMonth,
-  isMovementJoint,
+  expenseSplits,
+  isExpenseSplitJoint,
   median,
   monthSpan,
   monthsBetween,
@@ -214,18 +215,18 @@ export function computeJointSummary(
   profiles: JointMemberProfile[],
   jointCategories: readonly string[],
 ): JointSummary {
-  const jointSet = new Set(jointCategories);
-  const signedAbs = (m: Movement) => (m.type === 'refund' ? -1 : 1) * Math.abs(m.amount);
+  const signedAbs = (m: Movement, amount: number) => (m.type === 'refund' ? -1 : 1) * Math.abs(amount);
 
   const inputs: MemberInput[] = profiles.map(p => {
     const income = computeIncome(p.movements.filter(m => m.type === 'income'));
     const expenses = computeExpenses(p.movements.filter(m => m.type === 'expense' || m.type === 'refund'));
     const jointMonthly = new Map<string, number>();
     for (const m of p.movements) {
-      if ((m.type !== 'expense' && m.type !== 'refund') || (m.category ?? 'Otros') === EXCLUDED_CATEGORY) continue;
-      if (isMovementJoint(m, jointCategories)) {
+      if (m.type !== 'expense' && m.type !== 'refund') continue;
+      for (const split of expenseSplits(m)) {
+        if (split.category === EXCLUDED_CATEGORY || !isExpenseSplitJoint(m, split, jointCategories)) continue;
         const month = m.date.slice(0, 7);
-        jointMonthly.set(month, (jointMonthly.get(month) ?? 0) + signedAbs(m));
+        jointMonthly.set(month, (jointMonthly.get(month) ?? 0) + signedAbs(m, split.amount));
       }
     }
     const firstMonth = p.movements.length > 0
@@ -434,19 +435,19 @@ export function computeJointSummary(
   for (const p of profiles) {
     const memberCatTotals = new Map<string, number>();
     for (const m of p.movements) {
-      if ((m.type !== 'expense' && m.type !== 'refund') || (m.category ?? 'Otros') === EXCLUDED_CATEGORY) continue;
-      if (!isMovementJoint(m, jointCategories)) continue;
-
-      const cat = m.category ?? 'Otros';
-      const month = m.date.slice(0, 7);
-      if (month >= windowStart) {
-        let byMonth = jointCategoryByMonth.get(cat);
-        if (!byMonth) {
-          byMonth = new Map<string, number>();
-          jointCategoryByMonth.set(cat, byMonth);
+      if (m.type !== 'expense' && m.type !== 'refund') continue;
+      for (const split of expenseSplits(m)) {
+        if (split.category === EXCLUDED_CATEGORY || !isExpenseSplitJoint(m, split, jointCategories)) continue;
+        const month = m.date.slice(0, 7);
+        if (month >= windowStart) {
+          let byMonth = jointCategoryByMonth.get(split.category);
+          if (!byMonth) {
+            byMonth = new Map<string, number>();
+            jointCategoryByMonth.set(split.category, byMonth);
+          }
+          byMonth.set(month, (byMonth.get(month) ?? 0) + signedAbs(m, split.amount));
+          memberCatTotals.set(split.category, (memberCatTotals.get(split.category) ?? 0) + signedAbs(m, split.amount));
         }
-        byMonth.set(month, (byMonth.get(month) ?? 0) + signedAbs(m));
-        memberCatTotals.set(cat, (memberCatTotals.get(cat) ?? 0) + signedAbs(m));
       }
     }
     for (const [cat, total] of memberCatTotals) {

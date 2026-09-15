@@ -33,6 +33,7 @@ export { ChartRangeSummary, type ChartRangeSummaryProps } from './results/ChartR
 export { SummaryCard, type SummaryCardProps } from './results/SummaryCard';
 export { ExpenseCategoryIcon } from './results/CategoryIcon';
 export { BankLogo } from './results/BankLogo';
+export { ExpenseCardList } from './results/ExpenseCardList';
 export { Icon } from './Icons';
 export {
   CategoryBreakdown,

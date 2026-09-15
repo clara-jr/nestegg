@@ -24,6 +24,7 @@ import {
   reclassifyPaypalDuplicates,
   readFileAsMatrix,
   type BankId,
+  type ExpenseSplit,
   type FileMeta,
   type Movement,
   type MovementType,
@@ -48,6 +49,7 @@ import {
   fillMonthly,
   formatDay,
   formatMonth,
+  expenseSplits,
   guessExpenseCategory,
   interestNetAmount,
   isMovementJoint,
@@ -95,7 +97,7 @@ import {
   LastMonthBreakdown,
   LastYearBreakdown,
   Modal,
-  NumberInput,
+  InputField,
   ResultsContainer,
   ScenarioSection,
   ScrollableTable,
@@ -106,6 +108,7 @@ import {
   signedExpenseFormat,
   Icon,
   BankLogo,
+  ExpenseCardList,
 } from './common';
 
 interface InvestmentsStore {
@@ -448,7 +451,7 @@ export default function InvestmentsSimulator() {
       ...prev,
       movements: prev.movements.map(m =>
         movementIds.includes(m.id)
-          ? { ...m, category, categoryAuto: false }
+          ? { ...m, category, categoryAuto: false, expenseSplits: undefined }
           : m
       ),
     }));
@@ -490,6 +493,17 @@ export default function InvestmentsSimulator() {
   const bulkUpdateCategory = (movementIds: string[], category: string) => {
     if (movementIds.length === 0) return;
     applyCategory(movementIds, category);
+  };
+
+  const saveExpenseSplits = (movementId: string, splits: ExpenseSplit[]) => {
+    setStore(prev => ({
+      ...prev,
+      movements: prev.movements.map(m =>
+        m.id === movementId
+          ? { ...m, category: splits[0]?.category ?? m.category, categoryAuto: false, expenseSplits: splits }
+          : m
+      ),
+    }));
   };
 
   const applyType = (movementIds: string[], type: MovementType) => {
@@ -1029,6 +1043,7 @@ export default function InvestmentsSimulator() {
                   jointCategories={jointConfig.jointCategories}
                   onChangeCategory={updateCategory}
                   onBulkChangeCategory={bulkUpdateCategory}
+                  onSaveExpenseSplits={saveExpenseSplits}
                   onChangeChargeType={updateChargeType}
                   onBulkChangeChargeType={bulkUpdateChargeType}
                 />
@@ -1464,11 +1479,13 @@ function PortfolioSection({
                             : 'Sin precio guardado; se usa el precio medio'
                         }
                       >
-                        <NumberInput
+                        <InputField
                           value={String(entry?.value ?? '')}
                           placeholder={h.avgPrice.toFixed(2)}
                           onChange={onSetPrice.bind(null, h.key, h.ticker)}
                           className="w-24"
+                          inputClassName="pr-8 py-1 pl-2 text-right rounded-md"
+                          stepperRound="md"
                         />
                       </Tooltip>
                     ),
@@ -1476,12 +1493,14 @@ function PortfolioSection({
             isPF && h.investedCost > 0
               ? {
                   content: (
-                    <NumberInput
+                    <InputField
                       value={plazoCfg?.rate ? String(plazoCfg.rate) : ''}
                       placeholder="% anual"
                       onChange={v => onSetPlazoConfig(h.key, { rate: Number.parseFloat(v.replace(',', '.')) })}
-                      step={0.5}
+                      step="0.5"
                       className="w-20"
+                      inputClassName="pr-8 py-1 pl-2 text-right rounded-md"
+                      stepperRound="md"
                     />
                   ),
                 }
@@ -1489,11 +1508,13 @@ function PortfolioSection({
             isPF && h.investedCost > 0
               ? {
                   content: (
-                    <NumberInput
+                    <InputField
                       value={plazoCfg?.months ? String(plazoCfg.months) : ''}
                       placeholder="meses"
                       onChange={v => onSetPlazoConfig(h.key, { months: Number.parseFloat(v.replace(',', '.')) })}
                       className="w-20"
+                      inputClassName="pr-8 py-1 pl-2 text-right rounded-md"
+                      stepperRound="md"
                     />
                   ),
                 }
@@ -2229,6 +2250,7 @@ function ExpensesSection({
   jointCategories,
   onChangeCategory,
   onBulkChangeCategory,
+  onSaveExpenseSplits,
   onChangeChargeType,
   onBulkChangeChargeType,
 }: {
@@ -2239,6 +2261,7 @@ function ExpensesSection({
   jointCategories: readonly string[];
   onChangeCategory: (id: string, category: string) => void;
   onBulkChangeCategory: (ids: string[], category: string) => void;
+  onSaveExpenseSplits: (id: string, splits: ExpenseSplit[]) => void;
   onChangeChargeType: (id: string, targetValue: 'joint' | 'individual' | 'auto') => void;
   onBulkChangeChargeType: (ids: string[], targetValue: 'joint' | 'individual' | 'auto') => void;
 }) {
@@ -2316,16 +2339,16 @@ function ExpensesSection({
     if (!dateRange) return data.byCategory;
     const from = rangeFromDay(dateRange.from);
     const to = rangeToDay(dateRange.to);
-    const signedAbs = (m: Movement) => (m.type === 'refund' ? -1 : 1) * Math.abs(m.amount);
     const catTotals = new Map<string, { total: number; firstDate: string }>();
     for (const m of movements) {
       if (m.date < from || m.date > to) continue;
-      const cat = m.category ?? 'Otros';
-      if (cat === 'Excluido') continue;
-      const entry = catTotals.get(cat) ?? { total: 0, firstDate: m.date };
-      entry.total += signedAbs(m);
-      if (m.date < entry.firstDate) entry.firstDate = m.date;
-      catTotals.set(cat, entry);
+      for (const split of expenseSplits(m)) {
+        if (split.category === 'Excluido') continue;
+        const entry = catTotals.get(split.category) ?? { total: 0, firstDate: m.date };
+        entry.total += (m.type === 'refund' ? -1 : 1) * Math.abs(split.amount);
+        if (m.date < entry.firstDate) entry.firstDate = m.date;
+        catTotals.set(split.category, entry);
+      }
     }
     const gross = [...catTotals.values()].reduce((s, e) => s + Math.max(e.total, 0), 0);
     const monthCount = Math.max(1, monthsBetween(rangeMonth(from), rangeMonth(to)).length);
@@ -2456,7 +2479,7 @@ function ExpensesSection({
     const from = expDateRange ? rangeFromDay(expDateRange.from) : null;
     const to = expDateRange ? rangeToDay(expDateRange.to) : null;
     return movements
-      .filter(m => expCategory === 'all' || (m.category ?? 'Otros') === expCategory)
+      .filter(m => expCategory === 'all' || expenseSplits(m).some(split => split.category === expCategory))
       .filter(m => expBank === 'all' || m.bank === expBank)
       .filter(m => !from || m.date >= from)
       .filter(m => !to || m.date <= to)
@@ -2483,8 +2506,8 @@ function ExpensesSection({
     return list;
   }, [filteredMovements, expSortKey, expSortDir]);
 
-  const expTotalPages = Math.max(1, Math.ceil(sortedMovements.length / PAGE_SIZE));
-  const expShown = sortedMovements.slice((expPage - 1) * PAGE_SIZE, expPage * PAGE_SIZE);
+  const expTotalPages = Math.max(1, Math.ceil(sortedMovements.length / EXPENSE_PAGE_SIZE));
+  const expShown = sortedMovements.slice((expPage - 1) * EXPENSE_PAGE_SIZE, expPage * EXPENSE_PAGE_SIZE);
 
   useEffect(() => setExpPage(1), [expCategory, expBank, expSearch, expDateRange, expSortKey, expSortDir]);
   useEffect(() => setSelected(new Set()), [movements]);
@@ -2696,6 +2719,23 @@ function ExpensesSection({
           </h4>
           <div className="flex-1" />
           <div className="flex flex-wrap items-center gap-3">
+            <Select
+              value={`${expSortKey}-${expSortDir}`}
+              onChange={v => {
+                const [key, dir] = v.split('-') as ['date' | 'amount', 'asc' | 'desc'];
+                setExpSortKey(key);
+                setExpSortDir(dir);
+              }}
+              ariaLabel="Ordenar gastos"
+              className="w-50"
+              leadingIcon={<SortArrowsIcon />}
+              options={[
+                { value: 'date-desc', label: 'Fecha: reciente primero' },
+                { value: 'date-asc', label: 'Fecha: antiguo primero' },
+                { value: 'amount-desc', label: 'Importe: mayor a menor' },
+                { value: 'amount-asc', label: 'Importe: menor a mayor' },
+              ]}
+            />
             <input
               type="search"
               value={expSearch}
@@ -2803,136 +2843,41 @@ function ExpensesSection({
           </p>
 ) : (
         <>
-        <ScrollableTable
-          columns={[
-            {
-              title: (
-                <input
-                  type="checkbox"
-                  aria-label="Seleccionar todos los visibles"
-                  checked={shownAllSelected}
-                  onChange={toggleAll}
-                  className="w-4 h-4 accent-gray-900 cursor-pointer"
-                />
-              ),
-              align: 'left',
-            },
-            {
-              title: (
-                <SortableHeader
-                  label="Fecha"
-                  active={expSortKey === 'date'}
-                  dir={expSortDir}
-                  onClick={() => toggleSort('date')}
-                />
-              ),
-              align: 'left',
-            },
-            { title: 'Concepto', align: 'left' },
-            {
-              title: (
-                <SortableHeader
-                  label="Importe"
-                  active={expSortKey === 'amount'}
-                  dir={expSortDir}
-                  onClick={() => toggleSort('amount')}
-                />
-              ),
-            },
-            { title: 'Banco', align: 'left', className: 'min-w-[160px]' },
-            { title: 'Categoría', align: 'left' },
-            { title: 'Propiedad', align: 'left', minWidth: 175 },
-          ]}
-          rows={expShown.map(m => {
-            const category = m.category ?? 'Otros';
-            const categoryIsJoint = jointCategories.includes(category);
-            const isOverridden = m.isJointAuto === false && m.isJoint !== undefined;
-            const isJoint = isOverridden ? Boolean(m.isJoint) : categoryIsJoint;
-            const selectValue: 'joint' | 'individual' | 'auto' = isOverridden
-              ? m.isJoint ? 'joint' : 'individual'
-              : 'auto';
-            return [
-              {
-                content: (
-                  <input
-                    type="checkbox"
-                    aria-label={`Seleccionar ${m.concept}`}
-                    checked={selected.has(m.id)}
-                    onChange={() => toggleOne(m.id)}
-                    className="w-4 h-4 accent-gray-900 cursor-pointer"
-                  />
-                ),
-              },
-              new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES'),
-              {
-                content: (
-                  <span className="flex items-center gap-2">
-                    <ExpenseCategoryIcon category={category} />
-                    <span className="block max-w-[420px] whitespace-normal break-words">{m.concept}</span>
-                  </span>
-                ),
-              },
-              {
-                content: m.type === 'refund' ? (
-                  <span className="text-emerald-600 font-semibold">{formatSigned(m.amount)}</span>
-                ) : (
-                  <span className="text-red-600 font-semibold">{formatSigned(m.amount)}</span>
-                ),
-              },
-              { content: <span className="inline-flex items-center gap-2 whitespace-nowrap text-gray-500"><BankLogo bank={m.bank} size={18} />{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
-              {
-                content: (
-                  <Select
-                    value={category}
-                    size="xs"
-                    ariaLabel={`Categoría de ${m.concept}`}
-                    className="w-[170px]"
-                    onChange={v => onChangeCategory(m.id, v)}
-                    options={EXPENSE_CATEGORY_LIST.map(c => ({
-                      value: c,
-                      label: c,
-                      icon: <ExpenseCategoryIcon category={c} size={11} />,
-                    }))}
-                  />
-                ),
-              },
-              {
-                content: (
-                  <div className="flex items-center gap-2">
-                    <Tooltip
-                      text={
-                        isJoint
-                          ? `Gasto conjunto (${isOverridden ? 'sobreescrito' : `heredado de «${category}»`})`
-                          : `Gasto individual (${isOverridden ? 'sobreescrito' : `heredado de «${category}»`})`
-                      }
-                    >
-                      <span className={`w-5 h-5 flex items-center justify-center shrink-0 ${isJoint ? 'text-gray-900' : 'text-gray-500'}`}>
-                        <Icon name={isJoint ? 'users' : 'user'} className="w-4 h-4" />
-                      </span>
-                    </Tooltip>
-                    <Select
-                      value={selectValue}
-                      size="xs"
-                      ariaLabel={`Propiedad de ${m.concept}`}
-                      className="w-[135px]"
-                      onChange={v => onChangeChargeType(m.id, v as 'joint' | 'individual' | 'auto')}
-                      options={[
-                        { value: 'joint', label: 'Conjunto' },
-                        { value: 'individual', label: 'Individual' },
-                        { value: 'auto', label: 'Según categoría' },
-                      ]}
-                    />
-                  </div>
-                ),
-              },
-            ];
-          })}
+        <ExpenseCardList
+          movements={expShown}
+          jointCategories={jointCategories}
+          selected={selected}
+          allSelected={shownAllSelected}
+          onToggleOne={toggleOne}
+          onToggleAll={toggleAll}
+          onChangeCategory={(id, cat) => onChangeCategory(id, cat)}
+          onSaveExpenseSplits={onSaveExpenseSplits}
+          onChangeChargeType={onChangeChargeType}
         />
         <Pagination page={expPage} totalPages={expTotalPages} onPageChange={setExpPage} />
         </>
         )}
       </div>
     </section>
+  );
+}
+
+function SortArrowsIcon() {
+  return (
+    <svg
+      width={13}
+      height={13}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      className="flex-shrink-0 text-gray-400"
+    >
+      <path strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" d="m3 8 4-4 4 4" />
+      <path strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" d="M7 4v16" />
+      <path strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" d="m21 16-4 4-4-4" />
+      <path strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" d="M17 20V4" />
+    </svg>
   );
 }
 
@@ -3051,6 +2996,9 @@ function MonthCategoryBreakdown({
 // ---------------------------------------------------------------------------
 
 const PAGE_SIZE = 50;
+
+// Tamaño de página para el detalle paginado de gastos.
+const EXPENSE_PAGE_SIZE = 10;
 
 // Tamaño de página para el listado paginado de ingresos.
 const INCOME_PAGE_SIZE = 10;

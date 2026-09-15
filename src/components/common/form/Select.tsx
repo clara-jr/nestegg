@@ -25,12 +25,22 @@ export interface SelectProps {
   dark?: boolean;
   ariaLabel?: string;
   className?: string;
+  /** Icono fijo al inicio del botón, separado del contenido por una línea vertical fina. */
+  leadingIcon?: ReactNode;
 }
 
 const SIZE_CLASSES: Record<NonNullable<SelectProps['size']>, string> = {
   xs: 'px-2 py-1 text-xs rounded-md',
   sm: 'px-2.5 py-1.5 text-sm rounded-xl',
   md: 'px-3 py-2 text-sm rounded-xl',
+};
+
+/** Márgenes negativos que compensan el padding vertical del botón para que el
+ *  separador del leadingIcon llegue hasta arriba y abajo del input. */
+const LEADING_MARGINS: Record<NonNullable<SelectProps['size']>, string> = {
+  xs: '-my-1',
+  sm: '-my-1.5',
+  md: '-my-2',
 };
 
 function ChevronIcon() {
@@ -82,6 +92,7 @@ export function Select({
   dark = false,
   ariaLabel,
   className = '',
+  leadingIcon,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -166,6 +177,12 @@ export function Select({
           dark ? 'focus-visible:ring-white/30' : 'focus-visible:ring-gray-900/15'
         }`}
       >
+        {leadingIcon && (
+          <span className={`flex shrink-0 items-center self-stretch ${LEADING_MARGINS[size]}`}>
+            <span className="flex-shrink-0">{leadingIcon}</span>
+            <span className={`ml-2 w-px shrink-0 self-stretch ${dark ? 'bg-gray-600' : 'bg-gray-200'}`} />
+          </span>
+        )}
         {selected?.icon && <span className="flex-shrink-0">{selected.icon}</span>}
         <span className="flex-1 truncate">{selected ? selected.label : (placeholder ?? 'Selecciona…')}</span>
         <span className="flex-shrink-0">

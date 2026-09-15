@@ -45,7 +45,7 @@ export function Tooltip({ text, children, className }: { text: string; children:
       onClick={() => setOpen(!open)}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
-      className={`relative inline-flex items-center ${className ?? 'cursor-pointer'}`}
+      className={className ?? 'relative inline-flex items-center cursor-pointer'}
     >
       {children}
       {open && (

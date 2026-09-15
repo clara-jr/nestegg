@@ -3,18 +3,40 @@ import { Tooltip } from '../info/Tooltip';
 import { NumberInput } from './NumberInput';
 
 export interface InputFieldProps {
-  label: string;
+  label?: string;
   value: number | string;
   onChange: (value: string) => void;
   type?: 'number' | 'text';
   step?: string;
+  placeholder?: string;
+  min?: number;
+  ariaLabel?: string;
+  className?: string;
+  inputClassName?: string;
+  stepperRound?: 'md' | 'xl';
   hint?: string;
   disabled?: boolean;
   disabledTitle?: string;
   error?: string;
 }
 
-export function InputField({ label, value, onChange, type = 'number', step, hint, disabled, disabledTitle, error }: Readonly<InputFieldProps>) {
+export function InputField({
+  label,
+  value,
+  onChange,
+  type = 'number',
+  step,
+  placeholder,
+  min,
+  ariaLabel,
+  className,
+  inputClassName,
+  stepperRound = 'xl',
+  hint,
+  disabled,
+  disabledTitle,
+  error,
+}: Readonly<InputFieldProps>) {
   const [raw, setRaw] = useState(() => String(value ?? ''));
   const isFocused = useRef(false);
 
@@ -30,11 +52,13 @@ export function InputField({ label, value, onChange, type = 'number', step, hint
   };
 
   const numberClasses = (base: string) =>
-    `${base} pr-12 pl-3.5 py-2.5 rounded-xl focus:outline-none transition-all text-sm border w-full`;
+    `${base} ${inputClassName ?? 'pr-12 pl-3.5 py-2.5 rounded-xl'} focus:outline-none transition-all text-sm border w-full`;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className={`text-xs font-semibold uppercase tracking-wider ${disabled ? 'text-gray-400' : error ? 'text-red-700' : 'text-gray-600'}`}>{label}</label>
+    <div className={`flex flex-col gap-1.5 ${className ?? ''}`}>
+      {label && (
+        <label className={`text-xs font-semibold uppercase tracking-wider ${disabled ? 'text-gray-400' : error ? 'text-red-700' : 'text-gray-600'}`}>{label}</label>
+      )}
       {disabled && disabledTitle ? (
         <Tooltip text={disabledTitle}>
           {type === 'number' ? (
@@ -44,10 +68,13 @@ export function InputField({ label, value, onChange, type = 'number', step, hint
               onFocus={() => { isFocused.current = true; }}
               onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
               step={step ? Number(step) : 1}
+              placeholder={placeholder}
+              min={min}
+              ariaLabel={ariaLabel}
               disabled
               className="w-full"
               inputClassName={numberClasses('bg-zinc-100 border-gray-200 text-gray-400 cursor-not-allowed')}
-              stepperRound="xl"
+              stepperRound={stepperRound}
             />
           ) : (
             <input
@@ -57,6 +84,8 @@ export function InputField({ label, value, onChange, type = 'number', step, hint
               onFocus={() => { isFocused.current = true; }}
               onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
               step={step}
+              placeholder={placeholder}
+              aria-label={ariaLabel}
               disabled
               className="px-3.5 py-2.5 border rounded-xl focus:outline-none transition-all text-sm bg-zinc-100 border-gray-200 text-gray-400 cursor-not-allowed w-full disabled:pointer-events-none"
             />
@@ -69,6 +98,9 @@ export function InputField({ label, value, onChange, type = 'number', step, hint
           onFocus={() => { isFocused.current = true; }}
           onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
           step={step ? Number(step) : 1}
+          placeholder={placeholder}
+          min={min}
+          ariaLabel={ariaLabel}
           disabled={disabled}
           className="w-full"
           inputClassName={numberClasses(
@@ -78,7 +110,7 @@ export function InputField({ label, value, onChange, type = 'number', step, hint
                 ? 'bg-[#fdfdfe] border-red-400 text-gray-900'
                 : 'bg-[#fdfdfe] border-gray-200 text-gray-900 focus:border-gray-300'
           )}
-          stepperRound="xl"
+          stepperRound={stepperRound}
         />
       ) : (
         <input
@@ -88,6 +120,8 @@ export function InputField({ label, value, onChange, type = 'number', step, hint
           onFocus={() => { isFocused.current = true; }}
           onBlur={() => { isFocused.current = false; setRaw(String(value ?? '')); }}
           step={step}
+          placeholder={placeholder}
+          aria-label={ariaLabel}
           disabled={disabled}
           className={`px-3.5 py-2.5 border rounded-xl focus:outline-none transition-all text-sm ${
             disabled

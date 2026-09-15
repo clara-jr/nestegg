@@ -871,6 +871,11 @@ export interface ExpensesSummary {
 
 export const EXCLUDED_CATEGORY = 'Excluido';
 
+export function expenseSplits(movement: Movement): Array<{ category: string; amount: number; isJoint?: boolean }> {
+  if (movement.expenseSplits?.length) return movement.expenseSplits;
+  return [{ category: movement.category ?? 'Otros', amount: Math.abs(movement.amount) }];
+}
+
 /**
  * Determina si un movimiento es un gasto conjunto.
  * Si el tipo de cargo ha sido sobreescrito manualmente (isJointAuto === false),
@@ -889,6 +894,17 @@ export function isMovementJoint(
   return jointCategories.includes(category);
 }
 
+export function isExpenseSplitJoint(
+  movement: Movement,
+  split: { category: string; isJoint?: boolean },
+  jointCategories: readonly string[],
+): boolean {
+  return split.isJoint ?? isMovementJoint(
+    { ...movement, category: split.category },
+    jointCategories,
+  );
+}
+
 function categoryMonthsSince(firstDate: string): number {
   const first = new Date(`${firstDate}T00:00:00`);
   if (Number.isNaN(first.getTime())) return 1;
@@ -902,17 +918,18 @@ function categoryMonthsSince(firstDate: string): number {
 }
 
 export function computeExpenses(expenseMovements: Movement[]): ExpensesSummary {
-  const counted = expenseMovements.filter(m => (m.category ?? 'Otros') !== EXCLUDED_CATEGORY);
-
   // Las devoluciones (tipo «refund») restan del sumatorio de gastos: son
   // reversiones de gastos previos, y se restan en la categoría a la que se
   // asignen (p. ej. una devolución de Ropa rebaja los gastos de Ropa).
-  const signedAbs = (m: Movement) => (m.type === 'refund' ? -1 : 1) * Math.abs(m.amount);
+  const signedAmount = (m: Movement, amount: number) => (m.type === 'refund' ? -1 : 1) * Math.abs(amount);
+  const counted = expenseMovements.flatMap(m => expenseSplits(m)
+    .filter(split => split.category !== EXCLUDED_CATEGORY)
+    .map(split => ({ movement: m, ...split })));
 
   const monthlyTotal = new Map<string, number>();
-  for (const m of counted) {
-    const month = m.date.slice(0, 7);
-    monthlyTotal.set(month, (monthlyTotal.get(month) ?? 0) + signedAbs(m));
+  for (const { movement, amount } of counted) {
+    const month = movement.date.slice(0, 7);
+    monthlyTotal.set(month, (monthlyTotal.get(month) ?? 0) + signedAmount(movement, amount));
   }
   const monthly: MonthPoint[] = [...monthlyTotal.entries()]
     .map(([month, total]) => ({ month, total }))
@@ -928,14 +945,13 @@ export function computeExpenses(expenseMovements: Movement[]): ExpensesSummary {
   const previousMonthKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
 
   const catTotals = new Map<string, { total: number; firstDate: string; lastMonth: number }>();
-  for (const m of counted) {
-    const cat = m.category ?? 'Otros';
-    const inCurrent = m.date.startsWith(current);
-    const entry = catTotals.get(cat) ?? { total: 0, firstDate: m.date, lastMonth: 0 };
-    entry.total += signedAbs(m);
-    if (inCurrent) entry.lastMonth += signedAbs(m);
-    if (m.date < entry.firstDate) entry.firstDate = m.date;
-    catTotals.set(cat, entry);
+  for (const { movement, category, amount } of counted) {
+    const inCurrent = movement.date.startsWith(current);
+    const entry = catTotals.get(category) ?? { total: 0, firstDate: movement.date, lastMonth: 0 };
+    entry.total += signedAmount(movement, amount);
+    if (inCurrent) entry.lastMonth += signedAmount(movement, amount);
+    if (movement.date < entry.firstDate) entry.firstDate = movement.date;
+    catTotals.set(category, entry);
   }
   // El porcentaje de cada categoría se calcula sobre el gasto bruto (suma de
   // las categorías con gasto neto positivo), ignorando las categorías donde las
@@ -958,18 +974,17 @@ export function computeExpenses(expenseMovements: Movement[]): ExpensesSummary {
     .sort((a, b) => b.total - a.total);
 
   // Serie mensual por categoría para poder filtrar la gráfica por categoría.
-  const byCatMovements = new Map<string, Movement[]>();
-  for (const m of counted) {
-    const cat = m.category ?? 'Otros';
-    if (!byCatMovements.has(cat)) byCatMovements.set(cat, []);
-    byCatMovements.get(cat)!.push(m);
+  const byCatMovements = new Map<string, Array<{ movement: Movement; amount: number }>>();
+  for (const { movement, category, amount } of counted) {
+    if (!byCatMovements.has(category)) byCatMovements.set(category, []);
+    byCatMovements.get(category)!.push({ movement, amount });
   }
   const monthlyByCategory: Record<string, MonthPoint[]> = {};
-  for (const [cat, movs] of byCatMovements) {
+  for (const [cat, splits] of byCatMovements) {
     const catTotalsByMonth = new Map<string, number>();
-    for (const m of movs) {
-      const month = m.date.slice(0, 7);
-      catTotalsByMonth.set(month, (catTotalsByMonth.get(month) ?? 0) + signedAbs(m));
+    for (const { movement, amount } of splits) {
+      const month = movement.date.slice(0, 7);
+      catTotalsByMonth.set(month, (catTotalsByMonth.get(month) ?? 0) + signedAmount(movement, amount));
     }
     monthlyByCategory[cat] = [...catTotalsByMonth.entries()]
       .map(([month, monthTotal]) => ({ month, total: monthTotal }))
@@ -984,11 +999,11 @@ export function computeExpenses(expenseMovements: Movement[]): ExpensesSummary {
     medianMonthly: median(completed.map(p => p.total)),
     monthCount: span,
     currentMonth: counted
-      .filter(m => m.date.startsWith(current))
-      .reduce((sum, m) => sum + signedAbs(m), 0),
+      .filter(({ movement }) => movement.date.startsWith(current))
+      .reduce((sum, { movement, amount }) => sum + signedAmount(movement, amount), 0),
     previousMonth: counted
-      .filter(m => m.date.startsWith(previousMonthKey))
-      .reduce((sum, m) => sum + signedAbs(m), 0),
+      .filter(({ movement }) => movement.date.startsWith(previousMonthKey))
+      .reduce((sum, { movement, amount }) => sum + signedAmount(movement, amount), 0),
     byCategory,
   };
 }
@@ -1140,9 +1155,11 @@ export function computeDailySeries(
   const expensesByDay = new Map<string, number>();
   for (const m of expenseMovements) {
     if (!m.date.startsWith(month)) continue;
-    if (category ? (m.category ?? 'Otros') !== category : (m.category ?? 'Otros') === EXCLUDED_CATEGORY) continue;
-    const value = (m.type === 'refund' ? -1 : 1) * Math.abs(m.amount);
-    expensesByDay.set(m.date, (expensesByDay.get(m.date) ?? 0) + value);
+    for (const split of expenseSplits(m)) {
+      if (category ? split.category !== category : split.category === EXCLUDED_CATEGORY) continue;
+      const value = (m.type === 'refund' ? -1 : 1) * Math.abs(split.amount);
+      expensesByDay.set(m.date, (expensesByDay.get(m.date) ?? 0) + value);
+    }
   }
   return daysOfMonth(month).map(date => {
     const income = incomeByDay.get(date) ?? 0;

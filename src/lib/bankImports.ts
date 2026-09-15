@@ -61,6 +61,8 @@ export interface Movement {
   tax?: number;
   assetClass?: string;
   category?: string;
+  /** Partes de un gasto repartido entre categorías y propiedades distintas. */
+  expenseSplits?: ExpenseSplit[];
   /**
    * Indica que la categoría fue asignada automáticamente (guessed) en lugar de
    * editada por el usuario. Permite recalcularla al arrancar cuando cambian las
@@ -87,6 +89,14 @@ export interface Movement {
    * categoría (`true`/`undefined`) o fue sobreescrito manualmente (`false`).
    */
   isJointAuto?: boolean;
+}
+
+export interface ExpenseSplit {
+  category: string;
+  /** Importe absoluto de esta parte. La suma debe coincidir con el gasto origen. */
+  amount: number;
+  /** Propiedad de esta parte. Ausente: hereda propiedad del gasto origen. */
+  isJoint?: boolean;
 }
 
 export interface FileMeta {

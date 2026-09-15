@@ -15,9 +15,14 @@ export interface ScrollableTableCell {
 
 export type ScrollableTableRow = Array<React.ReactNode | ScrollableTableCell>;
 
+export interface ScrollableTableExpandedRow {
+  content: React.ReactNode;
+  className?: string;
+}
+
 export interface ScrollableTableProps {
   columns: ScrollableTableColumn[];
-  rows: ScrollableTableRow[];
+  rows: Array<ScrollableTableRow | ScrollableTableExpandedRow>;
   bordered?: boolean;
 }
 
@@ -31,6 +36,10 @@ function getCellContent(cell: React.ReactNode | ScrollableTableCell): React.Reac
 
 function getCellClassName(cell: React.ReactNode | ScrollableTableCell): string | undefined {
   return isCellObject(cell) ? cell.className : undefined;
+}
+
+function isExpandedRow(row: ScrollableTableRow | ScrollableTableExpandedRow): row is ScrollableTableExpandedRow {
+  return !Array.isArray(row);
 }
 
 export function ScrollableTable({ columns, rows, bordered = true }: Readonly<ScrollableTableProps>) {
@@ -121,8 +130,12 @@ export function ScrollableTable({ columns, rows, bordered = true }: Readonly<Scr
         <table ref={bodyTableRef} className="w-full min-w-full mb-3">
           <tbody>
             {rows.map((row, ri) => (
-              <tr key={ri} className="hover:bg-zinc-100 transition-colors">
-                {row.map((cell, ci) => {
+              <tr key={ri} className={`${isExpandedRow(row) ? row.className ?? '' : 'hover:bg-zinc-100 transition-colors'}`}>
+                {isExpandedRow(row) ? (
+                  <td colSpan={columns.length} className="px-6 sm:px-8 py-3 text-sm text-gray-700">
+                    {row.content}
+                  </td>
+                ) : row.map((cell, ci) => {
                   const col = columns[ci];
                   return (
                     <td

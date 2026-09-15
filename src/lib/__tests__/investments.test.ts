@@ -482,6 +482,24 @@ describe('computeExpenses', () => {
     expect(summary.byCategory[0].category).toBe('Alimentación');
     expect(summary.byCategory[0].total).toBeCloseTo(100);
   });
+
+  it('reparte un gasto entre varias categorías sin duplicar su total', () => {
+    const summary = computeExpenses([mk({
+      type: 'expense',
+      date: iso(lastMonth),
+      amount: -100,
+      category: 'Otros',
+      expenseSplits: [
+        { category: 'Alimentación', amount: 60 },
+        { category: 'Transporte', amount: 40 },
+      ],
+    })]);
+    expect(summary.total).toBeCloseTo(100);
+    expect(summary.byCategory).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'Alimentación', total: 60 }),
+      expect.objectContaining({ category: 'Transporte', total: 40 }),
+    ]));
+  });
 });
 
 describe('computeIncome', () => {
@@ -769,6 +787,40 @@ describe('computeJointSummary', () => {
     // last12ByCategory incluye Restaurantes
     expect(joint.last12ByCategory['Restaurantes']).toBeCloseTo(80 / 12);
     expect(joint.last12ByCategory['Vivienda']).toBeCloseTo(800 / 12);
+  });
+
+  it('respeta propiedad distinta en cada parte de un gasto', () => {
+    const a: JointMemberProfile = {
+      profileId: 'a',
+      name: 'A',
+      color: '#0f766e',
+      movements: [
+        mk({ type: 'income', date: '2024-02-05', amount: 2000 }),
+        mk({
+          type: 'expense',
+          date: '2024-02-10',
+          amount: -100,
+          category: 'Otros',
+          expenseSplits: [
+            { category: 'Vivienda', amount: 60, isJoint: true },
+            { category: 'Alimentación', amount: 40, isJoint: false },
+          ],
+        }),
+      ],
+    };
+    const b: JointMemberProfile = {
+      profileId: 'b',
+      name: 'B',
+      color: '#6d28d9',
+      movements: [mk({ type: 'income', date: '2024-02-10', amount: 1500 })],
+    };
+    const joint = computeJointSummary([a, b], []);
+
+    expect(joint.totalExpenses).toBe(100);
+    expect(joint.members.find(member => member.profileId === 'a')?.totalJoint).toBe(60);
+    expect(joint.categoryBreakdown).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: 'Vivienda', total: 60 }),
+    ]));
   });
 });
 
