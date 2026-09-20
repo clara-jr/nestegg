@@ -105,6 +105,13 @@ input[type="range"]::-webkit-slider-runnable-track {
   background: var(--color-gray-300);
 }
 
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 input[type="range"]::-moz-range-track {
   height: 6px;
   border-radius: 9999px;

@@ -53,7 +53,7 @@ export function CategoryBreakdown({ categories, period }: { categories: Category
             <li key={c.category} className="space-y-1">
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-sm">
                 <span className="flex items-center gap-2 font-medium text-gray-700 min-w-0 sm:mr-auto">
-                  <ExpenseCategoryIcon category={c.category} />
+                  <ExpenseCategoryIcon category={c.category} size={16} />
                   {c.category}
                 </span>
                 <span className="text-gray-600 whitespace-nowrap w-full sm:w-auto">
@@ -130,7 +130,7 @@ export function LastMonthBreakdown({ categories }: { categories: CategoryTotal[]
           return (
             <li key={c.category} className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2 font-medium text-gray-700">
-                <ExpenseCategoryIcon category={c.category} />
+                <ExpenseCategoryIcon category={c.category} size={16} />
                 {c.category}
               </span>
               <span className="text-gray-600">
@@ -169,10 +169,10 @@ export function LastYearBreakdown({ avgByCategory }: { avgByCategory: Record<str
           return (
             <li key={category} className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2 font-medium text-gray-700">
-                <ExpenseCategoryIcon category={category} />
+                <ExpenseCategoryIcon category={category} size={16} />
                 {category}
               </span>
-              <span className="text-gray-600">
+              <span className="text-gray-600 min-w-[9.25rem] text-right">
                 {signedExpenseFormat(avg, '/mes')}
                 {pct !== undefined && (
                   <span className="text-gray-400 ml-2">{pct >= 0.05 ? `${pct.toFixed(1)}%` : '<0.1%'}</span>

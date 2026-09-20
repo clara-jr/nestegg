@@ -2967,7 +2967,7 @@ function MonthCategoryBreakdown({
               <li key={c.category} className="space-y-1">
                 <div className="flex items-baseline justify-between text-sm">
                   <span className="flex items-center gap-2 font-medium text-gray-700">
-                    <ExpenseCategoryIcon category={c.category} />
+                    <ExpenseCategoryIcon category={c.category} size={16} />
                     {c.category}
                   </span>
                   <span className="text-gray-600 text-right flex items-baseline justify-end gap-3">

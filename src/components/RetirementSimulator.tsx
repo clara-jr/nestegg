@@ -951,7 +951,7 @@ export default function RetirementSimulator() {
                         )}
                         {viewMode === 'con-pension' && selectedEarliest && params.members.length > 1 && buildPensionSchedule(params.members, selectedEarliest.retirementAge).map((p, i) => {
                           const startAge = selectedEarliest.retirementAge + p.startOffset;
-                          if (r.age !== startAge + 1) return null;
+                          if (r.age !== startAge + 1 || p.monthlyAmount <= 0) return null;
                           return (
                             <Tooltip key={`p-${i}`} text={`Pensión I${i + 1}: ${formatCurrency(p.monthlyAmount)}/mes`}>
                               <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold leading-none">P</span>
