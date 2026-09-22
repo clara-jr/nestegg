@@ -4,6 +4,7 @@ import RetirementSimulator from '../components/RetirementSimulator';
 import AffordabilitySimulator from '../components/AffordabilitySimulator';
 import InvestmentsSimulator from '../components/InvestmentsSimulator';
 import BackupRestore from '../components/BackupRestore';
+import SiteFooter from '../components/SiteFooter.astro';
 import '../styles/global.css';
 
 const title = 'NestEgg';
@@ -15,7 +16,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
   <head>
     <meta charset="UTF-8" />
     <meta name="title" content={title} />
-    <meta name="description" content={description} />
+    <meta name="description" content={description} data-i18n-meta="home.metaDescription" />
     <meta name="viewport" content="width=device-width" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
@@ -27,14 +28,14 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
     <meta property="og:image:width" content="395" />
     <meta property="og:image:height" content="289" />
     <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:alt" content="NestEgg — simuladores de finanzas personales" />
+    <meta property="og:image:alt" content="NestEgg — simuladores de finanzas personales" data-i18n-meta="home.imageAlt" />
     <meta property="twitter:card" content="summary_large_image" />
     <meta property="twitter:site" content="@clear_is_me" />
     <meta property="twitter:creator" content="@clear_is_me" />
     <meta property="twitter:title" content={title} />
     <meta property="twitter:description" content={description} />
     <meta property="twitter:image" content="https://clara-jr.github.io/nestegg/thumbnail.png" />
-    <meta property="twitter:image:alt" content="NestEgg — simuladores de finanzas personales" />
+    <meta property="twitter:image:alt" content="NestEgg — simuladores de finanzas personales" data-i18n-meta="home.imageAlt" />
     <link rel="icon" type="image/svg+xml" href="/nestegg/favicon.svg" />
     <title>{title}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -45,84 +46,748 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
     />
   </head>
   <body class="bg-[#fdfdfe] min-h-screen">
-    <nav class="flex justify-center px-3 sm:px-4 lg:px-8 pt-10 pb-2">
-      <div class="mx-auto max-w-6xl w-full flex items-center justify-center">
-        <div class="relative w-full max-w-xl sm:max-w-3xl lg:max-w-5xl" id="nav-container">
-          <!-- Mobile trigger -->
-          <button id="nav-mobile-trigger" class="cursor-pointer flex sm:hidden items-center gap-2.5 w-full px-4 py-3 bg-[#fdfdfe] border border-gray-200 rounded-xl text-sm font-semibold text-gray-900 cursor-pointer">
-            <span id="nav-mobile-icon" class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>
-            <span id="nav-mobile-label">Simulador de Ahorros</span>
-            <svg id="nav-mobile-arrow" class="w-4 h-4 text-gray-400 ml-auto transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-            </svg>
+    <header class="px-3 sm:px-4 lg:px-8 pt-4 sm:pt-5 lg:pt-6">
+      <div class="relative mx-auto max-w-6xl w-full" id="nav-container">
+        <div class="flex items-center justify-between gap-3">
+          <button
+            id="header-home-btn"
+            data-tab="home"
+            class="tab-btn cursor-pointer flex items-center gap-2.5 rounded-xl px-1.5 py-1 text-gray-900 transition-all"
+            aria-label="NestEgg - pantalla principal"
+            data-i18n-aria="home.homeAria"
+          >
+            <span class="flex-shrink-0 w-6 h-6 text-gray-900">
+              <svg class="w-full h-full" viewBox="0 0 24 24" aria-hidden="true">
+                <g fill="currentColor">
+                  <path
+                    d="M7.038 18.963Q5 16.925 5 14q0-1.925.638-3.875t1.65-3.537T9.55 4T12 3q1.225 0 2.463 1t2.25 2.588t1.65 3.537T19 14q0 2.925-2.037 4.963T12 21t-4.962-2.037m8.5-1.426Q17 16.075 17 14q0-1.425-.488-3t-1.225-2.912t-1.612-2.213T12.013 5t-1.675.875t-1.625 2.213T7.488 11T7 14q0 2.075 1.463 3.538T12 19t3.538-1.463M13 18q.425 0 .713-.288T14 17t-.288-.712T13 16q-1.25 0-2.125-.875T10 13q0-.425-.288-.712T9 12t-.712.288T8 13q0 2.075 1.463 3.538T13 18m-1-6"
+                  />
+                </g>
+              </svg>
+            </span>
+            <span class="text-sm font-semibold tracking-tight">NestEgg</span>
           </button>
-          <div id="nav-mobile-menu" class="hidden sm:hidden absolute left-0 right-0 top-full mt-2 bg-[#fdfdfe] border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
-            <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="savings">
-              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>
-              <div class="text-left">
-                <p class="text-sm font-semibold">Simulador de Ahorros</p>
-                <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Proyecta tu patrimonio, hipoteca e inversiones al detalle.</p>
-              </div>
+
+          <!-- Desktop nav -->
+          <nav id="desktop-nav" class="hidden md:flex items-center gap-1.5" aria-label="Simuladores y calculadoras" data-i18n-aria="home.navAria">
+            <button class="tab-btn cursor-pointer flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-zinc-100 hover:text-gray-900" data-tab="savings">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+              <span data-i18n="home.navSavings"></span>
             </button>
-            <div class="border-t border-gray-100"></div>
-            <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="retirement">
-              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-              <div class="text-left">
-                <p class="text-sm font-semibold">Calculadora de Jubilación</p>
-                <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Planifica cuándo jubilarte gestionando tus ahorros.</p>
-              </div>
+            <button class="tab-btn cursor-pointer flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-zinc-100 hover:text-gray-900" data-tab="retirement">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <span data-i18n="home.navRetirement"></span>
             </button>
-            <div class="border-t border-gray-100"></div>
-            <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="affordability">
-              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
-              <div class="text-left">
-                <p class="text-sm font-semibold">Calculadora de Hogar</p>
-                <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Descubre qué casa te puedes permitir.</p>
-              </div>
+            <button class="tab-btn cursor-pointer flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-zinc-100 hover:text-gray-900" data-tab="affordability">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              <span data-i18n="home.navHome"></span>
             </button>
-            <div class="border-t border-gray-100"></div>
-            <button class="cursor-pointer tab-btn flex items-center gap-3 w-full px-5 py-4 text-left" data-tab="investments">
-              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span>
-              <div class="text-left">
-                <p class="text-sm font-semibold">Agregador de Finanzas</p>
-                <p class="text-xs mt-0.5 leading-relaxed text-gray-500">Importa extractos y analiza tu cartera y capacidad de ahorro.</p>
-              </div>
+            <button class="tab-btn cursor-pointer flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-gray-600 transition-all hover:bg-zinc-100 hover:text-gray-900" data-tab="investments">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+              <span data-i18n="home.navFinances"></span>
             </button>
-          </div>
-          <!-- Desktop tabs -->
-          <div class="hidden sm:flex bg-[#fdfdfe] border border-gray-200 rounded-xl overflow-hidden divide-x divide-gray-200">
-            <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="savings">
-              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg></span>
-              <div>
-                <p class="text-sm font-semibold">Simulador de Ahorros</p>
-                <p class="text-xs mt-0.5 leading-relaxed">Proyecta tu patrimonio, hipoteca e inversiones al detalle.</p>
+          </nav>
+
+          <!-- Mobile trigger -->
+          <button
+            id="nav-mobile-trigger"
+            class="md:hidden cursor-pointer flex items-center justify-center w-11 h-11 rounded-xl border border-gray-200 bg-[#fdfdfe] text-gray-900 transition-colors hover:bg-zinc-100"
+            aria-label="Abrir menú de simuladores"
+            data-i18n-aria="home.menuAria"
+            aria-expanded="false"
+            aria-controls="nav-mobile-menu"
+          >
+            <svg id="nav-mobile-open-icon" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+            <svg id="nav-mobile-close-icon" class="hidden w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <!-- Mobile dropdown -->
+        <div id="nav-mobile-menu" class="hidden md:hidden absolute left-0 right-0 top-full mt-2 bg-[#fdfdfe] border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+          <button class="tab-btn cursor-pointer flex items-center gap-3 w-full px-5 py-3.5 text-sm font-semibold text-gray-600 text-left transition-colors hover:bg-zinc-100 hover:text-gray-900" data-tab="savings">
+            <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+            <span data-i18n="home.menuSavings"></span>
+          </button>
+          <div class="border-t border-gray-100"></div>
+          <button class="tab-btn cursor-pointer flex items-center gap-3 w-full px-5 py-3.5 text-sm font-semibold text-gray-600 text-left transition-colors hover:bg-zinc-100 hover:text-gray-900" data-tab="retirement">
+            <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span data-i18n="home.menuRetirement"></span>
+          </button>
+          <div class="border-t border-gray-100"></div>
+          <button class="tab-btn cursor-pointer flex items-center gap-3 w-full px-5 py-3.5 text-sm font-semibold text-gray-600 text-left transition-colors hover:bg-zinc-100 hover:text-gray-900" data-tab="affordability">
+            <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <span data-i18n="home.menuHome"></span>
+          </button>
+          <div class="border-t border-gray-100"></div>
+          <button class="tab-btn cursor-pointer flex items-center gap-3 w-full px-5 py-3.5 text-sm font-semibold text-gray-600 text-left transition-colors hover:bg-zinc-100 hover:text-gray-900" data-tab="investments">
+            <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            <span data-i18n="home.menuFinances"></span>
+          </button>
+        </div>
+      </div>
+    </header>
+    <div id="tab-home" class="tab-content hidden">
+      <div class="py-6 px-8 mb-4 sm:px-8">
+        <div class="mx-auto max-w-6xl">
+          <div class="flex flex-col gap-14 md:gap-20">
+            <section class="text-center px-2 pt-8 sm:pt-14 pb-4">
+              <span class="inline-flex items-center gap-2 rounded-2xl border border-gray-200 bg-[#fdfdfe] px-3.5 py-3 text-xs sm:text-sm font-semibold text-gray-600">
+                <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" aria-hidden="true"><path d="m9 11l3 3l8-8"/><path d="M20 12a8 8 0 1 1-5.3-7.533"/></svg>
+                <span class="max-[460px]:hidden" data-i18n="home.badge"></span>
+                <span class="min-[460px]:hidden flex flex-col items-center leading-tight">
+                  <span data-i18n="home.badge1"></span>
+                  <span class="mt-1" data-i18n="home.badge2"></span>
+                </span>
+              </span>
+              <p class="mx-auto mt-12 max-w-2xl text-base sm:text-xl leading-relaxed text-gray-500" data-i18n="home.heroText"></p>
+              <button
+                data-scroll="#simuladores"
+                class="home-scroll cursor-pointer mt-12 inline-flex items-center gap-2 rounded-xl bg-gray-900 px-6 py-3 text-base font-semibold text-white shadow-sm transition-all hover:bg-gray-800"
+              >
+                <span data-i18n="home.explore"></span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7-7-7M12 21V3" /></svg>
+              </button>
+            </section>
+
+            <section aria-label="Vistas previas de los simuladores" data-i18n-aria="home.previewAria" class="flex flex-col">
+                <div class="text-center">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-600" data-i18n="home.previewQuestion"></p>
+                  <h2 class="mt-2 text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight" data-i18n="home.previewTitle"></h2>
+                  <p class="mx-auto mt-2 max-w-xl leading-relaxed text-gray-500" data-i18n="home.previewSubtitle"></p>
+                </div>
+
+              <div class="mt-6 flex items-center justify-center gap-3">
+                <button
+                  data-preview-nav="prev"
+                  aria-label="Anterior vista previa"
+                  data-i18n-aria="home.previewPrev"
+                  class="hidden min-[640px]:flex cursor-pointer flex-shrink-0 items-center justify-center w-11 h-11 rounded-xl border border-gray-200 bg-[#fdfdfe] text-gray-700 transition-colors hover:bg-zinc-100 hover:text-gray-900"
+                >
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <div class="relative min-w-0 w-full max-w-[360px] min-[494px]:max-w-[430px] min-[921px]:max-w-[876px]">
+                <div id="preview-track" class="no-scrollbar flex w-full gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth">
+                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.savingsLabel"></p>
+                  <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.savingsTitle"></h3>
+                  <div class="mt-4 border-t border-gray-200 pt-4">
+                    <div class="grid grid-cols-1 gap-3">
+                      <div class="bg-[#fdfdfe] border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                          <svg class="w-6 h-6 text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.totalSaved"></p>
+                        </div>
+                        <p class="text-xl font-bold text-gray-900">250.000 €</p>
+                      </div>
+                      <div class="bg-[#fdfdfe] border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                          <svg class="w-6 h-6 text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
+                          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.remunerated"></p>
+                        </div>
+                        <p class="text-xl font-bold text-gray-900">50.000 €</p>
+                      </div>
+                      <div class="bg-[#fdfdfe] border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                          <svg class="w-6 h-6 text-gray-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.investments"></p>
+                        </div>
+                        <p class="text-xl font-bold text-gray-900">200.000 €</p>
+                      </div>
+                    </div>
+                    <div class="mt-5 border-t border-gray-200 pt-5">
+                      <p class="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4" data-i18n="home.preview.contributedVsTotal"></p>
+                      <svg class="w-full" viewBox="0 0 340 170" fill="none" role="img" aria-label="Gráfica del dinero aportado y el total invertido a lo largo de 30 años" data-i18n-aria="home.preview.chartAria">
+                        <line x1="4" y1="150" x2="340" y2="150" stroke="#d1d5db" stroke-width="1" />
+                        <line x1="4" y1="121.6" x2="336" y2="121.6" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3 3" />
+                        <line x1="4" y1="93.2" x2="336" y2="93.2" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3 3" />
+                        <line x1="4" y1="64.8" x2="336" y2="64.8" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3 3" />
+                        <line x1="4" y1="36.4" x2="336" y2="36.4" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3 3" />
+                        <line x1="4" y1="8" x2="336" y2="8" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3 3" />
+                        <text x="336" y="125.6" text-anchor="end" font-size="9" fill="#706f6c">50k €</text>
+                        <text x="336" y="97.2" text-anchor="end" font-size="9" fill="#706f6c">100k €</text>
+                        <text x="336" y="68.8" text-anchor="end" font-size="9" fill="#706f6c">150k €</text>
+                        <text x="336" y="40.4" text-anchor="end" font-size="9" fill="#706f6c">200k €</text>
+                        <text x="336" y="11.6" text-anchor="end" font-size="9" fill="#706f6c">250k €</text>
+                        <path d="M4 124.4 L336 87.5" stroke="#706f6c" stroke-width="2" stroke-linecap="round" />
+                        <path d="M4 124.4 C22.4 121.6 40.8 119.2 59.3 116 C77.8 112.8 96.2 109 114.7 104.7 C133.1 100.4 151.6 95.4 170 89.7 C188.4 84 206.9 77.4 225.3 69.8 C243.8 62.2 262.2 53.4 280.7 43.3 C299.1 33.2 317.6 19.8 336 8" stroke="#00bc7d" stroke-width="2" stroke-linecap="round" />
+                      </svg>
+                      <div class="grid grid-cols-3 text-xs text-gray-500">
+                        <span class="text-right" data-i18n="home.preview.axis10"></span><span class="text-right" data-i18n="home.preview.axis20"></span><span class="text-right" data-i18n="home.preview.axis30"></span>
+                      </div>
+                      <div class="mt-4 flex items-center justify-center gap-4 text-xs text-gray-700">
+                        <span class="inline-flex items-center gap-1.5"><span class="w-4 h-0.5 rounded-full bg-[#706f6c]"></span><span data-i18n="home.preview.contributed"></span></span>
+                        <span class="inline-flex items-center gap-1.5"><span class="w-4 h-0.5 rounded-full bg-[#00bc7d]"></span><span data-i18n="home.preview.total"></span></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.retirementLabel"></p>
+                  <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.retirementTitle"></h3>
+                  <div class="mt-4 border-t border-gray-200 pt-4">
+                    <div class="rounded-2xl border border-gray-200">
+                      <div class="rounded-t-2xl border-b border-gray-200 bg-zinc-50 px-5 py-4.5">
+                        <p class="text-sm font-bold text-gray-900" data-i18n="home.preview.withPension" data-i18n-vars="{&quot;amount&quot;:&quot;2.150 €&quot;}"></p>
+                      </div>
+                      <div class="grid grid-cols-1 divide-y divide-gray-200">
+                        <div class="px-4 py-4">
+                          <div class="flex items-center gap-2 mb-2">
+                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.minAge"></p>
+                          </div>
+                          <p class="text-xl font-bold text-gray-900" data-i18n="home.preview.minAgeValue1"></p>
+                        </div>
+                        <div class="px-4 py-4">
+                          <div class="flex items-center gap-2 mb-2">
+                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                            <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.savingsNeededAt" data-i18n-vars="{&quot;age&quot;:&quot;64&quot;}"></p>
+                          </div>
+                          <p class="text-xl font-bold text-gray-900">150.000 €</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="mt-8 rounded-2xl border border-gray-200">
+                      <div class="rounded-t-2xl border-b border-gray-200 bg-zinc-50 px-5 py-4.5">
+                        <p class="text-sm font-bold text-gray-900" data-i18n="home.preview.withoutPension"></p>
+                      </div>
+                      <div class="grid grid-cols-1 divide-y divide-gray-200">
+                        <div class="px-4 py-4">
+                          <div class="flex items-center gap-2 mb-2">
+                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.minAge"></p>
+                          </div>
+                          <p class="text-xl font-bold text-gray-900" data-i18n="home.preview.minAgeValue2"></p>
+                        </div>
+                        <div class="px-4 py-4">
+                          <div class="flex items-center gap-2 mb-2">
+                            <svg class="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                            <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.savingsNeededAt" data-i18n-vars="{&quot;age&quot;:&quot;67&quot;}"></p>
+                          </div>
+                          <p class="text-xl font-bold text-gray-900">300.000 €</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.homeLabel"></p>
+                  <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.homeTitle"></h3>
+                  <div class="mt-4 border-t border-gray-200 pt-4">
+                    <div class="grid grid-cols-2 gap-3">
+                      <div class="bg-zinc-100 border border-[#e3e3e0]/70 rounded-xl px-4 py-3">
+                        <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.realtyFees"></p>
+                        <p class="mt-1 text-lg font-bold text-gray-900">7.475 €</p>
+                      </div>
+                      <div class="bg-zinc-100 border border-[#e3e3e0]/70 rounded-xl px-4 py-3">
+                        <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.taxes"></p>
+                        <p class="mt-1 text-lg font-bold text-gray-900">18.525 €</p>
+                      </div>
+                      <div class="bg-zinc-100 border border-[#e3e3e0]/70 rounded-xl px-4 py-3">
+                        <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.reformFurniture"></p>
+                        <p class="mt-1 text-lg font-bold text-gray-900">9.000 €</p>
+                      </div>
+                      <div class="bg-zinc-100 border border-[#e3e3e0]/70 rounded-xl px-4 py-3">
+                        <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.capitalUsed"></p>
+                        <p class="mt-1 text-lg font-bold text-gray-900">120.000 €</p>
+                      </div>
+                    </div>
+                    <div class="mt-5 border-t border-gray-200 pt-5 grid grid-cols-1 gap-5">
+                      <div class="bg-[#fdfdfe] border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                          <svg class="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.maxPrice"></p>
+                        </div>
+                        <p class="text-xl font-bold text-gray-900">285.000 €</p>
+                      </div>
+                      <div class="bg-[#fdfdfe] border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                          <svg class="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg>
+                          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.maxMortgage"></p>
+                        </div>
+                        <p class="text-xl font-bold text-gray-900">200.000 €</p>
+                      </div>
+                      <div class="bg-[#fdfdfe] border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                          <svg class="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg>
+                          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.totalDownPayment"></p>
+                        </div>
+                        <p class="text-xl font-bold text-gray-900">85.000 €</p>
+                      </div>
+                      <div class="bg-[#fdfdfe] border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                          <svg class="w-6 h-6 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                          <p class="text-xs font-semibold text-gray-600 uppercase tracking-wider" data-i18n="home.preview.monthlyPayment"></p>
+                        </div>
+                        <p class="text-xl font-bold text-gray-900">1.180 €</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.financeLabel"></p>
+                  <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.accountEvolution"></h3>
+                  <div class="mt-4 border-t border-gray-200 pt-4">
+                    <div class="grid grid-cols-1 gap-3">
+                      <div class="bg-zinc-100 border-[#e3e3e0]/70 rounded-xl px-3 sm:px-4 py-3 border flex flex-col justify-center">
+                        <p class="text-xs font-semibold uppercase tracking-wider mb-1 text-gray-600" data-i18n="home.preview.cashOnAccount"></p>
+                        <p class="text-lg font-bold text-gray-900">13.785 €</p>
+                        <p class="text-xs mt-1 text-gray-500">+10,0 %</p>
+                      </div>
+                      <div class="bg-emerald-50 border-emerald-200 rounded-xl px-3 sm:px-4 py-3 border flex flex-col justify-center">
+                        <p class="text-xs font-semibold uppercase tracking-wider mb-1 text-emerald-800" data-i18n="home.preview.interests"></p>
+                        <p class="text-lg font-bold text-emerald-700">+1.385 €</p>
+                        <p class="text-xs mt-1 text-emerald-600" data-i18n="home.preview.monthsHistory" data-i18n-vars="{&quot;months&quot;:&quot;38&quot;}"></p>
+                      </div>
+                      <div class="bg-zinc-100 border-[#e3e3e0]/70 rounded-xl px-3 sm:px-4 py-3 border flex flex-col justify-center">
+                        <p class="text-xs font-semibold uppercase tracking-wider mb-1 text-gray-600" data-i18n="home.preview.currentYearInterests"></p>
+                        <p class="text-lg font-bold text-gray-900">+305 €</p>
+                      </div>
+                    </div>
+                    <div class="mt-5 border-t border-gray-200 pt-4">
+                      <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3" data-i18n="home.preview.balanceByAccount"></p>
+                      <table class="w-full text-sm">
+                        <thead>
+                          <tr>
+                            <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2" data-i18n="home.preview.bank"></th>
+                            <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2 min-w-[3.65rem]" data-i18n="home.preview.invested"></th>
+                            <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2 min-w-[3.65rem]" data-i18n="home.preview.balance"></th>
+                            <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 min-w-[3.55rem]" data-i18n="home.preview.interests"></th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                          <tr>
+                            <td class="py-2.5 pr-2">
+                              <span class="inline-flex items-center gap-2 font-semibold text-gray-900">
+                                <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full" style="background-color:#f0eef2;width:30px;height:30px">
+                                  <svg width="18" height="18" viewBox="0 6 48 30" xmlns="http://www.w3.org/2000/svg" class="block">
+                                    <linearGradient id="mi-g" gradientUnits="userSpaceOnUse" x1="35.0997" y1="16.9123" x2="47.5023" y2="16.9123" gradientTransform="matrix(1 0 0 -1 0 38)"><stop offset="0" stop-color="#1C6FC9"/><stop offset="0.45" stop-color="#CE28A3"/><stop offset="1" stop-color="#E62619"/></linearGradient>
+                                    <path fill="#282828" d="M0,8c0-0.4,0.1-0.7,0.4-0.9C0.7,6.8,1,6.7,1.4,6.7c0.4,0,0.7,0.1,0.9,0.4C2.5,7.3,2.7,7.6,2.7,8v0.5c0.6-0.5,1.2-1,1.9-1.3c0.8-0.5,1.6-0.6,2.4-0.6c1.1,0,2.3,0.3,3.3,0.8c1,0.5,1.8,1.2,2.4,2.1c0.7-0.9,1.5-1.6,2.5-2.1c1-0.5,2.1-0.8,3.3-0.8c1,0,1.9,0.2,2.8,0.6c1.7,0.7,3.1,2.1,3.8,3.8c0.4,0.9,0.6,1.8,0.6,2.8v12.7c0,0.4-0.1,0.7-0.4,0.9c-0.2,0.2-0.6,0.4-0.9,0.4c-0.4,0-0.7-0.1-0.9-0.4c-0.2-0.2-0.4-0.6-0.4-0.9V13.7c0-0.6-0.1-1.2-0.3-1.7c-0.4-1-1.3-1.9-2.3-2.3c-0.6-0.2-1.1-0.4-1.7-0.3c-0.6,0-1.2,0.1-1.7,0.3c-1,0.4-1.9,1.3-2.3,2.3c-0.2,0.5-0.4,1.1-0.3,1.7v12.7c0,0.4-0.1,0.7-0.4,0.9c-0.2,0.2-0.6,0.4-0.9,0.4c-0.4,0-0.7-0.1-0.9-0.4c-0.2-0.2-0.4-0.6-0.4-0.9V13.7c0-1.2-0.5-2.4-1.4-3.2c-1-0.8-2.1-1.3-3.2-1.3c-1.1,0-2.3,0.4-3.1,1.2c-0.8,0.8-1.3,1.9-1.3,3v12.9c0,0.4-0.1,0.7-0.4,0.9c-0.2,0.2-0.6,0.4-0.9,0.4s-0.7-0.1-0.9-0.4C0.2,27,0,26.7,0,26.3L0,8z"/>
+                                    <path fill="#282828" d="M27.8,8.4l7.1,18.4c0.2,0.4,0.5,0.7,0.9,0.8c0.4,0.1,0.9-0.1,1.1-0.4c0.3-0.3-0.4-0.8-0.2-1.2l-7-18.4C30,7.2,29.8,7,29.5,6.9c-0.3-0.1-0.6-0.1-0.9,0"></path>
+                                    <path fill="url(#mi-g)" d="M47.4,8.4l-10,26.2c-0.2,0.4-0.5,0.7-0.9,0.8c-0.4,0.1-0.9-0.1-1.1-0.4c-0.3-0.3-0.3-0.8-0.2-1.2l9.9-26.2c0.1-0.3,0.3-0.5,0.6-0.7c0.3-0.1,0.6-0.1,0.9,0c0.3,0.1,0.6,0.3,0.7,0.6C47.5,7.8,47.5,8.1,47.4,8.4"/>
+                                  </svg>
+                                </span>
+                                MyInvestor
+                              </span>
+                            </td>
+                            <td class="py-2.5 pr-2 text-right text-gray-900">6.800 €</td>
+                            <td class="py-2.5 pr-2 text-right text-gray-900">7.385 €</td>
+                            <td class="py-2.5 text-right text-emerald-600 font-semibold">+585 €</td>
+                          </tr>
+                          <tr>
+                            <td class="py-2.5 pr-2">
+                              <span class="inline-flex items-center gap-2 font-semibold text-gray-900">
+                                <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full" style="background-color:#ececec;width:30px;height:30px">
+                                  <svg width="18" height="18" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" class="block"><path fill="#1D1D1F" d="M168.7 71.3 0 126v156.7L168.7 228c13.3-4 27.3-4 40.7.7l62 21.3c13.3 4.7 27.3 4.7 40.7.7L511.3 196V39.3L312 94c-13.3 4-27.3 4-40.7-.7l-62-21.3c-12.6-4-27.3-4.7-40.6-.7m0 190L0 316v156.7L168.7 418c13.3-4 27.3-4 40.7.7l62 21.3c13.3 4.7 27.3 4.7 40.7.7L512 386V229.3L312.7 284c-13.3 4-27.3 4-40.7-.7L210 262c-13.3-4-28-4.7-41.3-.7"/></svg>
+                                </span>
+                                Trade Republic
+                              </span>
+                            </td>
+                            <td class="py-2.5 pr-2 text-right text-gray-900">4.200 €</td>
+                            <td class="py-2.5 pr-2 text-right text-gray-900">5.000 €</td>
+                            <td class="py-2.5 text-right text-emerald-600 font-semibold">+800 €</td>
+                          </tr>
+                          <tr>
+                            <td class="py-2.5 pr-2">
+                              <span class="inline-flex items-center gap-2 font-semibold text-gray-900">
+                                <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full" style="background-color:#fdeaea;width:30px;height:30px">
+                                  <svg width="18" height="18" viewBox="0 0 44 42.4" xmlns="http://www.w3.org/2000/svg" class="block"><path fill="#EC0000" d="M31.5,19.5 C31.4,18 31,16.5 30.2,15.2 L23.4,3.3 C22.9,2.4 22.5,1.4 22.3,0.4 L22,0.9 c-1.7,2.9 -1.7,6.6 0,9.5 l5.5,9.5 c1.7,2.9 1.7,6.6 0,9.5 l-0.3,0.5 c-0.2,-1 -0.6,-2 -1.1,-2.9 l-5,-8.7 -3.2,-5.6 C17.4,11.8 17,10.8 16.8,9.8 l-0.3,0.5 c-1.7,2.9 -1.7,6.5 0,9.5 v0 l5.5,9.5 c1.7,2.9 1.7,6.6 0,9.5 l-0.3,0.5 c-0.2,-1 -0.6,-2 -1.1,-2.9 L13.7,24.5 C12.8,22.9 12.4,21.1 12.4,19.3 5.1,21.2 0,25.3 0,30 0,36.6 9.8,41.9 21.9,41.9 34,41.9 43.8,36.6 43.8,30 43.9,25.5 38.9,21.4 31.5,19.5 Z"/></svg>
+                                </span>
+                                Santander
+                              </span>
+                            </td>
+                            <td class="py-2.5 pr-2 text-right text-gray-900">1.400 €</td>
+                            <td class="py-2.5 pr-2 text-right text-gray-900">1.400 €</td>
+                            <td class="py-2.5 text-right text-gray-500">0 €</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      </div>
+                  </div>
+                </div>
+
+                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.financeLabel"></p>
+                  <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.financeSummary"></h3>
+                  <div class="mt-4 border-t border-gray-200 pt-4">
+                    <div class="grid grid-cols-1 gap-3">
+                      <div class="bg-zinc-100 border-[#e3e3e0]/70 rounded-xl px-3 sm:px-4 py-3 border flex flex-col justify-center">
+                        <p class="text-xs font-semibold uppercase tracking-wider mb-1 text-gray-600" data-i18n="home.preview.totalCapital"></p>
+                        <p class="text-lg font-bold text-gray-900">45.894 €</p>
+                        <p class="text-xs mt-1 text-gray-500" data-i18n="home.preview.portfolioAccountSplit" data-i18n-vars="{&quot;portfolio&quot;:&quot;32.109 €&quot;,&quot;portfolioPct&quot;:&quot;70&quot;,&quot;account&quot;:&quot;13.785 €&quot;,&quot;accountPct&quot;:&quot;30&quot;}">Cartera 32.109 € (70 %) · Cuenta 13.785 € (30 %)</p>
+                      </div>
+                      <div class="bg-emerald-50 border-emerald-200 rounded-xl px-3 sm:px-4 py-3 border flex flex-col justify-center">
+                        <p class="text-xs font-semibold uppercase tracking-wider mb-1 text-emerald-800" data-i18n="home.preview.totalProfit"></p>
+                        <p class="text-lg font-bold text-emerald-700">+8.318 € (18,1 %)</p>
+                        <p class="text-xs mt-1 text-emerald-600" data-i18n="home.preview.portfolioAccountSplitShort" data-i18n-vars="{&quot;portfolio&quot;:&quot;+6.933 €&quot;,&quot;account&quot;:&quot;+1.385 €&quot;}">Cartera +6.933 € · Cuenta +1.385 €</p>
+                      </div>
+                      <div class="bg-zinc-100 border-[#e3e3e0]/70 rounded-xl px-3 sm:px-4 py-3 border flex flex-col justify-center">
+                        <p class="text-xs font-semibold uppercase tracking-wider mb-1 text-gray-600" data-i18n="home.preview.avgMonthlyIncome"></p>
+                        <p class="text-lg font-bold text-gray-900">+3.100 €/mes</p>
+                        <p class="text-xs mt-1 text-gray-500" data-i18n="home.preview.median" data-i18n-vars="{&quot;value&quot;:&quot;+3.050 €&quot;,&quot;months&quot;:&quot;38&quot;}"></p>
+                      </div>
+                      <div class="bg-zinc-100 border-[#e3e3e0]/70 rounded-xl px-3 sm:px-4 py-3 border flex flex-col justify-center">
+                        <p class="text-xs font-semibold uppercase tracking-wider mb-1 text-gray-600" data-i18n="home.preview.avgMonthlyExpense"></p>
+                        <p class="text-lg font-bold text-gray-900">-2.150 €/mes</p>
+                        <p class="text-xs mt-1 text-gray-500" data-i18n="home.preview.median" data-i18n-vars="{&quot;value&quot;:&quot;-2.050 €&quot;,&quot;months&quot;:&quot;38&quot;}"></p>
+                      </div>
+                      <div class="bg-emerald-50 border-emerald-200 rounded-xl px-3 sm:px-4 py-3 border flex flex-col justify-center">
+                        <p class="text-xs font-semibold uppercase tracking-wider mb-1 text-emerald-800" data-i18n="home.preview.savingsCapacity"></p>
+                        <p class="text-lg font-bold text-emerald-700">+950 €/mes</p>
+                        <p class="text-xs mt-1 text-emerald-600" data-i18n="home.preview.incomeExpenseSplit" data-i18n-vars="{&quot;income&quot;:&quot;+3.100 €&quot;,&quot;expense&quot;:&quot;-2.150 €&quot;}"></p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.financeLabel"></p>
+                  <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.expensesByCategory"></h3>
+                  <div class="mt-4 border-t border-gray-200 pt-4">
+                    <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3" data-i18n="home.preview.expenseDetail"></p>
+                    <ul class="space-y-2.5">
+                      <li class="overflow-hidden rounded-2xl border border-gray-200 bg-[#fdfdfe]">
+                        <div class="flex items-start gap-3 px-4 pt-3 pb-1">
+                          <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full p-1" style="color:#ea580c;background-color:#ffedd5" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>
+                          </span>
+                          <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold leading-snug text-gray-900" data-i18n="home.preview.christmasDinner"></p>
+                            <p class="mt-0.5 text-xs leading-3 text-gray-500" data-i18n="home.preview.dateJan4"></p>
+                          </div>
+                          <span class="text-sm font-semibold text-red-600">-98,00 €</span>
+                        </div>
+                        <div class="border-t border-gray-100 px-4 pb-2.5 pt-2">
+                          <ul class="ml-7 space-y-1.5 border-l border-gray-200/80 pl-3">
+                            <li class="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
+                              <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                <span class="hidden min-[494px]:inline" data-i18n="home.preview.group"></span>
+                              </span>
+                              <span class="flex items-center gap-1.5 text-xs font-medium text-gray-700">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>
+                                <span data-i18n="categories.Restaurantes y delivery"></span>
+                              </span>
+                              <span class="ml-auto text-xs font-semibold text-red-600">-58,00 €</span>
+                            </li>
+                            <li class="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
+                              <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">
+                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                <span class="hidden min-[494px]:inline" data-i18n="home.preview.individual"></span>
+                              </span>
+                              <span class="flex items-center gap-1.5 text-xs font-medium text-gray-700">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M17 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg>
+                                <span data-i18n="categories.Ocio y cultura"></span>
+                              </span>
+                              <span class="ml-auto text-xs font-semibold text-red-600">-40,00 €</span>
+                            </li>
+                          </ul>
+                        </div>
+                      </li>
+                      <li class="overflow-hidden rounded-2xl border border-gray-200 bg-[#fdfdfe]">
+                        <div class="flex items-start gap-3 px-4 pt-3 pb-2">
+                          <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full p-1" style="color:#00a06a;background-color:#e7f9f0" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                          </span>
+                          <div class="min-w-0 flex-1">
+                            <p class="text-sm font-semibold leading-snug text-gray-900" data-i18n="home.preview.supermarket"></p>
+                            <p class="mt-0.5 text-xs leading-3 text-gray-500" data-i18n="home.preview.dateJan3"></p>
+                          </div>
+                          <span class="text-sm font-semibold text-red-600">-42,60 €</span>
+                        </div>
+                        <div class="flex items-center gap-2 border-t border-gray-100 px-4 py-2">
+                          <span class="flex items-center gap-1.5 text-xs font-medium text-gray-600">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                            <span data-i18n="categories.Alimentación"></span>
+                          </span>
+                          <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">
+                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <span data-i18n="home.preview.individual"></span>
+                          </span>
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
+                  <div class="mt-4 border-t border-gray-200 pt-4">
+                    <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-1" data-i18n="home.preview.thisMonthByCategory"></p>
+                    <ul class="space-y-3">
+                      <li class="flex items-center justify-between text-sm">
+                        <span class="flex items-center gap-2 font-medium text-gray-700">
+                          <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full p-1" style="color:#4f46e5;background-color:#e0e7ff" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></svg>
+                          </span>
+                          <span data-i18n="categories.Vivienda"></span>
+                        </span>
+                        <span class="text-gray-600">-1.350 €<span class="text-gray-400 ml-2">62.8%</span></span>
+                      </li>
+                      <li class="flex items-center justify-between text-sm">
+                        <span class="flex items-center gap-2 font-medium text-gray-700">
+                          <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full p-1" style="color:#00a06a;background-color:#e7f9f0" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+                          </span>
+                          <span data-i18n="categories.Alimentación"></span>
+                        </span>
+                        <span class="text-gray-600">-420 €<span class="text-gray-400 ml-2">19.5%</span></span>
+                      </li>
+                      <li class="flex items-center justify-between text-sm">
+                        <span class="flex items-center gap-2 font-medium text-gray-700">
+                          <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full p-1" style="color:#ea580c;background-color:#ffedd5" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>
+                          </span>
+                          <span data-i18n="categories.Restaurantes y delivery"></span>
+                        </span>
+                        <span class="text-gray-600">-260 €<span class="text-gray-400 ml-2">12.1%</span></span>
+                      </li>
+                      <li class="flex items-center justify-between text-sm">
+                        <span class="flex items-center gap-2 font-medium text-gray-700">
+                          <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full p-1" style="color:#0891b2;background-color:#cffafe" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
+                          </span>
+                          <span data-i18n="categories.Transporte"></span>
+                        </span>
+                        <span class="text-gray-600">-95 €<span class="text-gray-400 ml-2">4.4%</span></span>
+                      </li>
+                      <li class="flex items-center justify-between text-sm">
+                        <span class="flex items-center gap-2 font-medium text-gray-700">
+                          <span class="inline-flex items-center justify-center flex-shrink-0 rounded-full p-1" style="color:#a21caf;background-color:#fae8ff" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M17 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg>
+                          </span>
+                          <span data-i18n="categories.Ocio y cultura"></span>
+                        </span>
+                        <span class="text-gray-600">-25 €<span class="text-gray-400 ml-2">1.2%</span></span>
+                      </li>
+                      <li class="flex items-center justify-between text-sm border-t border-gray-200 pt-2">
+                        <span class="font-semibold text-gray-700" data-i18n="home.preview.totalThisMonth"></span>
+                        <span class="font-semibold text-red-600">-2.150 €</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
               </div>
-            </button>
-            <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="retirement">
-              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-              <div>
-                <p class="text-sm font-semibold">Calculadora de Jubilación</p>
-                <p class="text-xs mt-0.5 leading-relaxed">Planifica cuándo jubilarte gestionando tus ahorros.</p>
+              <div id="preview-shade" aria-hidden="true" class="pointer-events-none absolute inset-y-0 right-0 w-14 rounded-r-2xl bg-gradient-to-l from-[#fdfdfe] to-transparent min-[422px]:hidden"></div>
+                </div>
+                <button
+                  data-preview-nav="next"
+                  aria-label="Siguiente vista previa"
+                  data-i18n-aria="home.previewNext"
+                  class="hidden min-[640px]:flex cursor-pointer flex-shrink-0 items-center justify-center w-11 h-11 rounded-xl border border-gray-200 bg-[#fdfdfe] text-gray-700 transition-colors hover:bg-zinc-100 hover:text-gray-900"
+                >
+                  <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
               </div>
-            </button>
-            <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="affordability">
-              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
-              <div>
-                <p class="text-sm font-semibold">Calculadora de Hogar</p>
-                <p class="text-xs mt-0.5 leading-relaxed">Descubre qué casa te puedes permitir.</p>
+
+              <div id="preview-dots" class="mt-4 flex justify-center gap-1.5 min-[640px]:hidden" aria-label="Navegación de vistas previas" data-i18n-aria="home.previewDots">
+                <button aria-label="Ir a la vista previa 1" data-i18n-aria="home.previewDot" class="preview-dot w-2 h-2 rounded-full bg-gray-900 transition-colors"></button>
+                <button aria-label="Ir a la vista previa 2" data-i18n-aria="home.previewDot" class="preview-dot w-2 h-2 rounded-full bg-gray-300 transition-colors"></button>
+                <button aria-label="Ir a la vista previa 3" data-i18n-aria="home.previewDot" class="preview-dot w-2 h-2 rounded-full bg-gray-300 transition-colors"></button>
+                <button aria-label="Ir a la vista previa 4" data-i18n-aria="home.previewDot" class="preview-dot w-2 h-2 rounded-full bg-gray-300 transition-colors"></button>
+                <button aria-label="Ir a la vista previa 5" data-i18n-aria="home.previewDot" class="preview-dot w-2 h-2 rounded-full bg-gray-300 transition-colors"></button>
+                <button aria-label="Ir a la vista previa 6" data-i18n-aria="home.previewDot" class="preview-dot w-2 h-2 rounded-full bg-gray-300 transition-colors"></button>
               </div>
-            </button>
-            <button class="cursor-pointer tab-btn flex flex-1 items-center gap-3 px-5 py-4 text-left transition-all" data-tab="investments">
-              <span class="flex-shrink-0"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg></span>
-              <div>
-                <p class="text-sm font-semibold">Agregador de Finanzas</p>
-                <p class="text-xs mt-0.5 leading-relaxed">Importa extractos y analiza tu cartera y capacidad de ahorro.</p>
+            </section>
+
+            <section id="simuladores" class="flex flex-col gap-14 md:gap-20 scroll-mt-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
+                <div>
+                  <span class="inline-flex w-11 h-11 items-center justify-center rounded-xl bg-zinc-100 text-gray-900 mb-5">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
+                  </span>
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-600" data-i18n="home.savings.eyebrow"></p>
+                  <h2 class="mt-2 text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight" data-i18n="home.savings.title"></h2>
+                  <p class="mt-4 leading-relaxed text-gray-500" data-i18n="home.savings.text"></p>
+                  <ul class="mt-5 space-y-2.5 text-sm">
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.savings.b1"></span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.savings.b2"></span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.savings.b3"></span>
+                    </li>
+                  </ul>
+                  <button class="home-tab cursor-pointer mt-7 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-[#fdfdfe] px-5 py-2.5 text-sm font-semibold text-gray-900 transition-all hover:border-gray-300 hover:text-gray-900" data-tab="savings">
+                    <span data-i18n="home.savings.cta"></span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </button>
+                </div>
+                <div class="bg-[#fdfdfe] border border-gray-200 rounded-2xl p-6 sm:p-8">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.how"></p>
+                  <ol class="mt-5 space-y-5">
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">1</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.savings.step1"></p>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">2</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.savings.step2"></p>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">3</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.savings.step3"></p>
+                    </li>
+                  </ol>
+                </div>
               </div>
-            </button>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
+                <div class="md:order-2">
+                  <span class="inline-flex w-11 h-11 items-center justify-center rounded-xl bg-zinc-100 text-gray-900 mb-5">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  </span>
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-600" data-i18n="home.retirement.eyebrow"></p>
+                  <h2 class="mt-2 text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight" data-i18n="home.retirement.title"></h2>
+                  <p class="mt-4 leading-relaxed text-gray-500" data-i18n="home.retirement.text"></p>
+                  <ul class="mt-5 space-y-2.5 text-sm">
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.retirement.b1"></span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.retirement.b2"></span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.retirement.b3"></span>
+                    </li>
+                  </ul>
+                  <button class="home-tab cursor-pointer mt-7 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-[#fdfdfe] px-5 py-2.5 text-sm font-semibold text-gray-900 transition-all hover:border-gray-300 hover:text-gray-900" data-tab="retirement">
+                    <span data-i18n="home.retirement.cta"></span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </button>
+                </div>
+                <div class="md:order-1 bg-[#fdfdfe] border border-gray-200 rounded-2xl p-6 sm:p-8">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.how"></p>
+                  <ol class="mt-5 space-y-5">
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">1</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.retirement.step1"></p>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">2</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.retirement.step2"></p>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">3</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.retirement.step3"></p>
+                    </li>
+                  </ol>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
+                <div>
+                  <span class="inline-flex w-11 h-11 items-center justify-center rounded-xl bg-zinc-100 text-gray-900 mb-5">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                  </span>
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-600" data-i18n="home.hogar.eyebrow"></p>
+                  <h2 class="mt-2 text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight" data-i18n="home.hogar.title"></h2>
+                  <p class="mt-4 leading-relaxed text-gray-500" data-i18n="home.hogar.text"></p>
+                  <ul class="mt-5 space-y-2.5 text-sm">
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.hogar.b1"></span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.hogar.b2"></span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.hogar.b3"></span>
+                    </li>
+                  </ul>
+                  <button class="home-tab cursor-pointer mt-7 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-[#fdfdfe] px-5 py-2.5 text-sm font-semibold text-gray-900 transition-all hover:border-gray-300 hover:text-gray-900" data-tab="affordability">
+                    <span data-i18n="home.hogar.cta"></span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </button>
+                </div>
+                <div class="bg-[#fdfdfe] border border-gray-200 rounded-2xl p-6 sm:p-8">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.how"></p>
+                  <ol class="mt-5 space-y-5">
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">1</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.hogar.step1"></p>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">2</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.hogar.step2"></p>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">3</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.hogar.step3"></p>
+                    </li>
+                  </ol>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-center">
+                <div class="md:order-2">
+                  <span class="inline-flex w-11 h-11 items-center justify-center rounded-xl bg-zinc-100 text-gray-900 mb-5">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                  </span>
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-600" data-i18n="home.finanzas.eyebrow"></p>
+                  <h2 class="mt-2 text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight" data-i18n="home.finanzas.title"></h2>
+                  <p class="mt-4 leading-relaxed text-gray-500" data-i18n="home.finanzas.text"></p>
+                  <ul class="mt-5 space-y-2.5 text-sm">
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.finanzas.b1"></span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.finanzas.b2"></span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.finanzas.b3"></span>
+                    </li>
+                    <li class="flex items-start gap-2.5">
+                      <svg class="w-4 h-4 shrink-0 mt-0.5 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                      <span class="text-gray-600" data-i18n="home.finanzas.b4"></span>
+                    </li>
+                  </ul>
+                  <button class="home-tab cursor-pointer mt-7 inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-[#fdfdfe] px-5 py-2.5 text-sm font-semibold text-gray-900 transition-all hover:border-gray-300 hover:text-gray-900" data-tab="investments">
+                    <span data-i18n="home.finanzas.cta"></span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg>
+                  </button>
+                </div>
+                <div class="md:order-1 bg-[#fdfdfe] border border-gray-200 rounded-2xl p-6 sm:p-8">
+                  <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.how"></p>
+                  <ol class="mt-5 space-y-5">
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">1</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.finanzas.step1"></p>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">2</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.finanzas.step2"></p>
+                    </li>
+                    <li class="flex items-start gap-4">
+                      <span class="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-100 text-gray-700 text-sm font-bold flex items-center justify-center">3</span>
+                      <p class="pt-1 text-sm leading-relaxed text-gray-600" data-i18n="home.finanzas.step3"></p>
+                    </li>
+                  </ol>
+                </div>
+              </div>
+            </section>
+
+            <section class="bg-[#fdfdfe] border border-gray-200 rounded-2xl px-6 py-12 sm:py-14 text-center">
+              <svg class="mx-auto w-8 h-8 text-gray-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <p class="mt-4 text-xs font-semibold uppercase tracking-widest text-gray-600" data-i18n="home.privacy.eyebrow"></p>
+              <h2 class="mt-2 text-xl sm:text-2xl font-bold text-gray-900 tracking-tight" data-i18n="home.privacy.title"></h2>
+              <p class="mx-auto mt-4 max-w-2xl leading-relaxed text-gray-500" data-i18n="home.privacy.text"></p>
+            </section>
           </div>
         </div>
       </div>
-    </nav>
+    </div>
     <div id="tab-savings" class="tab-content">
       <SavingsSimulator client:load />
     </div>
@@ -138,6 +803,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
     <BackupRestore client:load />
     <script>
       const contents = {
+        home: document.getElementById('tab-home'),
         savings: document.getElementById('tab-savings'),
         retirement: document.getElementById('tab-retirement'),
         affordability: document.getElementById('tab-affordability'),
@@ -146,42 +812,38 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
       const tabBtns = document.querySelectorAll('.tab-btn');
       const mobileTrigger = document.getElementById('nav-mobile-trigger');
       const mobileMenu = document.getElementById('nav-mobile-menu')!;
-      const mobileLabel = document.getElementById('nav-mobile-label')!;
-      const mobileArrow = document.getElementById('nav-mobile-arrow')!;
+      const mobileOpenIcon = document.getElementById('nav-mobile-open-icon');
+      const mobileCloseIcon = document.getElementById('nav-mobile-close-icon');
       let mobileOpen = false;
 
+      function setMobileMenu(open: boolean) {
+        mobileOpen = open;
+        mobileMenu.classList.toggle('hidden', !open);
+        mobileOpenIcon?.classList.toggle('hidden', open);
+        mobileCloseIcon?.classList.toggle('hidden', !open);
+        mobileTrigger?.setAttribute('aria-expanded', String(open));
+      }
+
       function closeMobile() {
-        mobileOpen = false;
-        mobileMenu.classList.add('hidden');
-        mobileArrow.classList.remove('rotate-180');
+        setMobileMenu(false);
       }
 
       function switchTab(tab: string) {
         localStorage.setItem('nestegg-tab', tab);
         tabBtns.forEach(btn => {
           const isActive = (btn as HTMLElement).dataset.tab === tab;
-          btn.classList.toggle('bg-zinc-100', isActive);
-          btn.classList.toggle('hover:bg-zinc-100', isActive);
-          btn.classList.toggle('hover:bg-zinc-100', !isActive);
-          btn.classList.toggle('text-gray-900', !isActive && !btn.closest('#nav-mobile-menu'));
-          const desc = btn.querySelector('p:last-child');
           if (btn.closest('#nav-mobile-menu')) {
             btn.classList.toggle('bg-zinc-100', isActive);
+            btn.classList.toggle('text-gray-900', isActive);
+            btn.classList.toggle('text-gray-600', !isActive);
+          } else if ((btn as HTMLElement).dataset.tab === 'home') {
             btn.classList.toggle('text-gray-900', true);
           } else {
-            if (isActive) {
-              desc?.classList.add('text-gray-500');
-              desc?.classList.remove('text-gray-500');
-            } else {
-              desc?.classList.remove('text-gray-500');
-              desc?.classList.add('text-gray-500');
-            }
+            btn.classList.toggle('bg-zinc-100', isActive);
+            btn.classList.toggle('text-gray-900', isActive);
+            btn.classList.toggle('text-gray-600', !isActive);
           }
         });
-        const activeDesktopBtn = document.querySelector(`.tab-btn[data-tab="${tab}"]:not(#nav-mobile-menu .tab-btn)`);
-        mobileLabel.textContent = activeDesktopBtn?.querySelector('p:first-child')?.textContent ?? '';
-        const iconSrc = activeDesktopBtn?.querySelector('.flex-shrink-0');
-        if (iconSrc) document.getElementById('nav-mobile-icon')!.innerHTML = iconSrc.innerHTML;
         Object.entries(contents).forEach(([key, el]) => {
           el?.classList.toggle('hidden', key !== tab);
         });
@@ -193,12 +855,20 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
         btn.addEventListener('click', () => switchTab((btn as HTMLElement).dataset.tab ?? ''));
       });
 
+      document.querySelectorAll('.home-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchTab((btn as HTMLElement).dataset.tab ?? 'home'));
+      });
+
+      document.querySelectorAll('.home-scroll').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelector((btn as HTMLElement).dataset.scroll ?? '')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
+
       if (mobileTrigger) {
         mobileTrigger.addEventListener('click', (e) => {
           e.stopPropagation();
-          mobileOpen = !mobileOpen;
-          mobileMenu.classList.toggle('hidden', !mobileOpen);
-          mobileArrow.classList.toggle('rotate-180', mobileOpen);
+          setMobileMenu(!mobileOpen);
         });
         document.addEventListener('click', (e) => {
           if (!document.getElementById('nav-container')?.contains(e.target as Node)) {
@@ -207,15 +877,66 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
         });
       }
 
-      const savedTab = localStorage.getItem('nestegg-tab') || 'savings';
+      const savedTab =
+        (window.location.hash && contents[window.location.hash.slice(1)]) ?
+          window.location.hash.slice(1) :
+          (localStorage.getItem('nestegg-tab') || 'home');
       switchTab(savedTab);
+
+      window.addEventListener('hashchange', () => {
+        const tab = window.location.hash.slice(1);
+        if (contents[tab]) switchTab(tab);
+      });
+
+      const previewTrack = document.getElementById('preview-track');
+      const previewShade = document.getElementById('preview-shade');
+      const previewDots = document.querySelectorAll('.preview-dot');
+      const previewNavBtns = document.querySelectorAll('[data-preview-nav]');
+      if (previewTrack) {
+        const previewStep = () => {
+          const first = previewTrack.firstElementChild as HTMLElement | null;
+          return (first?.offsetWidth ?? 0) + 16;
+        };
+        const maxPreviewScroll = () => previewTrack.scrollWidth - previewTrack.clientWidth;
+        previewNavBtns.forEach(btn => {
+          btn.addEventListener('click', () => {
+            const isPrev = (btn as HTMLElement).dataset.previewNav === 'prev';
+            const step = previewStep();
+            const maxScroll = maxPreviewScroll();
+            if (maxScroll <= 0) return;
+            const index = Math.round(previewTrack.scrollLeft / step);
+            let target: number;
+            if (isPrev) {
+              target = previewTrack.scrollLeft <= 1 ? maxScroll : Math.max(0, (index - 1) * step);
+            } else {
+              target = previewTrack.scrollLeft >= maxScroll - 1 ? 0 : Math.min(maxScroll, (index + 1) * step);
+            }
+            previewTrack.scrollTo({ left: target, behavior: 'smooth' });
+          });
+        });
+        const updatePreviewDots = () => {
+          const index = Math.min(previewDots.length - 1, Math.round(previewTrack.scrollLeft / previewStep()));
+          previewDots.forEach((dot, i) => {
+            dot.classList.toggle('bg-gray-900', i === index);
+            dot.classList.toggle('bg-gray-300', i !== index);
+          });
+        };
+        const updatePreviewShade = () => {
+          if (previewShade) previewShade.classList.toggle('hidden', window.innerWidth >= 444);
+        };
+        const updatePreviewNav = () => {
+          updatePreviewDots();
+          updatePreviewShade();
+        };
+        previewTrack.addEventListener('scroll', updatePreviewNav);
+        previewDots.forEach((dot, i) => {
+          (dot as HTMLElement).addEventListener('click', () => {
+            previewTrack.scrollTo({ left: i * previewStep(), behavior: 'smooth' });
+          });
+        });
+        updatePreviewNav();
+      }
     </script>
-    <footer class="flex flex-col items-center gap-1 px-3 sm:px-4 lg:px-8 py-10">
-      <p class="text-xs text-gray-500 text-center">
-        <svg class="inline-block w-3.5 h-3.5 text-gray-400 align-[-2px] mr-1.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        <span>Todos los datos se procesan y almacenan localmente en tu navegador. Nada se envía a ningún servidor.</span>
-      </p>
-      <p class="text-xs text-gray-500 mt-2">© 2026 NestEgg · Todos los derechos reservados</p>
-    </footer>
+    <SiteFooter />
   </body>
 </html>

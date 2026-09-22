@@ -13,7 +13,7 @@ export function CollapsibleSection({ title, isOpen, onToggle, headerRight, child
     <section className="-mx-6 sm:-mx-8 border-t border-gray-200 first:border-t-0 first:pt-0">
       <button
         onClick={onToggle}
-        className="py-5 w-full px-6 sm:px-8 grid items-center gap-x-3 gap-y-3 grid-cols-[1fr_auto] min-[516px]:grid-cols-[auto_1fr_auto] min-[516px]:gap-y-0 border-b border-gray-200 cursor-pointer text-left"
+        className="py-5 w-full px-6 sm:px-8 grid items-center gap-x-3 gap-y-3 grid-cols-[1fr_auto] min-[516px]:grid-cols-[auto_1fr_auto] min-[516px]:gap-y-0 cursor-pointer text-left"
       >
         <h3 className="text-base font-bold text-gray-900 uppercase tracking-wider col-start-1 row-start-1">{title}</h3>
         <div className={`col-start-1 row-start-2 justify-self-start min-[516px]:col-start-2 min-[516px]:row-start-1 min-[516px]:justify-self-end ${headerRight ? '' : 'hidden'}`}>

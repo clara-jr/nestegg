@@ -1,6 +1,9 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useI18n } from '../../../lib/i18n';
 
-export function Tooltip({ text, children, className }: { text: string; children: React.ReactNode; className?: string }) {
+export function Tooltip({ text, textKey, children, className }: { text?: string; textKey?: string; children: React.ReactNode; className?: string }) {
+  const { t } = useI18n();
+  const translatedText = textKey ? t(textKey) : text ?? '';
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLSpanElement>(null);
   const tooltipRef = useRef<HTMLSpanElement>(null);
@@ -58,7 +61,7 @@ export function Tooltip({ text, children, className }: { text: string; children:
           }}
           className="px-3 py-1.5 rounded-xl bg-zinc-100 text-gray-700 border border-gray-200 text-xs leading-tight whitespace-normal max-w-[min(36rem,calc(100vw-2rem))] break-words shadow-lg z-50 pointer-events-none normal-case tracking-normal font-normal text-left"
         >
-          {text}
+          {translatedText}
         </span>
       )}
     </span>

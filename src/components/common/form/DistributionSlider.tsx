@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../../lib/i18n';
 
 export interface DistributionPeriod {
   label: string;
@@ -16,19 +17,20 @@ export interface DistributionSliderProps {
 }
 
 export function DistributionSlider({
-  title = 'Distribución por Tramos',
+  title,
   periods,
   sameForAll,
   showSameForAllToggle,
   onToggleSameForAll,
   onChange,
 }: Readonly<DistributionSliderProps>) {
+  const { t } = useI18n();
   const displayPeriods = sameForAll ? [periods[0]].filter(Boolean) : periods;
 
   return (
     <div className="bg-zinc-100 border border-[#e3e3e0]/70 rounded-xl px-4 py-3 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">{title}</p>
+        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wider">{title ?? t('common.distributionTitle')}</p>
         {showSameForAllToggle && (
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
@@ -37,7 +39,7 @@ export function DistributionSlider({
               onChange={(e) => onToggleSameForAll(e.target.checked)}
               className="w-3.5 h-3.5 text-gray-600 border-gray-300 rounded cursor-pointer"
             />
-            <span className="text-xs font-medium text-gray-700">Igual en todos</span>
+            <span className="text-xs font-medium text-gray-700">{t('common.sameForAll')}</span>
           </label>
         )}
       </div>
@@ -46,7 +48,7 @@ export function DistributionSlider({
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-gray-700">{period.label}</p>
             <span className="text-xs font-semibold text-gray-700">
-              {period.pct}% cuenta | {100 - period.pct}% inversiones
+              {t('common.accountVsInvestments', { acct: period.pct, inv: 100 - period.pct })}
             </span>
           </div>
           <input
@@ -59,7 +61,7 @@ export function DistributionSlider({
           />
         </div>
       ))}
-      <p className="text-xs text-gray-500">Cuenta ← → Inversiones</p>
+      <p className="text-xs text-gray-500">{t('common.accountLeftInvestmentsRight')}</p>
     </div>
   );
 }

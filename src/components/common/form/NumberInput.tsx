@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useI18n } from '../../../lib/i18n';
 
 interface NumberInputProps {
   value: string;
@@ -48,6 +49,7 @@ export function NumberInput({
   onFocus,
   onBlur,
 }: Readonly<NumberInputProps>) {
+  const { t } = useI18n();
   const topCorner = stepperRound === 'xl' ? 'rounded-tr-xl' : 'rounded-tr-md';
   const bottomCorner = stepperRound === 'xl' ? 'rounded-br-xl' : 'rounded-br-md';
 
@@ -78,7 +80,7 @@ export function NumberInput({
         <button
           type="button"
           tabIndex={-1}
-          aria-label="Subir"
+          aria-label={t('common.numberUp')}
           disabled={disabled}
           onMouseDown={e => e.preventDefault()}
           onClick={() => bump(1)}
@@ -89,7 +91,7 @@ export function NumberInput({
         <button
           type="button"
           tabIndex={-1}
-          aria-label="Bajar"
+          aria-label={t('common.numberDown')}
           disabled={disabled}
           onMouseDown={e => e.preventDefault()}
           onClick={() => bump(-1)}

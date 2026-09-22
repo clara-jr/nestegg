@@ -47,8 +47,6 @@ import {
   DAY_FILTER,
   averageMonthlyInRange,
   fillMonthly,
-  formatDay,
-  formatMonth,
   expenseSplits,
   guessExpenseCategory,
   interestNetAmount,
@@ -77,6 +75,7 @@ import {
   useProfiles,
 } from '../lib/profiles';
 import { useFontsReady } from '../lib/fonts';
+import { formatDateLocalized, formatDayLocalized, useI18n, type Lang } from '../lib/i18n';
 import ProfileSelector from './ProfileSelector';
 import JointSimulator from './JointSimulator';
 import { SimulatorLoading } from './common/layout/SimulatorLoading';
@@ -85,7 +84,6 @@ import {
   ChartRangeSummary,
   ChartTooltip,
   CustomRangeInputs,
-  PRESET_LABELS,
   dayOf,
   useDateRangeFilter,
   type DateRange,
@@ -130,14 +128,24 @@ interface ImportFeedback {
 
 type SectionTab = 'portfolio' | 'account' | 'income' | 'expenses' | 'movements' | 'joint';
 
-const SECTION_TABS: ReadonlyArray<{ id: SectionTab; label: string; onlyWithTwoProfiles?: boolean }> = [
-  { id: 'portfolio', label: 'Cartera' },
-  { id: 'account', label: 'Cuenta' },
-  { id: 'income', label: 'Ingresos' },
-  { id: 'expenses', label: 'Gastos' },
-  { id: 'movements', label: 'Movimientos' },
-  { id: 'joint', label: 'Convivencia', onlyWithTwoProfiles: true },
+const SECTION_TABS: ReadonlyArray<{ id: SectionTab; onlyWithTwoProfiles?: boolean }> = [
+  { id: 'portfolio' },
+  { id: 'account' },
+  { id: 'income' },
+  { id: 'expenses' },
+  { id: 'movements' },
+  { id: 'joint', onlyWithTwoProfiles: true },
 ];
+
+function timeFilterOptions(t: ReturnType<typeof useI18n>['t']): Array<{ value: string; label: string }> {
+  return [
+    { value: 'all', label: t('dateFilter.all') },
+    { value: 'month', label: t('dateFilter.month') },
+    { value: '6m', label: t('dateFilter.6m') },
+    { value: 'year', label: t('dateFilter.year') },
+    { value: 'custom', label: t('dateFilter.custom') },
+  ];
+}
 
 const BANK_LABELS: Record<BankId, string> = Object.fromEntries(
   BANKS.map(b => [b.id, b.label])
@@ -145,16 +153,18 @@ const BANK_LABELS: Record<BankId, string> = Object.fromEntries(
 
 const ORDERED_BANKS = [...BANKS].sort((a, b) => a.label.localeCompare(b.label, 'es'));
 
-function fmtMonthLabel(month: string): string {
-  const [y, m] = month.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+function fmtMonthLabel(month: string, lang: Lang): string {
+  return formatDayLocalized(lang, month, { month: 'short', year: '2-digit' });
 }
 
 /** Reparto del capital entre cartera y efectivo, con porcentaje sobre el total. */
-function capitalSplitSubtitle(cartera: number, cuenta: number): string {
+function capitalSplitSubtitle(cartera: number, cuenta: number, t: ReturnType<typeof useI18n>['t']): string {
   const total = cartera + cuenta;
   const pct = (v: number) => (total > 0.005 ? ` (${Math.round((v / total) * 100)}%)` : '');
-  return `Cartera ${formatCurrency(cartera)}${pct(cartera)} · Cuenta ${formatCurrency(cuenta)}${pct(cuenta)}`;
+  return t('investments.capitalSplit', {
+    cartera: `${formatCurrency(cartera)}${pct(cartera)}`,
+    cuenta: `${formatCurrency(cuenta)}${pct(cuenta)}`,
+  });
 }
 
 function pnlColor(value: number): string {
@@ -164,6 +174,7 @@ function pnlColor(value: number): string {
 }
 
 export default function InvestmentsSimulator() {
+  const { t } = useI18n();
   const { profiles } = useProfiles();
   const [store, setStore, storeReady] = useProfileLocalStorage<InvestmentsStore>('nestegg-investments-v1', {
     files: [],
@@ -318,7 +329,7 @@ export default function InvestmentsSimulator() {
     const input = fileInputRef.current;
     const selected = input?.files ? Array.from(input.files) : [];
     if (selected.length === 0) {
-      setFeedback({ kind: 'error', text: 'Selecciona al menos un fichero CSV o XLS.' });
+      setFeedback({ kind: 'error', text: t('investments.importSelectFile') });
       return;
     }
 
@@ -394,23 +405,25 @@ export default function InvestmentsSimulator() {
       if (addedCount === 0 && duplicateCount === 0) {
         setFeedback({
           kind: 'error',
-          text: `No se ha podido leer ningún movimiento de "${selected.map(f => f.name).join(', ')}". Comprueba que el banco seleccionado coincide con el origen del fichero.`,
+          text: t('investments.importNoMovements', { files: selected.map(f => f.name).join(', ') }),
         });
       } else {
         const parts = [
-          `${addedCount} movimiento${addedCount === 1 ? '' : 's'} importado${addedCount === 1 ? '' : 's'}`,
-          `${duplicateCount} duplicado${duplicateCount === 1 ? '' : 's'} omitido${duplicateCount === 1 ? '' : 's'}`,
+          t('investments.importAdded', { count: addedCount, plural: addedCount === 1 ? '' : 's' }),
+          t('investments.importDuplicates', { count: duplicateCount, plural: duplicateCount === 1 ? '' : 's' }),
         ];
         if (newlyHidden > 0) {
-          parts.push(`${newlyHidden} cargo${newlyHidden === 1 ? '' : 's'} de banco reclasificado${newlyHidden === 1 ? '' : 's'} a Traspaso por duplicar PayPal`);
+          parts.push(
+            t('investments.importHiddenCharges', { count: newlyHidden, plural: newlyHidden === 1 ? '' : 's' }),
+          );
         }
-        if (skippedRows > 0) parts.push(`${skippedRows} filas sin fecha o importe ignoradas`);
+        if (skippedRows > 0) parts.push(t('investments.importSkipped', { count: skippedRows }));
         setFeedback({ kind: addedCount > 0 ? 'success' : 'warning', text: `${parts.join(' · ')}.` });
       }
     } catch (err) {
       setFeedback({
         kind: 'error',
-        text: `Error leyendo el fichero: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('investments.importError', { message: err instanceof Error ? err.message : String(err) }),
       });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -678,7 +691,7 @@ export default function InvestmentsSimulator() {
         isin: h.isin,
       }));
     if (requests.length === 0) {
-      setPriceStatus('No hay posiciones en la cartera.');
+      setPriceStatus(t('investments.noPositions'));
       return;
     }
     const labelByKey = new Map(
@@ -706,11 +719,11 @@ export default function InvestmentsSimulator() {
         .join(', ');
       setPriceStatus(
         okCount > 0
-          ? `${okCount} de ${requests.length} precios actualizados${failedLabels ? ` · Sin datos: ${failedLabels}` : ''}`
-          : 'No se han podido obtener precios. Introdúcelos manualmente.'
+          ? `${t('investments.pricesUpdated', { ok: okCount, total: requests.length })}${failedLabels ? ` · ${t('investments.pricesNoData', { labels: failedLabels })}` : ''}`
+          : t('investments.pricesFailed')
       );
     } catch {
-      setPriceStatus('Error al conectar con el servicio de cotizaciones. Introdúcelos manualmente.');
+      setPriceStatus(t('investments.pricesError'));
     } finally {
       setUpdatingPrices(false);
     }
@@ -798,24 +811,24 @@ export default function InvestmentsSimulator() {
     <SimulatorLayout>
       <ProfileSelector />
       <FormContainer>
-        <FormSection title="Importar extractos bancarios" cols="single">
+        <FormSection title={t('investments.importTitle')} cols="single">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
             <label className="block">
-              <span className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">Banco de origen</span>
+              <span className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">{t('investments.bankOrigin')}</span>
               <Select
                 value={bank}
                 size="md"
                 fullWidth
-                ariaLabel="Banco de origen"
+                ariaLabel={t('investments.bankOrigin')}
                 onChange={handleBankChange}
                 options={ORDERED_BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={18} /> }))}
               />
               <span className="block text-xs text-gray-500 mt-1">
-                {BANKS.find(b => b.id === bank)?.hint}
+                {t(`page.bancos.bank.${bank}.hint`)}
               </span>
             </label>
             <label className="block">
-              <span className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">Ficheros (CSV/XLS)</span>
+              <span className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">{t('investments.fileLabel')}</span>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -833,11 +846,11 @@ export default function InvestmentsSimulator() {
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {importing
-                ? 'Importando…'
+                ? t('investments.importing')
                 : (
                     <>
                       <Icon name="upload" className="h-4 w-4" />
-                      Importar movimientos
+                      {t('investments.import')}
                     </>
                   )}
             </button>
@@ -875,7 +888,7 @@ export default function InvestmentsSimulator() {
                   >
                     <polyline points="9 18 15 12 9 6"/>
                   </svg>
-                  Histórico de ficheros ({store.files.length})
+                  {t('investments.fileHistory', { count: store.files.length })}
                 </button>
                 <button
                   type="button"
@@ -888,7 +901,7 @@ export default function InvestmentsSimulator() {
                     <line x1="10" y1="11" x2="10" y2="17"/>
                     <line x1="14" y1="11" x2="14" y2="17"/>
                   </svg>
-                  Vaciar todo
+                  {t('investments.clearAll')}
                 </button>
               </div>
               {showFileHistory && (
@@ -922,8 +935,8 @@ export default function InvestmentsSimulator() {
                           <button
                             type="button"
                             onClick={() => setEditingFile({ id: f.id, name: f.name })}
-                            aria-label="Renombrar fichero"
-                            title="Renombrar fichero"
+                            aria-label={t('investments.renameFile')}
+                            title={t('investments.renameFile')}
                             className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-gray-400 hover:text-gray-700 transition-colors cursor-pointer"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -932,12 +945,12 @@ export default function InvestmentsSimulator() {
                           </button>
                         </>
                       )}
-                      <span className="text-gray-400">{f.count} mov.</span>
-                      <Tooltip text="Eliminar fichero y sus movimientos">
+                      <span className="text-gray-400">{t('investments.fileMovements', { count: f.count })}</span>
+                      <Tooltip text={t('investments.deleteFile')}>
                         <button
                           type="button"
                           onClick={() => deleteFile(f.id)}
-                          aria-label="Eliminar fichero y sus movimientos"
+                          aria-label={t('investments.deleteFile')}
                           className="w-5 h-5 flex-shrink-0 flex items-center justify-center rounded-full text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
                         >
                           ✕
@@ -956,52 +969,56 @@ export default function InvestmentsSimulator() {
         {!hasData ? (
           <div className="py-14 flex flex-col items-center justify-center text-center gap-3">
             <Icon name="chart" className="h-14 w-14 text-gray-400" />
-            <p className="text-base font-bold text-gray-900">Aún no hay datos</p>
+            <p className="text-base font-bold text-gray-900">{t('investments.emptyTitle')}</p>
             <p className="text-sm text-gray-500 max-w-md leading-relaxed">
-              Sube los extractos CSV/XLS de tus bancos para ver el beneficio de tu cartera,
-              los intereses de cuentas remuneradas y un seguimiento mensual de tus gastos.
-              Todo se guarda únicamente en tu navegador.
+              {t('investments.emptyBody')}
             </p>
           </div>
         ) : (
           <>
-            <ScenarioSection title="Resumen de Finanzas" gridCols="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-3">
+            <ScenarioSection title={t('investments.summaryTitle')} gridCols="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-3">
               <SummaryCard
-                label="Capital Total"
+                label={t('investments.totalCapital')}
                 value={formatCurrency(totalCapital)}
                 variant="info"
-                subtitle={capitalSplitSubtitle(portfolio.summary.currentValue, cashBalance)}
+                subtitle={capitalSplitSubtitle(portfolio.summary.currentValue, cashBalance, t)}
               />
               <SummaryCard
-                label="Beneficio Total"
+                label={t('investments.totalProfit')}
                 value={`${formatSigned(totalBenefit)}${benefitPct !== null ? ` (${formatSignedPct(benefitPct)})` : ''}`}
                 variant={
                   totalBenefit > 0.005 ? 'positive' : totalBenefit < -0.005 ? 'negative' : 'neutral'
                 }
-                subtitle={`Cartera ${formatSigned(portfolio.summary.totalBenefit)} · Cuenta ${formatSigned(interest.total)}`}
+                subtitle={t('investments.profitSplit', {
+                  portfolio: formatSigned(portfolio.summary.totalBenefit),
+                  account: formatSigned(interest.total),
+                })}
               />
               <SummaryCard
-                label="Capacidad de Ahorro"
-                value={`${formatSigned(savingsAvg)}/mes`}
+                label={t('investments.savingsCapacity')}
+                value={<>{formatSigned(savingsAvg)}{t('investments.perMonth')}</>}
                 variant={savingsAvg >= 0 ? 'positive' : 'negative'}
-                subtitle={`Ingresos medios: ${formatSigned(income.averageMonthly)} · Gastos medios: ${formatSigned(-expenses.averageMonthly)}`}
+                subtitle={t('investments.incomeExpenseSplit', {
+                  income: formatSigned(income.averageMonthly),
+                  expense: formatSigned(-expenses.averageMonthly),
+                })}
               />
             </ScenarioSection>
 
             <div className="-mx-6 sm:-mx-8 px-6 sm:px-8 border-t border-gray-200 pt-5 space-y-5">
               <div className="flex flex-wrap gap-2">
-                {SECTION_TABS.filter(t => !t.onlyWithTwoProfiles || profiles.length > 1).map(t => (
+                {SECTION_TABS.filter(sec => !sec.onlyWithTwoProfiles || profiles.length > 1).map(sec => (
                   <button
-                    key={t.id}
+                    key={sec.id}
                     type="button"
-                    onClick={() => setTab(t.id)}
+                    onClick={() => setTab(sec.id)}
                     className={`px-4 py-2 text-sm font-semibold rounded-full border transition-colors cursor-pointer ${
-                      tab === t.id
+                      tab === sec.id
                         ? 'bg-zinc-100 text-gray-900 border-gray-200'
                         : 'bg-[#fdfdfe] text-gray-600 border-gray-200 hover:border-gray-300 hover:text-gray-900'
                     }`}
                   >
-                    {t.label}
+                    {t(`investments.tab.${sec.id}`)}
                   </button>
                 ))}
               </div>
@@ -1076,17 +1093,13 @@ export default function InvestmentsSimulator() {
       <Modal
         open={pendingCategoryChange !== null}
         onClose={() => setPendingCategoryChange(null)}
-        title="Cambiar categoría"
+        title={t('investments.changeCategory')}
       >
         <p className="text-sm text-gray-700 leading-relaxed">
-          Se han encontrado{' '}
-          <span className="font-semibold text-gray-900">{pendingCategoryChange?.ids.length ?? 0}</span>{' '}
-          movimientos con el concepto «{pendingCategoryChange?.concept}».
+          {t('investments.foundMovements', { count: pendingCategoryChange?.ids.length ?? 0, concept: pendingCategoryChange?.concept ?? '' })}
         </p>
         <p className="text-sm text-gray-700 leading-relaxed mt-2">
-          ¿Quieres moverlos todos a la categoría{' '}
-          <span className="font-semibold text-gray-900">{pendingCategoryChange?.category}</span>{' '}
-          o solo este movimiento?
+          {t('investments.moveAllOrOne', { category: pendingCategoryChange?.category ?? '' })}
         </p>
         <div className="flex flex-wrap justify-end gap-2 pt-5">
           <button
@@ -1094,14 +1107,14 @@ export default function InvestmentsSimulator() {
             onClick={confirmMoveOne}
             className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
-            Solo este
+            {t('investments.onlyThis')}
           </button>
           <button
             type="button"
             onClick={confirmMoveAll}
             className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
           >
-            Mover todos ({pendingCategoryChange?.ids.length})
+            {t('investments.moveAll', { count: pendingCategoryChange?.ids.length ?? 0 })}
           </button>
         </div>
       </Modal>
@@ -1109,19 +1122,13 @@ export default function InvestmentsSimulator() {
       <Modal
         open={pendingTypeChange !== null}
         onClose={() => setPendingTypeChange(null)}
-        title="Cambiar tipo"
+        title={t('investments.changeType')}
       >
         <p className="text-sm text-gray-700 leading-relaxed">
-          Se han encontrado{' '}
-          <span className="font-semibold text-gray-900">{pendingTypeChange?.ids.length ?? 0}</span>{' '}
-          movimientos con el concepto «{pendingTypeChange?.concept}».
+          {t('investments.foundMovements', { count: pendingTypeChange?.ids.length ?? 0, concept: pendingTypeChange?.concept ?? '' })}
         </p>
         <p className="text-sm text-gray-700 leading-relaxed mt-2">
-          ¿Quieres cambiar el tipo de todos a{' '}
-          <span className="font-semibold text-gray-900">
-            {pendingTypeChange ? MOVEMENT_TYPE_LABELS[pendingTypeChange.type] : ''}
-          </span>{' '}
-          o solo este movimiento?
+          {t('investments.changeTypePrompt', { type: pendingTypeChange ? movementTypeLabel(pendingTypeChange.type, t) : '' })}
         </p>
         <div className="flex flex-wrap justify-end gap-2 pt-5">
           <button
@@ -1129,14 +1136,14 @@ export default function InvestmentsSimulator() {
             onClick={confirmTypeOne}
             className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
-            Solo este
+            {t('investments.onlyThis')}
           </button>
           <button
             type="button"
             onClick={confirmTypeAll}
             className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
           >
-            Cambiar todos ({pendingTypeChange?.ids.length})
+            {t('investments.changeAll', { count: pendingTypeChange?.ids.length ?? 0 })}
           </button>
         </div>
       </Modal>
@@ -1144,13 +1151,13 @@ export default function InvestmentsSimulator() {
       <Modal
         open={pendingClearAll}
         onClose={() => setPendingClearAll(false)}
-        title="Vaciar todos los datos"
+        title={t('investments.clearAllTitle')}
       >
         <p className="text-sm text-gray-700 leading-relaxed">
-          ¿Vaciar todos los movimientos e histórico de ficheros importados?
+          {t('investments.clearAllPrompt')}
         </p>
         <p className="text-sm text-gray-500 leading-relaxed mt-2">
-          Esta acción no se puede deshacer.
+          {t('investments.irreversible')}
         </p>
         <div className="flex flex-wrap justify-end gap-2 pt-5">
           <button
@@ -1158,29 +1165,30 @@ export default function InvestmentsSimulator() {
             onClick={() => setPendingClearAll(false)}
             className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
-            Cancelar
+            {t('investments.cancel')}
           </button>
           <button
             type="button"
             onClick={clearAll}
             className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
           >
-            Vaciar todo
+            {t('investments.clearAll')}
           </button>
         </div>
       </Modal>
     <Modal
         open={pendingDeleteIds !== null}
         onClose={() => setPendingDeleteIds(null)}
-        title="Eliminar movimientos"
+        title={t('investments.deleteMovementsTitle')}
       >
         <p className="text-sm text-gray-700 leading-relaxed">
-          ¿Eliminar{' '}
-          <span className="font-semibold text-gray-900">{pendingDeleteIds?.length ?? 0}</span>{' '}
-          movimiento{pendingDeleteIds && pendingDeleteIds.length !== 1 ? 's' : ''}?
+          {t('investments.deleteMovementsPrompt', {
+            count: pendingDeleteIds?.length ?? 0,
+            plural: pendingDeleteIds && pendingDeleteIds.length !== 1 ? 's' : '',
+          })}
         </p>
         <p className="text-sm text-gray-500 leading-relaxed mt-2">
-          Esta acción no se puede deshacer.
+          {t('investments.irreversible')}
         </p>
         <div className="flex flex-wrap justify-end gap-2 pt-5">
           <button
@@ -1188,14 +1196,14 @@ export default function InvestmentsSimulator() {
             onClick={() => setPendingDeleteIds(null)}
             className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
-            Cancelar
+            {t('investments.cancel')}
           </button>
           <button
             type="button"
             onClick={confirmDelete}
             className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
           >
-            Eliminar
+            {t('investments.delete')}
           </button>
         </div>
       </Modal>
@@ -1203,23 +1211,20 @@ export default function InvestmentsSimulator() {
       <Modal
         open={pendingChargeTypeMovement !== null}
         onClose={() => setPendingChargeTypeMovement(null)}
-        title="Cambiar propiedad del gasto"
+        title={t('investments.changeOwnershipTitle')}
       >
         <p className="text-sm text-gray-700 leading-relaxed">
-          Se han encontrado{' '}
-          <span className="font-semibold text-gray-900">{pendingChargeTypeMovement?.ids.length ?? 0}</span>{' '}
-          movimientos con el concepto «{pendingChargeTypeMovement?.concept}».
+          {t('investments.foundMovements', { count: pendingChargeTypeMovement?.ids.length ?? 0, concept: pendingChargeTypeMovement?.concept ?? '' })}
         </p>
         <p className="text-sm text-gray-700 leading-relaxed mt-2">
-          ¿Quieres cambiar la propiedad de todos a{' '}
-          <span className="font-semibold text-gray-900">
-            {pendingChargeTypeMovement?.targetValue === 'joint'
-              ? 'Conjunto'
-              : pendingChargeTypeMovement?.targetValue === 'individual'
-                ? 'Individual'
-                : 'Según categoría'}
-          </span>{' '}
-          o solo este movimiento?
+          {t('investments.changeOwnershipPrompt', {
+            value:
+              pendingChargeTypeMovement?.targetValue === 'joint'
+                ? t('investments.joint')
+                : pendingChargeTypeMovement?.targetValue === 'individual'
+                  ? t('investments.individual')
+                  : t('investments.byCategory'),
+          })}
         </p>
         <div className="flex flex-wrap justify-end gap-2 pt-5">
           <button
@@ -1227,14 +1232,14 @@ export default function InvestmentsSimulator() {
             onClick={confirmChargeTypeOne}
             className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
-            Solo este
+            {t('investments.onlyThis')}
           </button>
           <button
             type="button"
             onClick={confirmChargeTypeAll}
             className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
           >
-            Cambiar todos ({pendingChargeTypeMovement?.ids.length})
+            {t('investments.changeAll', { count: pendingChargeTypeMovement?.ids.length ?? 0 })}
           </button>
         </div>
       </Modal>
@@ -1265,6 +1270,7 @@ function PortfolioSection({
   onSetPrice: (key: string, ticker: string | undefined, raw: string) => void;
   onSetPlazoConfig: (key: string, partial: Partial<PlazoFijoConfig>) => void;
 }) {
+  const { t } = useI18n();
   type PortfolioSort = 'annual' | 'tipo' | 'latente' | 'recibido' | 'total';
   const [portfolioSort, setPortfolioSort] = useState<PortfolioSort>('annual');
   const [portfolioDir, setPortfolioDir] = useState<'asc' | 'desc'>('desc');
@@ -1303,7 +1309,7 @@ function PortfolioSection({
       const hb = b.holding;
       let cmp: number;
       if (portfolioSort === 'tipo') {
-        cmp = investmentTypeLabel(ha.assetClass).localeCompare(investmentTypeLabel(hb.assetClass));
+        cmp = investmentTypeLabel(ha.assetClass, t).localeCompare(investmentTypeLabel(hb.assetClass, t));
       } else if (portfolioSort === 'latente') {
         cmp = ha.unrealizedPnl - hb.unrealizedPnl;
       } else if (portfolioSort === 'recibido') {
@@ -1313,7 +1319,7 @@ function PortfolioSection({
       }
       return cmp * mult || ha.name.localeCompare(hb.name);
     });
-  }, [rows, portfolioSort, portfolioDir, annualOrder]);
+  }, [rows, portfolioSort, portfolioDir, annualOrder, t]);
 
   const handlePortfolioSort = (key: PortfolioSort, defaultDir: 'asc' | 'desc') => {
     if (portfolioSort === key) {
@@ -1327,7 +1333,7 @@ function PortfolioSection({
   if (rows.length === 0) {
     return (
       <p className="text-sm text-gray-500 py-6 text-center">
-        No hay compras de ETFs, acciones o fondos en los extractos importados.
+        {t('investments.portfolio.empty')}
       </p>
     );
   }
@@ -1336,7 +1342,7 @@ function PortfolioSection({
     <section className="space-y-4 pb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">
-          Evolución de la cartera ({rows.length} productos)
+          {t('investments.portfolio.evolution', { count: rows.length })}
         </h3>
         {/*portfolioSort !== 'annual' && (
           <button
@@ -1364,20 +1370,20 @@ function PortfolioSection({
       </div>
 
       <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-5 gap-3 mb-8">
-        <SummaryCard label="Invertido" value={formatCurrency(summary.investedCost)} variant="info" />
-        <SummaryCard label="Valor Actual" value={formatCurrency(summary.currentValue)} variant="info" subtitle={valuePct !== null ? formatSignedPct(valuePct) : undefined} />
-        <SummaryCard label="Latente" value={formatSigned(summary.unrealized)} variant={summary.unrealized >= 0 ? 'positive' : 'negative'} subtitle="Pendiente de vender" />
-        <SummaryCard label="Recibido" value={formatSigned(summary.realized)} variant={summary.realized >= 0 ? 'positive' : 'negative'} subtitle="Ventas" />
-        <SummaryCard label="Dividendos" value={formatSigned(summary.dividends)} subtitle={undefined} />
+        <SummaryCard label={t('investments.colInvested')} value={formatCurrency(summary.investedCost)} variant="info" />
+        <SummaryCard label={t('investments.portfolio.currentValue')} value={formatCurrency(summary.currentValue)} variant="info" subtitle={valuePct !== null ? formatSignedPct(valuePct) : undefined} />
+        <SummaryCard label={t('investments.colLatente')} value={formatSigned(summary.unrealized)} variant={summary.unrealized >= 0 ? 'positive' : 'negative'} subtitle={t('investments.portfolio.pendingSell')} />
+        <SummaryCard label={t('investments.colRecibido')} value={formatSigned(summary.realized)} variant={summary.realized >= 0 ? 'positive' : 'negative'} subtitle={t('investments.portfolio.sales')} />
+        <SummaryCard label={t('investments.colDividends')} value={formatSigned(summary.dividends)} subtitle={undefined} />
       </div>
 
       <ScrollableTable
         columns={[
-          { title: 'Producto', align: 'left' },
+          { title: t('investments.colProduct'), align: 'left' },
           {
             title: (
               <SortableHeader
-                label="Tipo"
+                label={t('investments.colType')}
                 active={portfolioSort === 'tipo'}
                 dir={portfolioDir}
                 onClick={() => handlePortfolioSort('tipo', 'asc')}
@@ -1387,17 +1393,17 @@ function PortfolioSection({
             minWidth: 120,
           },
           //{ title: 'Días' },
-          { title: 'Partic.', minWidth: 105 },
-          { title: 'P. medio', minWidth: 150 },
-          { title: 'P. actual', align: 'left', minWidth: 170 },
-          { title: 'TIR %', minWidth: 110 },
-          { title: 'Duración', minWidth: 130 },
-          { title: 'Invertido', minWidth: 135 },
-          { title: 'Valor', minWidth: 135 },
+          { title: t('investments.colShares'), minWidth: 105 },
+          { title: t('investments.colAvgPrice'), minWidth: 150 },
+          { title: t('investments.colCurrPrice'), align: 'left', minWidth: 170 },
+          { title: t('investments.colTir'), minWidth: 110 },
+          { title: t('investments.colDuration'), minWidth: 130 },
+          { title: t('investments.colInvested'), minWidth: 135 },
+          { title: t('investments.colValue'), minWidth: 135 },
           {
             title: (
               <SortableHeader
-                label="Latente"
+                label={t('investments.colLatente')}
                 active={portfolioSort === 'latente'}
                 dir={portfolioDir}
                 onClick={() => handlePortfolioSort('latente', 'desc')}
@@ -1408,7 +1414,7 @@ function PortfolioSection({
           {
             title: (
               <SortableHeader
-                label="Recibido"
+                label={t('investments.colRecibido')}
                 active={portfolioSort === 'recibido'}
                 dir={portfolioDir}
                 onClick={() => handlePortfolioSort('recibido', 'desc')}
@@ -1416,11 +1422,11 @@ function PortfolioSection({
             ),
             minWidth: 150,
           },
-          { title: 'Dividendos', minWidth: 150 },
+          { title: t('investments.colDividends'), minWidth: 150 },
           {
             title: (
               <SortableHeader
-                label="Total"
+                label={t('investments.colTotal')}
                 active={portfolioSort === 'total'}
                 dir={portfolioDir}
                 onClick={() => handlePortfolioSort('total', 'desc')}
@@ -1431,7 +1437,7 @@ function PortfolioSection({
           {
             title: (
               <SortableHeader
-                label="% Anual"
+                label={t('investments.colAnnual')}
                 active={portfolioSort === 'annual'}
                 dir={portfolioDir}
                 onClick={() => handlePortfolioSort('annual', 'desc')}
@@ -1460,7 +1466,7 @@ function PortfolioSection({
                 </div>
               ),
             },
-            { content: <span className="text-gray-600">{investmentTypeLabel(h.assetClass)}</span> },
+            { content: <span className="text-gray-600">{investmentTypeLabel(h.assetClass, t)}</span> },
             /*daysHeld !== null
               ? { content: <span className="text-gray-500" title={`Primera compra: ${h.firstBuyDate}`}>{daysHeld.toLocaleString('es-ES')}</span> }
               : '—',*/
@@ -1475,8 +1481,10 @@ function PortfolioSection({
                       <Tooltip
                         text={
                           entry
-                            ? `Precio ${entry.source === 'auto' ? 'obtenido automáticamente' : 'introducido manualmente'}`
-                            : 'Sin precio guardado; se usa el precio medio'
+                            ? entry.source === 'auto'
+                              ? t('investments.portfolio.priceAuto')
+                              : t('investments.portfolio.priceManual')
+                            : t('investments.portfolio.noPrice')
                         }
                       >
                         <InputField
@@ -1495,7 +1503,7 @@ function PortfolioSection({
                   content: (
                     <InputField
                       value={plazoCfg?.rate ? String(plazoCfg.rate) : ''}
-                      placeholder="% anual"
+                      placeholder={t('investments.portfolio.annualRate')}
                       onChange={v => onSetPlazoConfig(h.key, { rate: Number.parseFloat(v.replace(',', '.')) })}
                       step="0.5"
                       className="w-20"
@@ -1510,7 +1518,7 @@ function PortfolioSection({
                   content: (
                     <InputField
                       value={plazoCfg?.months ? String(plazoCfg.months) : ''}
-                      placeholder="meses"
+                      placeholder={t('investments.portfolio.months')}
                       onChange={v => onSetPlazoConfig(h.key, { months: Number.parseFloat(v.replace(',', '.')) })}
                       className="w-20"
                       inputClassName="pr-8 py-1 pl-2 text-right rounded-md"
@@ -1528,10 +1536,19 @@ function PortfolioSection({
                     <Tooltip
                       text={
                         isPF && h.plazoProjectedGain !== undefined
-                          ? `Ganancia prevista al vencimiento: ${formatCurrency(h.investedCost)} × ${formatPct(h.plazoRate ?? 0).replace('+', '')} / 12 × ${h.plazoMonths ?? 0} meses = ${formatCurrency(h.plazoProjectedGain)}${h.realizedPnl > 0 ? `, menos ${formatCurrency(h.realizedPnl)} ya cobrados` : ''}.`
+                          ? t('investments.portfolio.plazoHint', {
+                              invested: formatCurrency(h.investedCost),
+                              rate: formatPct(h.plazoRate ?? 0).replace('+', ''),
+                              months: String(h.plazoMonths ?? 0),
+                              gain: formatCurrency(h.plazoProjectedGain),
+                              realized:
+                                h.realizedPnl > 0
+                                  ? ' · ' + formatCurrency(h.realizedPnl) + ' ' + t('investments.alreadyReceived')
+                                  : '',
+                            })
                           : isPF
-                            ? 'Indica la TIR % y la duración del plazo para estimar la ganancia al vencimiento.'
-                            : 'Diferencia entre el valor actual y el invertido (pendiente de vender).'
+                            ? t('investments.portfolio.plazoRateHint')
+                            : t('investments.portfolio.latenteHint')
                       }
                     >
                       <span className={pnlColor(h.unrealizedPnl)}>{formatSigned(h.unrealizedPnl)}</span>
@@ -1552,16 +1569,12 @@ function PortfolioSection({
                 </span>
               ),
             },
-            annualizedGainCell(h),
+            annualizedGainCell(h, t),
           ];
         })}
       />
       <p className="text-xs text-gray-400 -mt-2">
-        El precio actual es editable: sin dato guardado se usa el precio medio de compra.
-        La columna «% Anual» anualiza la subida total desde la primera compra; si aún no ha pasado
-        un año (*), muestra la subida actual sin anualizar.
-        En los plazos fijos, la TIR % y la duración que indiques estiman en «Latente»
-        la ganancia prevista al vencimiento y marcan «% Anual» con la TIR del plazo.
+        {t('investments.portfolio.note')}
       </p>
     </section>
   );
@@ -1618,12 +1631,12 @@ function annualizedGainRatio(h: Holding): number | null {
  * muestra la subida actual marcada con un asterisco y explicada en el tooltip.
  * En depósitos a plazo muestra la TIR anual indicada por el usuario.
  */
-function annualizedGainCell(h: Holding): { content: ReactNode } | string {
+function annualizedGainCell(h: Holding, t: ReturnType<typeof useI18n>['t']): { content: ReactNode } | string {
   if (h.assetClass === 'plazo-fijo') {
     if (!h.plazoRate || h.investedCost <= 0) {
       return {
         content: (
-          <Tooltip text="Indica la TIR % y la duración del plazo para ver su rentabilidad anual.">
+          <Tooltip text={t('investments.portfolio.plazoRateHint')}>
             <span className="text-gray-500">—</span>
           </Tooltip>
         ),
@@ -1631,7 +1644,7 @@ function annualizedGainCell(h: Holding): { content: ReactNode } | string {
     }
     return {
       content: (
-        <Tooltip text={`TIR anual del plazo fijo (${h.plazoMonths ?? 0} meses): ${formatPct(h.plazoRate)}.`}>
+        <Tooltip text={t('investments.portfolio.plazoRateTir', { months: String(h.plazoMonths ?? 0), rate: formatPct(h.plazoRate) })}>
           <span className={pnlColor(h.plazoRate)}>{formatPct(h.plazoRate)}</span>
         </Tooltip>
       ),
@@ -1646,7 +1659,7 @@ function annualizedGainCell(h: Holding): { content: ReactNode } | string {
   if (years < 1) {
     return {
       content: (
-        <Tooltip text={`Primera compra el ${h.firstBuyDate}: aún no cumple 1 año, se muestra la subida actual (${formatPct(totalPct)}) sin anualizar.`}>
+        <Tooltip text={t('investments.portfolio.firstYear', { date: h.firstBuyDate, pct: formatPct(totalPct) })}>
           <span className={pnlColor(totalPct)}>
             {formatPct(totalPct)}
           </span>
@@ -1659,7 +1672,7 @@ function annualizedGainCell(h: Holding): { content: ReactNode } | string {
   if (totalPct <= -100) {
     return {
       content: (
-        <Tooltip text={`Subida total ${formatPct(totalPct)} desde ${h.firstBuyDate}: no anualizable.`}>
+        <Tooltip text={t('investments.portfolio.notAnnualizable', { pct: formatPct(totalPct), date: h.firstBuyDate })}>
           <span className="text-gray-500">—</span>
         </Tooltip>
       ),
@@ -1669,24 +1682,29 @@ function annualizedGainCell(h: Holding): { content: ReactNode } | string {
   const cagr = (Math.pow(1 + totalPct / 100, 1 / years) - 1) * 100;
   return {
     content: (
-      <Tooltip text={`Subida total ${formatPct(totalPct)} desde la primera compra (${h.firstBuyDate}, ${days.toLocaleString('es-ES')} días), anualizada en ${years.toFixed(1)} años.`}>
+      <Tooltip text={t('investments.portfolio.annualized', { pct: formatPct(totalPct), date: h.firstBuyDate, days: days.toLocaleString('es-ES'), years: years.toFixed(1) })}>
         <span className={pnlColor(cagr)}>{formatPct(cagr)}</span>
       </Tooltip>
     ),
   };
 }
 
+/** Etiqueta traducida del tipo de movimiento. */
+function movementTypeLabel(type: MovementType, t: ReturnType<typeof useI18n>['t']): string {
+  return t(`investments.type.${type}`);
+}
+
 /** Etiqueta del tipo de inversión a partir de la clase de activo del banco. */
-function investmentTypeLabel(assetClass: string | undefined): string {
+function investmentTypeLabel(assetClass: string | undefined, t: ReturnType<typeof useI18n>['t']): string {
   if (!assetClass) return '—';
-  const t = assetClass.toUpperCase();
-  if (/PLAZO.?FIJO/.test(t)) return 'Plazo Fijo';
-  if (/FUND|ETF/.test(t)) return 'ETF';
-  if (/STOCK|ACCI|EQUITY|SHARE/.test(t)) return 'Acción';
-  if (/SUSCRIP|REEMBOLSO|TRASPASO|FUSION|FONDO/.test(t)) return 'Fondo';
-  if (/BOND|BONO|RENTA FIJA/.test(t)) return 'Bono';
-  if (/CRYPTO|CRIPTO/.test(t)) return 'Cripto';
-  if (/COMMODIT|METAL|GOLD|\bOR\b/.test(t)) return 'Materia prima';
+  const t2 = assetClass.toUpperCase();
+  if (/PLAZO.?FIJO/.test(t2)) return t('investments.asset.plazoFijo');
+  if (/FUND|ETF/.test(t2)) return t('investments.asset.etf');
+  if (/STOCK|ACCI|EQUITY|SHARE/.test(t2)) return t('investments.asset.stock');
+  if (/SUSCRIP|REEMBOLSO|TRASPASO|FUSION|FONDO/.test(t2)) return t('investments.asset.fund');
+  if (/BOND|BONO|RENTA FIJA/.test(t2)) return t('investments.asset.bond');
+  if (/CRYPTO|CRIPTO/.test(t2)) return t('investments.asset.crypto');
+  if (/COMMODIT|METAL|GOLD|\bOR\b/.test(t2)) return t('investments.asset.commodity');
   return assetClass;
 }
 
@@ -1703,12 +1721,13 @@ function AccountSection({
   data: ReturnType<typeof computeInterest>;
   account: ReturnType<typeof computeAccountEvolution>;
   cashBalance: number;
-  bankBreakdown: BankBreakdownEntry[];
+bankBreakdown: BankBreakdownEntry[];
 }) {
+  const { t } = useI18n();
   if (account.evolution.length === 0) {
     return (
       <p className="text-sm text-gray-500 py-6 text-center">
-        No se han detectado ingresos ni abonos de interés en los extractos importados.
+        {t('investments.account.empty')}
       </p>
     );
   }
@@ -1716,19 +1735,19 @@ function AccountSection({
 
   return (
     <section className="space-y-4 pb-6">
-      <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Evolución de la cuenta</h3>
+      <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">{t('investments.account.evolution')}</h3>
       <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-3">
         <SummaryCard
-          label="Efectivo en Cuenta"
+          label={t('investments.account.cash')}
           value={formatCurrency(cashBalance)}
           variant="info"
           subtitle={cashPct !== null ? formatSignedPct(cashPct) : undefined}
         />
         <SummaryCard
-          label="Intereses"
+          label={t('investments.account.interest')}
           value={formatSigned(account.totalInterest)}
           variant={account.totalInterest > 0 ? 'positive' : 'neutral'}
-          subtitle={`${data.monthly.length} meses de histórico`}
+          subtitle={t('investments.account.monthsHistory', { count: data.monthly.length })}
           /*subtitle={
             data.withheld > 0
               ? `${formatCurrency(data.gross)} − ${formatCurrency(data.withheld)} en retenciones`
@@ -1736,7 +1755,7 @@ function AccountSection({
           }*/ // TODO: Calcular data.gross y data.withheld correctamente con myinvestor también
         />
         <SummaryCard
-          label={`Intereses Año en Curso`}
+          label={t('investments.account.yearToDate')}
           value={formatSigned(data.currentYear)}
           variant="info"
         />
@@ -1744,13 +1763,13 @@ function AccountSection({
 
       {bankBreakdown.length > 1 && (
         <div>
-          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-8">Saldo por cuenta</h4>
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 mt-8">{t('investments.account.balanceByAccount')}</h4>
           <ScrollableTable
             columns={[
-              { title: 'Banco', align: 'left' },
-              { title: 'Invertido' },
-              { title: 'Saldo' },
-              { title: 'Intereses' },
+              { title: t('investments.colBank'), align: 'left' },
+              { title: t('investments.colInvested') },
+              { title: t('investments.colBalance') },
+              { title: t('investments.colInterest') },
             ]}
             rows={bankBreakdown.map(b => [
               { content: <span className="inline-flex items-center gap-2 font-semibold text-gray-900"><BankLogo bank={b.bank as BankId} size={18} />{BANK_LABELS[b.bank as BankId] ?? b.bank}</span> },
@@ -1797,11 +1816,11 @@ stroke="#00bc7d"
   );
 }
 
-function evolutionChartData(points: AccountEvolutionPoint[]) {
+function evolutionChartData(points: AccountEvolutionPoint[], lang: Lang) {
   return points.map(p => ({
     ...p,
     total: p.contributed + p.interest,
-    label: fmtMonthLabel(p.month),
+    label: fmtMonthLabel(p.month, lang),
   }));
 }
 
@@ -1862,11 +1881,11 @@ function accountTooltip() {
 
 /** Etiqueta del intervalo de los últimos 12 meses calendario ya terminados
  *  (p. ej. «sep 25 – ago 26»), el mismo criterio que usa la media anual. */
-function last12WindowLabel(monthly: MonthPoint[]): string | null {
+function last12WindowLabel(monthly: MonthPoint[], lang: Lang): string | null {
   const completed = completedMonths(monthly);
   const lastGlobal = completed[completed.length - 1]?.month;
   if (!lastGlobal) return null;
-  return `${formatMonth(shiftMonth(lastGlobal, -11))} – ${formatMonth(lastGlobal)}`;
+  return `${fmtMonthLabel(shiftMonth(lastGlobal, -11), lang)} – ${fmtMonthLabel(lastGlobal, lang)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1888,6 +1907,7 @@ function IncomeSection({
   movements: Movement[];
   expenseMovements: Movement[];
 }) {
+  const { t, lang } = useI18n();
   const savingsCurrent = income.currentMonth - expCurrent;
   const savingsPrev = income.previousMonth - expPrev;
   const expByMonth = useMemo(() => new Map(expMonthly.map(p => [p.month, p.total])), [expMonthly]);
@@ -1915,12 +1935,13 @@ function IncomeSection({
     () =>
       monthlyChartData(
         monthlyExpenseSlice(fillMonthly(income.monthly, income.monthly[0]?.month, currentMonthKey())),
+        lang,
       ).map(p => ({
         ...p,
         expenses: expByMonth.get(p.month) ?? 0,
         savings: p.total - (expByMonth.get(p.month) ?? 0),
       })),
-    [income.monthly, expByMonth]
+    [income.monthly, expByMonth, lang]
   );
 
   const incomeMedian = useMemo(() => median(completedMonths(income.monthly).map(p => p.total)), [income.monthly]);
@@ -1950,12 +1971,12 @@ function IncomeSection({
       .filter(p => p.date >= rangeFromDay(dateRange.from) && p.date <= rangeToDay(dateRange.to))
       .map(p => ({
         month: p.date,
-        label: formatDay(p.date),
+        label: formatDayLocalized(lang, p.date),
         total: p.income,
         expenses: p.expenses,
         savings: p.savings,
       }));
-  }, [dateRange, movements, expenseMovements]);
+  }, [dateRange, movements, expenseMovements, lang]);
   const chartRows = isDaily ? dailyData : visibleData;
   // Límites del intervalo «Sin filtro de tiempo»: de la fecha del primer
   // movimiento de ingresos al último mes de ingresos ya terminado (las mismas
@@ -2048,22 +2069,22 @@ function IncomeSection({
 
   return (
     <section className="space-y-4 pb-6">
-      <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Ingresos</h3>
+      <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">{t('investments.tab.income')}</h3>
       <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-4 gap-3">
-        <SummaryCard label="Ingreso Medio Mensual" value={<>{formatSigned(income.averageMonthly)}/mes</>} variant="info" subtitle={`Mediana: ${formatSigned(incomeMedian)} · ${income.monthCount} meses`} />
+        <SummaryCard label={t('investments.income.avgMonthly')} value={<>{formatSigned(income.averageMonthly)}{t('investments.perMonth')}</>} variant="info" subtitle={t('investments.income.median', { value: formatSigned(incomeMedian), count: String(income.monthCount) })} />
         <SummaryCard
-          label="Media último año"
-          value={<>{formatSigned(last12Avg)}/mes</>}
+          label={t('investments.avgLastYear')}
+          value={<>{formatSigned(last12Avg)}{t('investments.perMonth')}</>}
           variant="neutral"
-          subtitle={last12WindowLabel(income.monthly) ?? 'Últimos 12 meses'}
+          subtitle={last12WindowLabel(income.monthly, lang) ?? t('investments.last12Months')}
         />
         <SummaryCard
-          label="Mes Actual"
+          label={t('investments.currentMonth')}
           value={formatSigned(income.currentMonth)}
           variant="neutral"
           subtitle={
             <span>
-              Capacidad de ahorro:{' '}
+              {t('investments.savingsCapacityColon')}{' '}
               <span className={`font-semibold ${savingsCurrent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {formatSigned(savingsCurrent)}
               </span>
@@ -2071,12 +2092,12 @@ function IncomeSection({
           }
         />
         <SummaryCard
-          label="Mes Anterior"
+          label={t('investments.previousMonth')}
           value={formatSigned(income.previousMonth)}
           variant="neutral"
           subtitle={
             <span>
-              Capacidad de ahorro:{' '}
+              {t('investments.savingsCapacityColon')}{' '}
               <span className={`font-semibold ${savingsPrev >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {formatSigned(savingsPrev)}
               </span>
@@ -2087,7 +2108,7 @@ function IncomeSection({
 
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
-          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Ingresos por mes</h4>
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('investments.income.byMonth')}</h4>
           {chartData.length > 0 && (
             <>
               <div className="flex-1" />
@@ -2095,9 +2116,9 @@ function IncomeSection({
                 <Select
                   value={incomeTime.preset}
                   onChange={v => incomeTime.selectPreset(v as DateRangePreset)}
-                  ariaLabel="Filtro de tiempo"
+                  ariaLabel={t('dateFilter.aria')}
                   className="w-44"
-                  options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+                  options={timeFilterOptions(t)}
                 />
               </div>
               {incomeTime.preset === 'custom' && (
@@ -2130,7 +2151,7 @@ function IncomeSection({
               <Bar
                 dataKey="total"
                 radius={[3, 3, 0, 0]}
-                name="Ingresos"
+                name={t('common.income')}
                 maxBarSize={40}
                 onClick={handleBarClick}
                 className="cursor-pointer"
@@ -2157,14 +2178,14 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
       <div className="space-y-4">
         <div className="flex items-start justify-between gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Detalle de ingresos
+            {t('investments.income.detail')}
             {selectedMonth
-              ? ` · ${selectedMonth.length === 10 ? formatDay(selectedMonth) : fmtMonthLabel(selectedMonth)}`
+              ? ` · ${selectedMonth.length === 10 ? formatDayLocalized(lang, selectedMonth) : fmtMonthLabel(selectedMonth, lang)}`
               : dateRange
                 ? ` · ${
                     rangeMonth(dateRange.from) === rangeMonth(dateRange.to)
-                      ? fmtMonthLabel(rangeMonth(dateRange.from))
-                      : `${fmtMonthLabel(rangeMonth(dateRange.from))} – ${fmtMonthLabel(rangeMonth(dateRange.to))}`
+                      ? fmtMonthLabel(rangeMonth(dateRange.from), lang)
+                      : `${fmtMonthLabel(rangeMonth(dateRange.from), lang)} – ${fmtMonthLabel(rangeMonth(dateRange.to), lang)}`
                   }`
                 : ''}
           </h4>
@@ -2177,7 +2198,7 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" className="w-3.5 h-3.5">
                 <path d="M10.5 3.5 6 8l4.5 4.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Ver histórico
+              {t('investments.viewHistory')}
             </button>
           ) : dateRange ? (
             <button
@@ -2188,23 +2209,23 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
               <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" className="w-3.5 h-3.5">
                 <path d="M10.5 3.5 6 8l4.5 4.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
-              Ver histórico
+              {t('investments.viewHistory')}
             </button>
           ) : null}
         </div>
         {selectedMonth && selectedOverview && (
           <div className="grid grid-cols-3 gap-3 mb-4">
-            <SummaryCard label="Ingresos" value={formatCurrency(selectedOverview.total)} variant="positive" />
+            <SummaryCard label={t('investments.tab.income')} value={formatCurrency(selectedOverview.total)} variant="positive" />
             <SummaryCard
-              label="Gastos"
+              label={t('investments.tab.expenses')}
               value={formatSigned(-selectedOverview.expenses)}
               variant={selectedOverview.expenses < 0 ? 'positive' : 'negative'}
               subtitle={
-                selectedOverview.expenses < 0 ? 'Las devoluciones superan a los gastos.' : undefined
+                selectedOverview.expenses < 0 ? t('investments.refundsExceed') : undefined
               }
             />
             <SummaryCard
-              label="Capacidad de ahorro"
+              label={t('investments.savingsCapacity')}
               value={formatSigned(selectedOverview.savings)}
               variant={selectedOverview.savings >= 0 ? 'positive' : 'negative'}
             />
@@ -2213,8 +2234,8 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
         {shown.length === 0 ? (
           <p className="text-sm text-gray-400 py-4 text-center border border-gray-100 rounded-xl bg-[#fdfdfe]">
             {selectedMonth || dateRange
-              ? 'No hay ingresos en el periodo seleccionado.'
-              : 'No hay ingresos registrados.'}
+              ? t('investments.income.noDataRange')
+              : t('investments.income.noData')}
           </p>
         ) : (
           <ul className="divide-y divide-gray-100 border border-gray-100 rounded-xl">
@@ -2223,7 +2244,7 @@ stroke={isSelected ? 'var(--color-gray-50)' : 'none'}
                 <div className="min-w-0">
                   <p className="font-medium text-gray-700 truncate">{m.concept}</p>
                   <p className="inline-flex items-center gap-1.5 text-xs text-gray-400">
-                    {new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES')} · <BankLogo bank={m.bank} size={11} />
+                    {formatDateLocalized(lang, m.date)} · <BankLogo bank={m.bank} size={11} />
                     {BANK_LABELS[m.bank]}
                   </p>
                 </div>
@@ -2265,6 +2286,7 @@ function ExpensesSection({
   onChangeChargeType: (id: string, targetValue: 'joint' | 'individual' | 'auto') => void;
   onBulkChangeChargeType: (ids: string[], targetValue: 'joint' | 'individual' | 'auto') => void;
 }) {
+  const { t, lang, tCategory } = useI18n();
   const [expPage, setExpPage] = useState(1);
   const [expCategory, setExpCategory] = useState<string>('all');
   const [expBank, setExpBank] = useState<'all' | BankId>('all');
@@ -2370,8 +2392,8 @@ function ExpensesSection({
 
   const incomeByMonth = useMemo(() => new Map(income.monthly.map(p => [p.month, p.total])), [income.monthly]);
   const expenseChartData = useMemo(
-    () => monthlyExpenseChartData(data, chartCategory, incomeByMonth),
-    [data, chartCategory, incomeByMonth]
+    () => monthlyExpenseChartData(data, chartCategory, incomeByMonth, lang),
+    [data, chartCategory, incomeByMonth, lang]
   );
 
   const visibleExpenseData = useMemo(
@@ -2399,12 +2421,12 @@ function ExpensesSection({
       .filter(p => p.date >= rangeFromDay(dateRange.from) && p.date <= rangeToDay(dateRange.to))
       .map(p => ({
         month: p.date,
-        label: formatDay(p.date),
+        label: formatDayLocalized(lang, p.date),
         total: p.expenses,
         income: p.income,
         savings: p.savings,
       }));
-  }, [dateRange, incomeMovements, movements, chartCategory]);
+  }, [dateRange, incomeMovements, movements, chartCategory, lang]);
   const chartRows = isDaily ? dailyData : visibleExpenseData;
   // Límites del intervalo «Sin filtro de tiempo»: de la fecha del primer
   // movimiento de gastos al último mes de gastos ya terminado (las mismas
@@ -2560,7 +2582,7 @@ function ExpensesSection({
   if (movements.length === 0) {
     return (
       <p className="text-sm text-gray-500 py-6 text-center">
-        No se han detectado gastos (tarjetas, recibos, comercios…) en los extractos importados.
+        {t('investments.expenses.empty')}
       </p>
     );
   }
@@ -2570,18 +2592,18 @@ function ExpensesSection({
 
   return (
     <section className="space-y-4 pb-6">
-      <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Gastos</h3>
+      <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">{t('investments.tab.expenses')}</h3>
       <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* <SummaryCard label="Gasto Total" value={formatCurrency(data.total)} variant="negative" /> */}
-        <SummaryCard label="Gasto Medio Mensual" value={<>{formatSigned(-data.averageMonthly)}/mes</>} variant="info" subtitle={`Mediana: ${formatSigned(-data.medianMonthly)} · ${data.monthCount} meses`} />
-        <SummaryCard label="Media último año" value={<>{formatSigned(-last12Avg)}/mes</>} variant="neutral" subtitle={last12WindowLabel(data.monthly) ?? 'Últimos 12 meses'} />
+        <SummaryCard label={t('investments.expenses.avgMonthly')} value={<>{formatSigned(-data.averageMonthly)}{t('investments.perMonth')}</>} variant="info" subtitle={t('investments.expenses.median', { value: formatSigned(-data.medianMonthly), count: String(data.monthCount) })} />
+        <SummaryCard label={t('investments.avgLastYear')} value={<>{formatSigned(-last12Avg)}{t('investments.perMonth')}</>} variant="neutral" subtitle={last12WindowLabel(data.monthly, lang) ?? t('investments.last12Months')} />
         <SummaryCard
-          label="Mes Actual"
+          label={t('investments.currentMonth')}
           value={formatSigned(-data.currentMonth)}
           variant="neutral"
           subtitle={
             <span>
-              Capacidad de ahorro:{' '}
+              {t('investments.savingsCapacityColon')}{' '}
               <span className={`font-semibold ${income.currentMonth - data.currentMonth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {formatSigned(income.currentMonth - data.currentMonth)}
               </span>
@@ -2589,12 +2611,12 @@ function ExpensesSection({
           }
         />
         <SummaryCard
-          label="Mes Anterior"
+          label={t('investments.previousMonth')}
           value={formatSigned(-data.previousMonth)}
           variant="neutral"
           subtitle={
             <span>
-              Capacidad de ahorro:{' '}
+              {t('investments.savingsCapacityColon')}{' '}
               <span className={`font-semibold ${income.previousMonth - data.previousMonth >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                 {formatSigned(income.previousMonth - data.previousMonth)}
               </span>
@@ -2606,23 +2628,23 @@ function ExpensesSection({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Gastos por mes
+            {t('investments.expenses.byMonth')}
           </h4>
           <div className="flex-1" />
           <div className="flex flex-wrap items-center gap-3">
             <Select
               value={chartCategory}
               onChange={setChartCategory}
-              ariaLabel="Categoría del gráfico"
+              ariaLabel={t('investments.expenses.chartCategoryAria')}
               className="w-52"
               options={[
-                { value: 'all', label: 'Todas las categorías' },
+                { value: 'all', label: t('investments.allCategories') },
                 ...data.byCategory
                   .slice()
-                  .sort((a, b) => a.category.localeCompare(b.category, 'es', { sensitivity: 'base' }))
+                  .sort((a, b) => a.category.localeCompare(b.category, lang, { sensitivity: 'base' }))
                   .map(c => ({
                     value: c.category,
-                    label: c.category,
+                    label: tCategory(c.category),
                     icon: <ExpenseCategoryIcon category={c.category} size={12} />,
                   })),
               ]}
@@ -2630,9 +2652,9 @@ function ExpensesSection({
             <Select
               value={chartTime.preset}
               onChange={v => chartTime.selectPreset(v as DateRangePreset)}
-              ariaLabel="Filtro de tiempo"
+              ariaLabel={t('dateFilter.aria')}
               className="w-44"
-              options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+              options={timeFilterOptions(t)}
             />
           </div>
           {chartTime.preset === 'custom' && (
@@ -2653,7 +2675,7 @@ function ExpensesSection({
             savings={intervalSummary.savings}
             perDay={perDay}
             categoryOnly={chartCategory !== 'all'}
-            categoryLabel={chartCategory !== 'all' ? chartCategory : undefined}
+            categoryLabel={chartCategory !== 'all' ? tCategory(chartCategory) : undefined}
           />
         )}
         <ResponsiveContainer width="100%" height={240}>
@@ -2665,7 +2687,7 @@ function ExpensesSection({
             <Bar
               dataKey="total"
               radius={[3, 3, 0, 0]}
-              name={chartCategory === 'all' ? 'Gastos' : chartCategory}
+              name={chartCategory === 'all' ? t('investments.tab.expenses') : tCategory(chartCategory)}
               maxBarSize={40}
               onClick={handleBarClick}
               className="cursor-pointer"
@@ -2701,8 +2723,8 @@ function ExpensesSection({
           period={
             dateRange
               ? rangeMonth(dateRange.from) === rangeMonth(dateRange.to)
-                ? fmtMonthLabel(rangeMonth(dateRange.from))
-                : `${fmtMonthLabel(rangeMonth(dateRange.from))} – ${fmtMonthLabel(rangeMonth(dateRange.to))}`
+                ? fmtMonthLabel(rangeMonth(dateRange.from), lang)
+                : `${fmtMonthLabel(rangeMonth(dateRange.from), lang)} – ${fmtMonthLabel(rangeMonth(dateRange.to), lang)}`
               : undefined
           }
         />
@@ -2715,7 +2737,7 @@ function ExpensesSection({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
           <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-            Detalle de gastos
+            {t('investments.expenses.detail')}
           </h4>
           <div className="flex-1" />
           <div className="flex flex-wrap items-center gap-3">
@@ -2726,33 +2748,33 @@ function ExpensesSection({
                 setExpSortKey(key);
                 setExpSortDir(dir);
               }}
-              ariaLabel="Ordenar gastos"
+              ariaLabel={t('investments.expenses.sortAria')}
               className="w-50"
               leadingIcon={<SortArrowsIcon />}
               options={[
-                { value: 'date-desc', label: 'Fecha: reciente primero' },
-                { value: 'date-asc', label: 'Fecha: antiguo primero' },
-                { value: 'amount-desc', label: 'Importe: mayor a menor' },
-                { value: 'amount-asc', label: 'Importe: menor a mayor' },
+                { value: 'date-desc', label: t('investments.expenses.sortDateDesc') },
+                { value: 'date-asc', label: t('investments.expenses.sortDateAsc') },
+                { value: 'amount-desc', label: t('investments.expenses.sortAmountDesc') },
+                { value: 'amount-asc', label: t('investments.expenses.sortAmountAsc') },
               ]}
             />
             <input
               type="search"
               value={expSearch}
               onChange={e => setExpSearch(e.target.value)}
-              placeholder="Buscar concepto…"
+              placeholder={t('investments.searchConcept')}
               className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm w-44 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
             />
             <Select
               value={expCategory}
               onChange={setExpCategory}
-              ariaLabel="Filtrar por categoría"
+              ariaLabel={t('investments.filterCategory')}
               className="w-48"
               options={[
-                { value: 'all', label: 'Todas las categorías' },
+                { value: 'all', label: t('investments.allCategories') },
                 ...EXPENSE_CATEGORY_LIST.map(c => ({
                   value: c,
-                  label: c,
+                  label: tCategory(c),
                   icon: <ExpenseCategoryIcon category={c} size={12} />,
                 })),
               ]}
@@ -2760,19 +2782,19 @@ function ExpensesSection({
             <Select
               value={expBank}
               onChange={v => setExpBank(v as 'all' | BankId)}
-              ariaLabel="Filtrar por banco"
+              ariaLabel={t('investments.filterBank')}
               className="w-44"
               options={[
-                { value: 'all', label: 'Todos los bancos' },
+                { value: 'all', label: t('investments.allBanks') },
                 ...ORDERED_BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
               ]}
             />
             <Select
               value={expTime.preset}
               onChange={v => expTime.selectPreset(v as DateRangePreset)}
-              ariaLabel="Filtro de tiempo"
+              ariaLabel={t('dateFilter.aria')}
               className="w-44"
-              options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+              options={timeFilterOptions(t)}
             />
           </div>
           {expTime.preset === 'custom' && (
@@ -2787,29 +2809,29 @@ function ExpensesSection({
         {bulkSelectedMovements.length > 0 && (
           <div className="flex flex-wrap items-center gap-3 py-2 px-3 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900">
             <span className="text-sm font-semibold">
-              {selected.size} seleccionado{selected.size === 1 ? '' : 's'}
+              {t('investments.selected', { count: String(selected.size), plural: selected.size === 1 ? '' : 's' })}
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Mover a:</span>
+              <span className="text-xs text-gray-500">{t('investments.moveTo')}</span>
               <Select
                 value=""
-                placeholder="Elegir categoría…"
-                ariaLabel="Mover movimientos a categoría"
+                placeholder={t('investments.chooseCategory')}
+                ariaLabel={t('investments.moveToCategoryAria')}
                 className="w-44"
                 onChange={applyBulk}
                 options={EXPENSE_CATEGORY_LIST.map(c => ({
                   value: c,
-                  label: c,
+                  label: tCategory(c),
                   icon: <ExpenseCategoryIcon category={c} size={12} />,
                 }))}
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">Propiedad:</span>
+              <span className="text-xs text-gray-500">{t('investments.ownership')}</span>
               <Select
                 value=""
-                placeholder="Elegir propiedad…"
-                ariaLabel="Cambiar propiedad del gasto"
+                placeholder={t('investments.chooseOwnership')}
+                ariaLabel={t('investments.changeOwnershipAria')}
                 className="w-48"
                 onChange={v => {
                   if (v === 'joint' || v === 'individual' || v === 'auto') {
@@ -2818,9 +2840,9 @@ function ExpensesSection({
                   clearSelection();
                 }}
                 options={[
-                  { value: 'joint', label: 'Conjunto', icon: <Icon name="users" className="w-3.5 h-3.5" /> },
-                  { value: 'individual', label: 'Individual', icon: <Icon name="user" className="w-3.5 h-3.5" /> },
-                  { value: 'auto', label: 'Según categoría' },
+                  { value: 'joint', label: t('investments.joint'), icon: <Icon name="users" className="w-3.5 h-3.5" /> },
+                  { value: 'individual', label: t('investments.individual'), icon: <Icon name="user" className="w-3.5 h-3.5" /> },
+                  { value: 'auto', label: t('investments.byCategory') },
                 ]}
               />
             </div>
@@ -2829,17 +2851,17 @@ function ExpensesSection({
               onClick={clearSelection}
               className="ml-auto px-3 py-1.5 rounded-xl bg-[#fdfdfe] text-sm font-semibold text-gray-900 hover:bg-zinc-200 transition-colors cursor-pointer"
             >
-              Limpiar
+              {t('investments.clear')}
             </button>
           </div>
         )}
         {filteredMovements.length === 0 ? (
           <p className="text-sm text-gray-400 py-4 text-center border border-gray-100 rounded-xl bg-[#fdfdfe]">
             {expDateRange
-              ? 'No hay gastos en el periodo seleccionado.'
+              ? t('investments.expenses.noDataRange')
               : expSearch || expCategory !== 'all' || expBank !== 'all'
-                ? 'No hay gastos que coincidan con los filtros.'
-                : 'No hay gastos registrados.'}
+                ? t('investments.expenses.noFilterMatch')
+                : t('investments.expenses.noData')}
           </p>
 ) : (
         <>
@@ -2892,11 +2914,15 @@ function SortableHeader({
   dir: 'asc' | 'desc';
   onClick: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
       onClick={onClick}
-      title={`Ordenar por ${label} (${active ? (dir === 'asc' ? 'ascendente' : 'descendente') : 'descendente'})`}
+      title={t('investments.sortTitle', {
+        label,
+        dir: active ? (dir === 'asc' ? t('investments.ascending') : t('investments.descending')) : t('investments.descending'),
+      })}
       className="inline-flex items-center gap-1 uppercase tracking-wider font-bold cursor-pointer group text-gray-900"
     >
       {label}
@@ -2937,13 +2963,14 @@ function MonthCategoryBreakdown({
   categories: Array<{ category: string; total: number }>;
   onClose: () => void;
 }) {
+  const { t, lang, tCategory } = useI18n();
   const gross = categories.reduce((sum, c) => sum + Math.max(c.total, 0), 0);
   const total = categories.reduce((sum, c) => sum + c.total, 0);
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-3 mt-8">
         <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-          Por categoría · {fmtMonthLabel(month)}
+          {t('investments.monthCategories', { month: fmtMonthLabel(month, lang) })}
         </h4>
         <button
           type="button"
@@ -2953,11 +2980,11 @@ function MonthCategoryBreakdown({
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" className="w-3.5 h-3.5">
             <path d="M10.5 3.5 6 8l4.5 4.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          Ver histórico
+          {t('investments.viewHistory')}
         </button>
       </div>
       {categories.length === 0 ? (
-        <p className="text-sm text-gray-500 py-2">Sin gastos registrados este mes.</p>
+        <p className="text-sm text-gray-500 py-2">{t('investments.noExpensesMonth')}</p>
       ) : (
         <ul className="space-y-2">
           {categories.map(c => {
@@ -2967,8 +2994,8 @@ function MonthCategoryBreakdown({
               <li key={c.category} className="space-y-1">
                 <div className="flex items-baseline justify-between text-sm">
                   <span className="flex items-center gap-2 font-medium text-gray-700">
-                    <ExpenseCategoryIcon category={c.category} />
-                    {c.category}
+                    <ExpenseCategoryIcon category={c.category} size={16} />
+                    {tCategory(c.category)}
                   </span>
                   <span className="text-gray-600 text-right flex items-baseline justify-end gap-3">
                     <span>{signedExpenseFormat(c.total)}</span>
@@ -2986,7 +3013,7 @@ function MonthCategoryBreakdown({
           })}
         </ul>
       )}
-      <p className="text-xs text-gray-400 mt-3">Total mes: {signedExpenseFormat(total)}</p>
+      <p className="text-xs text-gray-400 mt-3">{t('investments.monthTotal')} {signedExpenseFormat(total)}</p>
     </div>
   );
 }
@@ -3014,6 +3041,7 @@ function Pagination({
   totalPages: number;
   onPageChange: (p: number) => void;
 }) {
+  const { t } = useI18n();
   if (totalPages <= 1) return null;
   return (
     <div className="flex items-center justify-center gap-2 pt-2">
@@ -3023,7 +3051,7 @@ function Pagination({
         disabled={page <= 1}
         className="px-3 py-1 text-xs font-semibold rounded border border-gray-200 text-gray-600 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
       >
-        ← Anterior
+        {t('investments.paginationPrev')}
       </button>
       <span className="text-xs text-gray-500">
         {page} / {totalPages}
@@ -3034,7 +3062,7 @@ function Pagination({
         disabled={page >= totalPages}
         className="px-3 py-1 text-xs font-semibold rounded border border-gray-200 text-gray-600 hover:bg-zinc-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
       >
-        Siguiente →
+        {t('investments.paginationNext')}
       </button>
     </div>
   );
@@ -3067,6 +3095,7 @@ function MovementsSection({
   onDelete: (id: string) => void;
   onRequestBulkDelete: (ids: string[]) => void;
 }) {
+  const { t, lang } = useI18n();
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [movSortKey, setMovSortKey] = useState<'date' | 'amount'>('date');
@@ -3156,42 +3185,42 @@ function MovementsSection({
     <section className="space-y-4 pb-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">
-          Todos los movimientos ({sortedMovements.length})
+          {t('investments.movements.all', { count: String(sortedMovements.length) })}
         </h3>
         <div className="flex flex-wrap items-center gap-3">
           <input
             type="search"
             value={search}
             onChange={e => { onSearchChange(e.target.value); setPage(1); }}
-            placeholder="Buscar concepto…"
+            placeholder={t('investments.searchConcept')}
             className="px-3 py-1.5 border border-gray-200 rounded-xl text-sm w-44 focus:outline-none focus:ring-2 focus:ring-gray-900/10"
           />
           <Select
             value={filter}
             onChange={v => { onFilterChange(v as 'all' | MovementType); setPage(1); }}
-            ariaLabel="Filtrar por tipo"
+            ariaLabel={t('investments.filterType')}
             className="w-44"
             options={[
-              { value: 'all', label: 'Todos los tipos' },
-              ...types.map(t => ({ value: t, label: MOVEMENT_TYPE_LABELS[t] })),
+              { value: 'all', label: t('investments.allTypes') },
+              ...types.map(ty => ({ value: ty, label: movementTypeLabel(ty, t) })),
             ]}
           />
           <Select
             value={bankFilter}
             onChange={v => { onBankFilterChange(v as 'all' | BankId); setPage(1); }}
-            ariaLabel="Filtrar por banco"
+            ariaLabel={t('investments.filterBank')}
             className="w-44"
             options={[
-              { value: 'all', label: 'Todos los bancos' },
+              { value: 'all', label: t('investments.allBanks') },
               ...ORDERED_BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={14} /> })),
             ]}
           />
           <Select
             value={movTime.preset}
             onChange={v => { movTime.selectPreset(v as DateRangePreset); setPage(1); }}
-            ariaLabel="Filtro de tiempo"
+            ariaLabel={t('dateFilter.aria')}
             className="w-44"
-            options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+            options={timeFilterOptions(t)}
           />
         </div>
         {movTime.preset === 'custom' && (
@@ -3207,17 +3236,17 @@ function MovementsSection({
       {selected.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 py-2 px-3 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900">
           <span className="text-sm font-semibold">
-            {selected.size} seleccionado{selected.size === 1 ? '' : 's'}
+            {t('investments.selected', { count: String(selected.size), plural: selected.size === 1 ? '' : 's' })}
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Cambiar tipo a:</span>
+            <span className="text-xs text-gray-500">{t('investments.changeTypeTo')}</span>
             <Select
               value=""
-              placeholder="Elegir tipo…"
-              ariaLabel="Cambiar tipo de los movimientos"
+              placeholder={t('investments.chooseType')}
+              ariaLabel={t('investments.changeTypeAria')}
               className="w-44"
               onChange={v => applyBulk(v as MovementType)}
-              options={ALL_MOVEMENT_TYPES.map(t => ({ value: t, label: MOVEMENT_TYPE_LABELS[t] }))}
+              options={ALL_MOVEMENT_TYPES.map(ty => ({ value: ty, label: movementTypeLabel(ty, t) }))}
             />
           </div>
           <button
@@ -3225,20 +3254,20 @@ function MovementsSection({
             onClick={() => onRequestBulkDelete([...selected])}
             className="px-3 py-1.5 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700 transition-colors cursor-pointer"
           >
-            Eliminar
+            {t('investments.delete')}
           </button>
           <button
             type="button"
             onClick={clearSelection}
             className="ml-auto px-3 py-1.5 rounded-xl bg-[#fdfdfe] text-sm font-semibold text-gray-900 hover:bg-zinc-200 transition-colors cursor-pointer"
           >
-            Limpiar
+            {t('investments.clear')}
           </button>
         </div>
       )}
 
       {shown.length === 0 ? (
-        <p className="text-sm text-gray-500 py-6 text-center">Ningún movimiento coincide con el filtro.</p>
+        <p className="text-sm text-gray-500 py-6 text-center">{t('investments.movements.noFilterMatch')}</p>
       ) : (
         <ScrollableTable
           columns={[
@@ -3246,7 +3275,7 @@ function MovementsSection({
               title: (
                 <input
                   type="checkbox"
-                  aria-label="Seleccionar todos los visibles"
+                  aria-label={t('investments.selectAllVisible')}
                   checked={shownAllSelected}
                   onChange={toggleAll}
                   className="w-4 h-4 accent-gray-900 cursor-pointer"
@@ -3257,7 +3286,7 @@ function MovementsSection({
             {
               title: (
                 <SortableHeader
-                  label="Fecha"
+                  label={t('investments.colDate')}
                   active={movSortKey === 'date'}
                   dir={movSortDir}
                   onClick={() => toggleMovSort('date')}
@@ -3265,13 +3294,13 @@ function MovementsSection({
               ),
               align: 'left',
             },
-            { title: 'Banco', align: 'left', className: 'min-w-[180px]' },
-            { title: 'Tipo', align: 'left', className: 'min-w-[160px]' },
-            { title: 'Concepto', align: 'left' },
+            { title: t('investments.colBank'), align: 'left', className: 'min-w-[180px]' },
+            { title: t('investments.colType'), align: 'left', className: 'min-w-[160px]' },
+            { title: t('investments.colConcept'), align: 'left' },
             {
               title: (
                 <SortableHeader
-                  label="Importe"
+                  label={t('investments.colAmount')}
                   active={movSortKey === 'amount'}
                   dir={movSortDir}
                   onClick={() => toggleMovSort('amount')}
@@ -3285,39 +3314,39 @@ function MovementsSection({
               content: (
                 <input
                   type="checkbox"
-                  aria-label={`Seleccionar ${m.concept}`}
+                  aria-label={t('investments.selectMov', { concept: m.concept })}
                   checked={selected.has(m.id)}
                   onChange={() => toggleOne(m.id)}
                   className="w-4 h-4 accent-gray-900 cursor-pointer"
                 />
               ),
             },
-            new Date(`${m.date}T00:00:00`).toLocaleDateString('es-ES'),
+            formatDateLocalized(lang, m.date),
             { content: <span className="inline-flex items-center gap-2 whitespace-nowrap text-gray-500"><BankLogo bank={m.bank} size={18} />{BANK_LABELS[m.bank]}</span>, className: 'text-sm' },
             {
               content: (
                 <Select
                   value={m.type}
                   size="xs"
-                  ariaLabel={`Tipo de ${m.concept}`}
+                  ariaLabel={t('investments.typeOf', { concept: m.concept })}
                   className="w-[140px]"
                   onChange={v => onChangeType(m.id, v as MovementType)}
-                  options={ALL_MOVEMENT_TYPES.map(t => ({ value: t, label: MOVEMENT_TYPE_LABELS[t] }))}
+                  options={ALL_MOVEMENT_TYPES.map(ty => ({ value: ty, label: movementTypeLabel(ty, t) }))}
                 />
               ),
             },
             {
               content: (
                 <Tooltip
-                  text={`${m.concept}${m.shares !== undefined ? ` · ${formatQuantity(m.shares)} part.` : ''}${m.price !== undefined ? ` · ${formatQuantity(m.price)} €/part.` : ''}`}
+                  text={`${m.concept}${m.shares !== undefined ? t('investments.movements.shareUnit', { qty: formatQuantity(m.shares) }) : ''}${m.price !== undefined ? t('investments.movements.priceUnit', { price: formatQuantity(m.price) }) : ''}`}
                   className="cursor-default"
                 >
                   <span className="block truncate max-w-[220px]">
                     {m.concept}
                     {(m.shares !== undefined || m.price !== undefined) && (
                       <span className="ml-2 text-xs text-gray-400">
-                        {m.shares !== undefined ? `${formatQuantity(m.shares)} part.` : ''}
-                        {m.price !== undefined ? ` @ ${formatQuantity(m.price)} €/part.` : ''}
+                        {m.shares !== undefined ? t('investments.movements.shareUnit', { qty: formatQuantity(m.shares) }) : ''}
+                        {m.price !== undefined ? t('investments.movements.priceSuffix', { price: formatQuantity(m.price) }) : ''}
                       </span>
                     )}
                   </span>
@@ -3341,11 +3370,11 @@ function MovementsSection({
             },
             {
               content: (
-                <Tooltip text="Eliminar movimiento">
+                <Tooltip text={t('investments.deleteMovement')}>
                   <button
                     type="button"
                     onClick={() => setPendingDelete(m)}
-                    aria-label="Eliminar movimiento"
+                    aria-label={t('investments.deleteMovement')}
                     className="w-6 h-6 flex items-center justify-center rounded text-gray-400 hover:text-red-600 transition-colors cursor-pointer"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3365,17 +3394,16 @@ function MovementsSection({
       <Modal
         open={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
-        title="Eliminar movimiento"
+        title={t('investments.deleteMovement')}
       >
         <p className="text-sm text-gray-700 leading-relaxed">
-          ¿Eliminar el movimiento{' '}
-          <span className="font-semibold text-gray-900">“{pendingDelete?.concept ?? ''}”</span>
-          {pendingDelete
-            ? ` del ${new Date(`${pendingDelete.date}T00:00:00`).toLocaleDateString('es-ES')}`
-            : ''}?
+          {t('investments.deleteMovementPrompt', {
+            concept: pendingDelete?.concept ?? '',
+            date: pendingDelete ? formatDateLocalized(lang, pendingDelete.date) : '',
+          })}
         </p>
         <p className="text-sm text-gray-500 leading-relaxed mt-2">
-          Esta acción no se puede deshacer.
+          {t('investments.irreversible')}
         </p>
         <div className="flex flex-wrap justify-end gap-2 pt-5">
           <button
@@ -3383,7 +3411,7 @@ function MovementsSection({
             onClick={() => setPendingDelete(null)}
             className="px-4 py-2 rounded-xl border border-gray-300 text-sm font-semibold text-gray-700 hover:bg-zinc-100 transition-colors cursor-pointer"
           >
-            Cancelar
+            {t('investments.cancel')}
           </button>
           <button
             type="button"
@@ -3393,7 +3421,7 @@ function MovementsSection({
             }}
             className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
           >
-            Eliminar
+            {t('investments.delete')}
           </button>
         </div>
       </Modal>
@@ -3414,8 +3442,8 @@ function median(values: number[]): number {
     : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-function monthlyChartData(points: Array<{ month: string; total: number }>) {
-  return points.map(p => ({ ...p, label: fmtMonthLabel(p.month) }));
+function monthlyChartData(points: Array<{ month: string; total: number }>, lang: Lang) {
+  return points.map(p => ({ ...p, label: fmtMonthLabel(p.month, lang) }));
 }
 
 function monthlyExpenseSlice(points: Array<{ month: string; total: number }>) {
@@ -3428,13 +3456,14 @@ function monthlyExpenseChartData(
   data: ReturnType<typeof computeExpenses>,
   category: string,
   incomeByMonth: Map<string, number>,
+  lang: Lang,
 ) {
   const raw = category === 'all' ? data.monthly : data.monthlyByCategory[category] ?? [];
   // Se rellena todo el rango de actividad de gastos (meses con 0) hasta el mes
   // en curso incluido, de modo que los meses sin gasto en la categoría
   // seleccionada (o el mes actual sin movimientos) no desaparezcan del eje.
   const points = fillMonthly(raw, data.monthly[0]?.month, currentMonthKey());
-  return monthlyChartData(monthlyExpenseSlice(points)).map(p => ({
+  return monthlyChartData(monthlyExpenseSlice(points), lang).map(p => ({
     ...p,
     income: incomeByMonth.get(p.month) ?? 0,
     savings: (incomeByMonth.get(p.month) ?? 0) - p.total,

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../../lib/i18n';
 
 interface TooltipPayloadEntry {
   dataKey: string;
@@ -23,6 +24,7 @@ const TOOLTIP_STYLE = {
 } as const;
 
 export function ChartTooltip({ active, payload, renderContent }: Readonly<ChartTooltipProps>) {
+  const { t } = useI18n();
   if (!active || !payload?.length) return null;
 
   return (
@@ -31,7 +33,7 @@ export function ChartTooltip({ active, payload, renderContent }: Readonly<ChartT
         ? renderContent(payload)
         : payload.map((entry, i) => (
             <p key={i} style={{ color: entry.color, marginBottom: i < payload.length - 1 ? 2 : 0 }}>
-              {entry.dataKey === 'total' ? 'Total: ' : entry.dataKey === 'minimumTotal' ? 'Mínimo: ' : ''}{entry.value}
+              {entry.dataKey === 'total' ? t('common.tooltipTotal') : entry.dataKey === 'minimumTotal' ? t('common.tooltipMinimum') : ''}{entry.value}
             </p>
           ))
       }

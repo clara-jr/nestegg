@@ -3,6 +3,7 @@ import { formatCurrency } from '../lib/calculations';
 import { calculateAffordability, type AffordabilityParams, type AffordabilityResult } from '../lib/affordability';
 import { getSimulatorData, setSimulatorData, subscribe, useLocalStorage } from '../lib/sharedStore';
 import { useFontsReady } from '../lib/fonts';
+import { useI18n } from '../lib/i18n';
 import {
   SimulatorLayout,
   FormContainer,
@@ -45,6 +46,7 @@ export default function AffordabilitySimulator() {
     : 0;
 
   const fontsReady = useFontsReady();
+  const { t } = useI18n();
 
   const result = useMemo<AffordabilityResult>(() => calculateAffordability(params), [params]);
 
@@ -120,17 +122,17 @@ export default function AffordabilitySimulator() {
   return storageReady && fontsReady ? (
     <SimulatorLayout>
       <FormContainer>
-        <FormSection title="Ingresos" cols="single">
+        <FormSection title={t('affordability.incomeTitle')} cols="single">
           <div className="space-y-4">
             {params.members.map((member, i) => (
               <MemberCard key={i} index={i} totalMembers={params.members.length} onRemove={params.members.length > 1 ? () => removeMember(i) : undefined}>
                 <InputField
-                  label="Salario Bruto Anual (€)"
+                  label={t('affordability.annualGrossSalary')}
                   value={member.annualGrossSalary}
                   onChange={(v) => handleMemberChange(i, v)}
                 />
                 {params.members.length > 1 && result.memberNetMonthlyIncomes[i] > 0 && (
-                  <p className="text-xs text-gray-500">~{formatCurrency(result.memberNetMonthlyIncomes[i])}/netos al mes</p>
+                  <p className="text-xs text-gray-500">{t('affordability.netMonthly', { amount: formatCurrency(result.memberNetMonthlyIncomes[i]) })}</p>
                 )}
               </MemberCard>
             ))}
@@ -138,91 +140,91 @@ export default function AffordabilitySimulator() {
           </div>
         </FormSection>
 
-        <FormSection title="Ahorros" cols="double">
+        <FormSection title={t('affordability.savingsTitle')} cols="double">
           <InputField
-            label="Ahorros Iniciales (€)"
+            label={t('affordability.initialSavings')}
             value={params.initialSavings}
             onChange={(v) => handleInputChange('initialSavings', v)}
-            hint="Capital del que dispones para la compra"
+            hint={t('affordability.initialSavingsHint')}
           />
           <InputField
-            label="Colchón de Seguridad (€)"
+            label={t('affordability.cushion')}
             value={params.cushion}
             onChange={(v) => handleInputChange('cushion', v)}
-            hint="Dinero que reservas para imprevistos"
+            hint={t('affordability.cushionHint')}
           />
           <SummaryCard
-            label="Ahorros Disponibles"
+            label={t('affordability.availableSavings')}
             value={formatCurrency(result.availableForHouse)}
-            subtitle="Ahorros − colchón"
+            subtitle={t('affordability.availableSavingsSubtitle')}
             variant={result.availableForHouse > 0 ? 'positive' : 'neutral'}
           />
         </FormSection>
 
-        <FormSection title="Vivienda" cols="double">
+        <FormSection title={t('affordability.housingTitle')} cols="double">
           <HouseTypeField
             isNewBuild={params.isNewBuild}
             onChange={(v) => handleInputChange('isNewBuild', v)}
           />
           <InputField
-            label="Reforma y Muebles (€)"
+            label={t('affordability.reformFurniture')}
             value={params.reformFurnitureCosts}
             onChange={(v) => handleInputChange('reformFurnitureCosts', v)}
           />
           <InputField
-            label="Comisión Inmobiliaria (%)"
+            label={t('affordability.realEstateCommission')}
             value={params.realEstatePercentage}
             onChange={(v) => handleInputChange('realEstatePercentage', v)}
             step="0.1"
           />
         </FormSection>
 
-        <FormSection title="Financiación" cols="double">
+        <FormSection title={t('affordability.financingTitle')} cols="double">
           <SingleRangeSlider
-            title="Financiación Bancaria"
+            title={t('affordability.bankFinancing')}
             value={params.ltvRatio ?? 80}
             min={10}
             max={100}
             minLabel="10%"
             maxLabel="100%"
             valueLabel={`${params.ltvRatio ?? 80}%`}
-            description="% del precio que financia el banco (habitual 80%, puede llegar al 100%)"
+            description={t('affordability.ltvDescription')}
             fullWidth
             headerClassName="mb-0"
             onChange={(v) => handleInputChange('ltvRatio', v)}
           />
           <InputField
-            label="TAE Hipoteca (%)"
+            label={t('affordability.mortgageAPR')}
             value={params.mortgageAPR}
             onChange={(v) => handleInputChange('mortgageAPR', v)}
             step="0.1"
           />
           <InputField
-            label="Duración (años)"
+            label={t('affordability.durationYears')}
             value={params.mortgageDurationYears}
             onChange={(v) => handleInputChange('mortgageDurationYears', v)}
           />
           <SingleRangeSlider
-            title="Ratio Esfuerzo"
+            title={t('affordability.effortRatio')}
             value={params.debtToIncomeRatio}
             min={10}
             max={50}
             minLabel="10%"
             maxLabel="50%"
             valueLabel={`${params.debtToIncomeRatio}%`}
-            description="% de ingresos netos destinado a la hipoteca"
+            description={t('affordability.effortRatioDescription')}
             fullWidth
             headerClassName="mb-0"
             onChange={(v) => handleInputChange('debtToIncomeRatio', v)}
           />
           <InputField
-            label="Préstamo Familiar (€)"
+            label={t('affordability.familyLoan')}
             value={params.familyLoanAmount}
             onChange={(v) => handleInputChange('familyLoanAmount', v)}
-            hint="0% interés"
+            hint={t('affordability.familyLoanHint')}
           />
           <InputField
-            label="Duración Préstamo (años)"
+            label={t('affordability.familyLoanDuration')}
             value={params.familyLoanDurationYears}
             onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
           />
@@ -231,36 +233,36 @@ export default function AffordabilitySimulator() {
 
       <ResultsContainer>
         <ScenarioSection>
-          <ScenarioCard label="Ingreso Neto Mensual" value={formatCurrency(result.totalNetMonthlyIncome)} />
-          <ScenarioCard label={`Impuestos (${params.isNewBuild ? '11.2' : '6.5'}%)`} value={formatCurrency(result.estimatedTaxes)} />
+          <ScenarioCard label={t('affordability.netMonthlyIncome')} value={formatCurrency(result.totalNetMonthlyIncome)} />
+          <ScenarioCard label={t('affordability.taxes', { pct: params.isNewBuild ? '11.2' : '6.5' })} value={formatCurrency(result.estimatedTaxes)} />
           {params.realEstatePercentage > 0 && (
-            <ScenarioCard label="Gastos Inmobiliaria" value={formatCurrency(result.estimatedRealEstateFees)} />
+            <ScenarioCard label={t('affordability.realEstateFees')} value={formatCurrency(result.estimatedRealEstateFees)} />
           )}
           {params.reformFurnitureCosts > 0 && (
-            <ScenarioCard label="Reforma y Muebles" value={formatCurrency(params.reformFurnitureCosts)} />
+            <ScenarioCard label={t('affordability.reformFurnitureCard')} value={formatCurrency(params.reformFurnitureCosts)} />
           )}
-          <ScenarioCard label="Capital Empleado" value={formatCurrency(result.availableForHouse)} />
+          <ScenarioCard label={t('affordability.capitalUsed')} value={formatCurrency(result.availableForHouse)} />
           {hasFamilyLoan && (<>
-            <ScenarioCard label="Cuota Préstamo Familiar" value={`${formatCurrency(familyLoanMonthlyPayment)}/mes`} />
-            <ScenarioCard label="Duración Préstamo Familiar" value={`${params.familyLoanDurationYears} años`} />
+            <ScenarioCard label={t('affordability.familyLoanPayment')} value={`${formatCurrency(familyLoanMonthlyPayment)}${t('affordability.perMonth')}`} />
+            <ScenarioCard label={t('affordability.familyLoanDurationCard')} value={t('affordability.yearsCount', { count: params.familyLoanDurationYears })} />
           </>)}
         </ScenarioSection>
 
         <ResultsSection>
-          <ResultsCard label="Precio Máximo" value={formatCurrency(result.maxBaseHousePrice)} icon="home" />
-          <ResultsCard label={`Hipoteca Máxima (${result.ltvRatio}%)`} value={formatCurrency(result.maxMortgageAmount)} icon="bank" />
-          <ResultsCard label="Entrada Total" value={formatCurrency(result.totalDownPayment)} icon="key" />
+          <ResultsCard label={t('affordability.maxPrice')} value={formatCurrency(result.maxBaseHousePrice)} icon="home" />
+          <ResultsCard label={t('affordability.maxMortgagePct', { pct: result.ltvRatio })} value={formatCurrency(result.maxMortgageAmount)} icon="bank" />
+          <ResultsCard label={t('affordability.totalDownPayment')} value={formatCurrency(result.totalDownPayment)} icon="key" />
           {params.mortgageDurationYears > 0 && (
-          <ResultsCard label={`Cuota Mensual (${result.monthlyPaymentToIncomePct}%)`} value={`${formatCurrency(result.maxMortgageMonthlyPayment)}/mes`} icon="card" />
+          <ResultsCard label={t('affordability.monthlyPaymentPct', { pct: result.monthlyPaymentToIncomePct })} value={`${formatCurrency(result.maxMortgageMonthlyPayment)}${t('affordability.perMonth')}`} icon="card" />
           )}
         </ResultsSection>
         <NoteCard variant="warning">
           <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-amber-600" /></strong> {hasSalary && result.constraintType === 'income'
-            ? (<><strong>La limitación está en tus ingresos</strong>{`: la hipoteca máxima que puedes conseguir está limitada por la cuota que eres capaz de pagar mensualmente. La hipoteca máxima (${formatCurrency(result.maxMortgageByIncome)}) y todo tu capital (${formatCurrency(result.availableForHouse)}) determinan el precio máximo de la casa.`}</>)
+            ? (<><strong>{t('affordability.limitIncomeTitle')}</strong>{t('affordability.limitIncomeBody', { maxMortgage: formatCurrency(result.maxMortgageByIncome), capital: formatCurrency(result.availableForHouse) })}</>)
             : hasSalary
-              ? (<><strong>La limitación está en tu capital</strong>{`: la hipoteca máxima que puedes conseguir está limitada por los ahorros que tienes para la entrada. El banco te prestará hasta el ${params.ltvRatio ?? 80}% y los ${formatCurrency(result.availableForHouse)} disponibles cubren justo el ${100 - (params.ltvRatio ?? 80)}% de entrada + impuestos (${params.isNewBuild ? '11,2%' : '6,5%'}) + comisión inmobiliaria (${params.realEstatePercentage}%) + reforma.`}</>)
-              : 'Introduce al menos un salario para obtener un desglose detallado.'
-          } {hasSalary && `El ratio de esfuerzo (${params.debtToIncomeRatio}%) se aplica sobre el ingreso neto mensual${params.members.length > 1 ? ' conjunto' : ''} de ${formatCurrency(result.totalNetMonthlyIncome)}.`}
+              ? (<><strong>{t('affordability.limitCapitalTitle')}</strong>{t('affordability.limitCapitalBody', { ltv: params.ltvRatio ?? 80, available: formatCurrency(result.availableForHouse), downPaymentPct: 100 - (params.ltvRatio ?? 80), taxPct: params.isNewBuild ? '11,2%' : '6,5%', commissionPct: params.realEstatePercentage })}</>)
+              : t('affordability.noSalary')
+          } {hasSalary && t('affordability.effortNote', { ratio: params.debtToIncomeRatio, joint: params.members.length > 1 ? t('affordability.joint') : '', netIncome: formatCurrency(result.totalNetMonthlyIncome) })}
         </NoteCard>
       </ResultsContainer>
     </SimulatorLayout>

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal, Icon } from './common';
+import { useI18n } from '../lib/i18n';
 import { PROFILE_COLORS, getProfileData, setActiveProfileId, useProfiles } from '../lib/profiles';
 
 function hasImportedFiles(profileId: string): boolean {
@@ -15,6 +16,7 @@ function hasImportedFiles(profileId: string): boolean {
  * precios y depósitos a plazo); las calculadoras son compartidas.
  */
 export default function ProfileSelector() {
+  const { t } = useI18n();
   const { profiles, activeId, activeProfile, create, rename, setColor, remove } = useProfiles();
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -52,7 +54,7 @@ export default function ProfileSelector() {
               key={p.id}
               type="button"
               onClick={() => { if (p.id !== activeId) setActiveProfileId(p.id); }}
-              title={`Ver ${p.name}`}
+              title={t('profiles.view', { name: p.name })}
               className={`inline-flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full text-sm font-medium cursor-pointer border ${
                 p.id === activeId
                   ? 'bg-zinc-100 text-gray-900 border-gray-200'
@@ -65,12 +67,7 @@ export default function ProfileSelector() {
           ))}
         </div>
         <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-          {profiles.length > 1
-            ? <>El Agregador de Finanzas guarda los extractos de cada perfil por
-               separado; los cambios afectan solo al perfil activo. Las calculadoras (ahorro,
-               jubilación y hogar) son compartidas.</>
-            : <>Crea más perfiles para separar los extractos de cada integrante y desbloquear la
-               sección «Convivencia». Los simuladores y calculadoras son compartidos.</>}
+          {profiles.length > 1 ? t('profiles.multiHint') : t('profiles.singleHint')}
         </p>
         <div className="flex items-center gap-2 justify-end mt-3">
           <button
@@ -78,7 +75,7 @@ export default function ProfileSelector() {
             onClick={() => setAdding(true)}
             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
           >
-            + Nuevo perfil
+            + {t('profiles.addNew')}
           </button>
           {activeProfile && (
             <button
@@ -87,24 +84,22 @@ export default function ProfileSelector() {
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
             >
               <Icon name="edit" className="h-3.5 w-3.5" />
-              Editar
+              {t('profiles.edit')}
             </button>
           )}
         </div>
       </section>
 
-      <Modal open={adding} onClose={() => setAdding(false)} title="Nuevo perfil">
+      <Modal open={adding} onClose={() => setAdding(false)} title={t('profiles.newProfile')}>
         <p className="text-sm text-gray-600 leading-relaxed mb-3">
-          Cada perfil es un integrante de la casa y guarda por separado sus extractos importados y
-          precios en el Agregador de Finanzas. Podrás descargar o restaurar su copia de seguridad
-          de forma individual.
+          {t('profiles.newProfileDesc')}
         </p>
         <input
           autoFocus
           value={newName}
           onChange={e => setNewName(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && confirmCreate()}
-          placeholder="Nombre (p. ej. Laura)"
+          placeholder={t('profiles.namePlaceholder')}
           className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10 mb-3"
         />
         <div className="flex justify-end gap-2">
@@ -113,7 +108,7 @@ export default function ProfileSelector() {
             onClick={() => setAdding(false)}
             className="px-4 py-2 rounded-xl border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
           >
-            Cancelar
+            {t('profiles.cancel')}
           </button>
           <button
             type="button"
@@ -121,13 +116,13 @@ export default function ProfileSelector() {
             disabled={!newName.trim()}
             className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40 cursor-pointer"
           >
-            Crear
+            {t('profiles.create')}
           </button>
         </div>
       </Modal>
 
       {editing && (
-        <Modal open onClose={() => setEditing(null)} title="Editar perfil">
+        <Modal open onClose={() => setEditing(null)} title={t('profiles.editProfile')}>
           <input
             autoFocus
             value={editName}
@@ -135,15 +130,15 @@ export default function ProfileSelector() {
             onKeyDown={e => e.key === 'Enter' && confirmRename()}
             className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900/10 mb-4"
           />
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Color</label>
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">{t('profiles.color')}</label>
           <div className="flex items-center gap-2 flex-wrap mb-4">
             {PROFILE_COLORS.map(color => (
               <button
                 key={color}
                 type="button"
                 onClick={() => setEditColor(color)}
-                aria-label={`Color ${color}`}
-                title={`Color ${color}`}
+                aria-label={t('profiles.colorAria', { color })}
+                title={t('profiles.colorAria', { color })}
                 className={`w-7 h-7 rounded-full cursor-pointer transition-transform ${
                   editColor.toLowerCase() === color ? 'ring-2 ring-gray-900 ring-offset-2 scale-110' : 'hover:scale-110'
                 }`}
@@ -156,9 +151,9 @@ export default function ProfileSelector() {
                 value={editColor}
                 onChange={e => setEditColor(e.target.value)}
                 className="w-7 h-7 rounded cursor-pointer border border-gray-200 p-0.5 bg-transparent"
-                title="Color personalizado"
+                title={t('profiles.customColor')}
               />
-              <span className="whitespace-nowrap">Personalizado</span>
+              <span className="whitespace-nowrap">{t('profiles.custom')}</span>
             </div>
           </div>
           <div className="flex justify-between items-center gap-2">
@@ -168,7 +163,7 @@ export default function ProfileSelector() {
               disabled={profiles.length <= 1}
               className="px-3 py-2 rounded-xl text-red-600 text-sm font-semibold hover:bg-red-50 transition-colors disabled:opacity-40 cursor-pointer"
             >
-              Eliminar
+              {t('profiles.delete')}
             </button>
             <div className="flex gap-2">
               <button
@@ -176,7 +171,7 @@ export default function ProfileSelector() {
                 onClick={() => setEditing(null)}
                 className="px-4 py-2 rounded-xl border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
               >
-                Cancelar
+                {t('profiles.cancel')}
               </button>
               <button
                 type="button"
@@ -184,7 +179,7 @@ export default function ProfileSelector() {
                 disabled={!editName.trim()}
                 className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40 cursor-pointer"
               >
-                Guardar
+                {t('profiles.save')}
               </button>
             </div>
           </div>
@@ -192,14 +187,13 @@ export default function ProfileSelector() {
       )}
 
       {deleting && (
-        <Modal open onClose={() => setDeleting(null)} title="Eliminar perfil">
+        <Modal open onClose={() => setDeleting(null)} title={t('profiles.deleteProfile')}>
           <p className="text-sm text-gray-600 leading-relaxed mb-1">
-            ¿Seguro que quieres eliminar el perfil <span className="font-semibold text-gray-900">{deleting.name}</span>?
+            {t('profiles.deleteConfirm', { name: deleting.name })}
           </p>
           {hasImportedFiles(deleting.id) && (
             <p className="text-xs text-amber-600 leading-relaxed mb-3">
-              Este perfil tiene extractos importados. Antes de eliminar, descarga su copia de
-              seguridad si quieres conservarlos.
+              {t('profiles.deleteHasImports')}
             </p>
           )}
           <div className="flex justify-end gap-2">
@@ -208,14 +202,14 @@ export default function ProfileSelector() {
               onClick={() => setDeleting(null)}
               className="px-4 py-2 rounded-xl border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
             >
-              Cancelar
+              {t('profiles.cancel')}
             </button>
             <button
               type="button"
               onClick={confirmDelete}
               className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
             >
-              Eliminar
+              {t('profiles.delete')}
             </button>
           </div>
         </Modal>
