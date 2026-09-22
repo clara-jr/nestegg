@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useI18n } from '../../../lib/i18n';
 
 export interface SelectOption {
   value: string;
@@ -94,6 +95,7 @@ export function Select({
   className = '',
   leadingIcon,
 }: SelectProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -184,7 +186,7 @@ export function Select({
           </span>
         )}
         {selected?.icon && <span className="flex-shrink-0">{selected.icon}</span>}
-        <span className="flex-1 truncate">{selected ? selected.label : (placeholder ?? 'Selecciona…')}</span>
+        <span className="flex-1 truncate">{selected ? selected.label : (placeholder ?? t('common.selectPlaceholder'))}</span>
         <span className="flex-shrink-0">
           <ChevronIcon />
         </span>

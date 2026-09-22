@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect } from 'react';
+import { useI18n } from '../../../lib/i18n';
 
 interface ModalProps {
   open: boolean;
@@ -8,6 +9,7 @@ interface ModalProps {
 }
 
 export function Modal({ open, onClose, title, children }: Readonly<ModalProps>) {
+  const { t } = useI18n();
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -35,7 +37,7 @@ export function Modal({ open, onClose, title, children }: Readonly<ModalProps>) 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t('common.close')}
             className="shrink-0 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
           >
             <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">

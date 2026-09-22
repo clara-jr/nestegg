@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { localeOf, useI18n } from '../../../lib/i18n';
 import { BANKS, type BankId, type ExpenseSplit, type Movement } from '../../../lib/bankImports';
 import { formatCurrency, formatSigned } from '../../../lib/calculations';
 import { EXPENSE_CATEGORY_LIST, expenseSplits } from '../../../lib/investments';
@@ -14,8 +15,8 @@ const BANK_LABELS: Record<BankId, string> = Object.fromEntries(
 ) as Record<BankId, string>;
 
 /** Fecha corta estilo Whisper: «14 ene» en lugar del locale completo. */
-function cardDate(date: string): string {
-  return new Date(`${date}T00:00:00`).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+function cardDate(date: string, lang: 'es' | 'en' | 'fr'): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString(localeOf(lang), { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function TrashIcon() {
@@ -42,6 +43,7 @@ function PropertySelect({
   label: string;
   onChange: (value: 'joint' | 'individual' | 'auto') => void;
 }) {
+  const { t } = useI18n();
   return (
     <Select
       value={value}
@@ -50,9 +52,9 @@ function PropertySelect({
       className="w-[158px]"
       onChange={v => onChange(v as 'joint' | 'individual' | 'auto')}
       options={[
-        { value: 'auto', label: 'Según categoría', icon: <span className="inline-flex h-[19px] w-[19px] items-center justify-center"><Icon name={categoryJoint ? 'users' : 'user'} className="h-4 w-4 text-gray-500" /></span> },
-        { value: 'joint', label: 'Conjunto', icon: <span className="inline-flex h-[19px] w-[19px] items-center justify-center"><Icon name="users" className="h-4 w-4 text-gray-500" /></span> },
-        { value: 'individual', label: 'Individual', icon: <span className="inline-flex h-[19px] w-[19px] items-center justify-center"><Icon name="user" className="h-4 w-4 text-gray-500" /></span> },
+        { value: 'auto', label: t('common.accordingToCategory'), icon: <span className="inline-flex h-[19px] w-[19px] items-center justify-center"><Icon name={categoryJoint ? 'users' : 'user'} className="h-4 w-4 text-gray-500" /></span> },
+        { value: 'joint', label: t('common.joint'), icon: <span className="inline-flex h-[19px] w-[19px] items-center justify-center"><Icon name="users" className="h-4 w-4 text-gray-500" /></span> },
+        { value: 'individual', label: t('common.individual'), icon: <span className="inline-flex h-[19px] w-[19px] items-center justify-center"><Icon name="user" className="h-4 w-4 text-gray-500" /></span> },
       ]}
     />
   );
@@ -85,6 +87,7 @@ export function ExpenseCardList({
   onSaveExpenseSplits,
   onChangeChargeType,
 }: Readonly<ExpenseCardListProps>) {
+  const { t, lang, tCategory } = useI18n();
   const [editingSplit, setEditingSplit] = useState<{ movement: Movement; splits: ExpenseSplit[] } | null>(null);
 
   return (
@@ -93,15 +96,15 @@ export function ExpenseCardList({
         <label className="flex cursor-pointer select-none items-center gap-2 text-xs text-gray-600 transition-colors hover:text-gray-900">
           <input
             type="checkbox"
-            aria-label="Seleccionar todos los visibles"
+            aria-label={t('common.selectAllVisible')}
             checked={allSelected}
             onChange={onToggleAll}
             className="h-4 w-4 cursor-pointer accent-gray-900"
           />
           <span>
-            Seleccionar visibles
+            {t('common.selectVisible')}
             <span className="text-gray-400">
-              {' '}({movements.length} gasto{movements.length === 1 ? '' : 's'})
+              {' '}{t('common.expenseCount', { n: movements.length, s: movements.length === 1 ? '' : 's' })}
             </span>
           </span>
         </label>
@@ -161,7 +164,7 @@ export function ExpenseCardList({
                 <div className="flex items-start gap-3 px-4 pb-2 pt-3 sm:items-center">
                   <input
                     type="checkbox"
-                    aria-label={`Seleccionar ${m.concept}`}
+                    aria-label={t('common.selectConcept', { concept: m.concept })}
                     checked={isChecked}
                     onChange={() => onToggleOne(m.id)}
                     className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-gray-900 sm:mt-0"
@@ -176,7 +179,7 @@ export function ExpenseCardList({
                     <Tooltip text={m.concept} className="block w-full min-w-0 cursor-pointer">
                       <p className="line-clamp-2 break-words text-sm font-semibold leading-snug text-gray-900 md:line-clamp-1">{m.concept}</p>
                     </Tooltip>
-                    <p className="mt-0.5 text-xs leading-3 text-gray-500">{cardDate(m.date)}</p>
+                    <p className="mt-0.5 text-xs leading-3 text-gray-500">{cardDate(m.date, lang)}</p>
                   </div>
                   <div className="relative z-10 flex shrink-0 items-center gap-1.5">
                     <div className="flex shrink-0 items-center gap-2.5">
@@ -195,7 +198,7 @@ export function ExpenseCardList({
                     </div>
                     <button
                       type="button"
-                      aria-label={isEditingSplit ? `Cerrar reparto de ${m.concept}` : `Repartir ${m.concept}`}
+                      aria-label={isEditingSplit ? t('common.closeSplitOf', { concept: m.concept }) : t('common.splitConcept', { concept: m.concept })}
                       onClick={() =>
                         setEditingSplit(current =>
                           current?.movement.id === m.id
@@ -219,19 +222,19 @@ export function ExpenseCardList({
                     <Select
                       value={category}
                       size="xs"
-                      ariaLabel={`Categoría de ${m.concept}`}
+                      ariaLabel={t('common.categoryOf', { concept: m.concept })}
                       className="w-[158px]"
                       onChange={v => onChangeCategory(m.id, v)}
                       options={EXPENSE_CATEGORY_LIST.map(c => ({
                         value: c,
-                        label: c,
+                        label: tCategory(c),
                         icon: <ExpenseCategoryIcon category={c} size={11} />,
                       }))}
                     />
                     <PropertySelect
                       value={selectValue}
                       categoryJoint={categoryIsJoint}
-                      label={`Propiedad de ${m.concept}`}
+                      label={t('common.ownershipOf', { concept: m.concept })}
                       onChange={v => onChangeChargeType(m.id, v)}
                     />
                   </div>
@@ -246,7 +249,7 @@ export function ExpenseCardList({
                             {isEditingSplit && index === displayedSplits.length - 1 && (
                               <button
                                 type="button"
-                                aria-label="Añadir parte"
+                                aria-label={t('common.addPart')}
                                 onClick={() =>
                                   setEditingSplit(current =>
                                     current
@@ -286,7 +289,7 @@ export function ExpenseCardList({
                             <Select
                               value={split.category}
                               size="xs"
-                              ariaLabel={`Categoría de parte ${index + 1}`}
+                              ariaLabel={t('common.categoryOfPart', { n: index + 1 })}
                               className="w-[158px]"
                               onChange={v => {
                                 if (isEditingSplit) updateSplit(index, { category: v });
@@ -300,14 +303,14 @@ export function ExpenseCardList({
                               }}
                               options={EXPENSE_CATEGORY_LIST.map(c => ({
                                 value: c,
-                                label: c,
+                                label: tCategory(c),
                                 icon: <ExpenseCategoryIcon category={c} size={11} />,
                               }))}
                             />
                             <PropertySelect
                               value={split.isJoint === undefined ? 'auto' : split.isJoint ? 'joint' : 'individual'}
                               categoryJoint={jointCategories.includes(split.category)}
-                              label={`Propiedad de parte ${index + 1}`}
+                              label={t('common.ownershipOfPart', { n: index + 1 })}
                               onChange={property => {
                                 const isJointValue = property === 'auto' ? undefined : property === 'joint';
                                 if (isEditingSplit) updateSplit(index, { isJoint: isJointValue });
@@ -329,7 +332,7 @@ export function ExpenseCardList({
                                   }
                                   min={0.01}
                                   step="1"
-                                  ariaLabel={`Importe de parte ${index + 1}`}
+                                  ariaLabel={t('common.amountOfPart', { n: index + 1 })}
                                   className="w-28"
                                   inputClassName="pr-8 py-1 px-2 text-right rounded-md"
                                   stepperRound="md"
@@ -342,7 +345,7 @@ export function ExpenseCardList({
                               {isEditingSplit && (
                                 <button
                                   type="button"
-                                  aria-label={`Eliminar parte ${index + 1}`}
+                                  aria-label={t('common.removePart', { n: index + 1 })}
                                   disabled={displayedSplits.length === 1}
                                   onClick={() =>
                                     setEditingSplit(current =>
@@ -367,7 +370,7 @@ export function ExpenseCardList({
                 {isEditingSplit && (
                   <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 px-4 py-2.5 max-[521px]:flex-col max-[521px]:items-stretch">
                     <span className={`text-xs font-semibold ${valid ? 'text-emerald-700' : 'text-red-600'}`}>
-                      Repartido: {formatCurrency(total)} de {formatCurrency(expected)}
+                      {t('common.splitProgress', { total: formatCurrency(total), expected: formatCurrency(expected) })}
                     </span>
                     <div className="flex-1 max-[521px]:hidden" />
                     <div className="flex items-center gap-3 max-[521px]:w-full max-[521px]:justify-end">
@@ -380,7 +383,7 @@ export function ExpenseCardList({
                         }}
                         className="cursor-pointer rounded-xl border border-gray-200 bg-zinc-100 px-2 py-1 text-xs min-[480px]:text-sm font-semibold text-gray-900 transition-colors hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        Guardar
+                        {t('common.save')}
                       </button>
                       {hasSavedSplit && (
                         <button
@@ -391,7 +394,7 @@ export function ExpenseCardList({
                           }}
                           className="cursor-pointer rounded-xl border border-gray-200 hover:bg-zinc-100 px-2 py-1 text-xs min-[480px]:text-sm font-semibold text-gray-900 transition-colors"
                         >
-                          Eliminar reparto
+                          {t('common.removeSplit')}
                         </button>
                       )}
                     </div>

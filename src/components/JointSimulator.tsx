@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
-import { formatAxisCurrency, formatCurrency, formatSigned } from '../lib/calculations';
-import { EXPENSE_CATEGORY_LIST, DAY_FILTER, averageInRange, currentMonthKey, formatDay, monthsBetween, rangeFromDay, rangeMonth, rangeToDay } from '../lib/investments';
+import { formatAxisCurrency, formatSigned } from '../lib/calculations';
+import { useI18n, formatDayLocalized, type Lang } from '../lib/i18n';
+import { EXPENSE_CATEGORY_LIST, DAY_FILTER, averageInRange, currentMonthKey, monthsBetween, rangeFromDay, rangeMonth, rangeToDay } from '../lib/investments';
 import type { Movement } from '../lib/bankImports';
 import { reclassifyPaypalDuplicates } from '../lib/bankImports';
 import {
@@ -48,8 +49,8 @@ function loadMovements(profileId: string): Movement[] {
   return reclassifyPaypalDuplicates(movements);
 }
 
-function fmtMonth(month: string): string {
-  return new Date(`${month}-01T00:00:00`).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' });
+function fmtMonth(month: string, lang: Lang): string {
+  return formatDayLocalized(lang, month, { month: 'short', year: '2-digit' });
 }
 
 function pct(value: number | null, digits = 0): string {
@@ -58,20 +59,20 @@ function pct(value: number | null, digits = 0): string {
 }
 
 /** Valor compuesto de una card: ingresos, gastos y capacidad de ahorro. */
-function IncomeExpenseValue({ income, expenses, savings, perMonth = false }: { income: number; expenses: number; savings: number; perMonth?: boolean }) {
-  const suffix = perMonth ? '/mes' : '';
+function IncomeExpenseValue({ income, expenses, savings, perMonth = false, t }: { income: number; expenses: number; savings: number; perMonth?: boolean; t: (key: string, vars?: Record<string, string | number>) => string }) {
+  const suffix = perMonth ? t('affordability.perMonth') : '';
   return (
     <div className="w-full space-y-0.5">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">Ingresos</span>
+        <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">{t('joint.income')}</span>
         <span className="text-sm text-emerald-600 font-bold whitespace-nowrap">{formatSigned(income)}{suffix}</span>
       </div>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">Gastos</span>
+        <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">{t('joint.expenses')}</span>
         <span className="text-sm text-red-600 font-bold whitespace-nowrap">{formatSigned(-expenses)}{suffix}</span>
       </div>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">Ahorro</span>
+        <span className="text-[0.7rem] font-medium uppercase tracking-wide text-gray-400">{t('joint.savings')}</span>
         <span className={`text-sm font-bold whitespace-nowrap ${savings >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{formatSigned(savings)}{suffix}</span>
       </div>
     </div>
@@ -84,6 +85,7 @@ function IncomeExpenseValue({ income, expenses, savings, perMonth = false }: { i
  * a las categorías de gasto marcadas como «conjuntas».
  */
 export default function JointSimulator() {
+  const { t, tCategory, lang } = useI18n();
   const [tick, setTick] = useState(0);
   const [config, setConfig] = useState(() => getJointConfig());
   const [jointView, setJointView] = useState<string>('all');
@@ -146,14 +148,14 @@ export default function JointSimulator() {
       const p = byMonth.get(month);
       return {
         month,
-        label: fmtMonth(month),
+        label: fmtMonth(month, lang),
         income: p?.income ?? 0,
         expenses: p?.expenses ?? 0,
         savings: p?.savings ?? 0,
         savingsRate: p?.savingsRate ?? null,
       };
     });
-  }, [monthAxis, summary.monthly]);
+  }, [monthAxis, summary.monthly, lang]);
 
   const isCategoryView =
     jointView.startsWith('cat:') && jointView.slice(4) in summary.monthlyByCategory;
@@ -176,7 +178,7 @@ export default function JointSimulator() {
       const p = summaryByMonth.get(month);
       return {
         month,
-        label: fmtMonth(month),
+        label: fmtMonth(month, lang),
         income: p?.income ?? 0,
         expenses: p?.expenses ?? 0,
         savings: p?.savings ?? 0,
@@ -184,7 +186,7 @@ export default function JointSimulator() {
         total: byMonth.get(month) ?? 0,
       };
     }) as typeof chartData;
-  }, [selectedCategory, monthAxis, summary.monthly, summary.monthlyByCategory]);
+  }, [selectedCategory, monthAxis, summary.monthly, summary.monthlyByCategory, lang]);
 
   const [dateRange, setDateRange] = useState<DateRange | null>(null);
   const visibleChartData = useMemo(
@@ -219,14 +221,14 @@ export default function JointSimulator() {
       .filter(p => p.date >= rangeFromDay(dateRange.from) && p.date <= rangeToDay(dateRange.to))
       .map(p => ({
         month: p.date,
-        label: formatDay(p.date),
+        label: formatDayLocalized(lang, p.date, { day: '2-digit', month: 'short' }),
         income: p.income,
         expenses: p.expenses,
         savings: p.savings,
         savingsRate: p.income > 0 ? (p.savings / p.income) * 100 : null,
         total: p.expenses,
       }));
-  }, [isDaily, dateRange, memberProfiles, selectedCategory]);
+  }, [isDaily, dateRange, memberProfiles, selectedCategory, lang]);
   const chartDataFinal = isCategoryView
     ? isDaily
       ? dailyData
@@ -298,7 +300,7 @@ export default function JointSimulator() {
       return (
         <>
           <p className="mb-1 font-semibold text-gray-900">{label}</p>
-          <SignedTooltipLine label="Ingresos" value={Number(p?.income ?? 0)} />
+          <SignedTooltipLine label={t('joint.income')} value={Number(p?.income ?? 0)} />
         </>
       );
     }
@@ -306,7 +308,7 @@ export default function JointSimulator() {
       return (
         <>
           <p className="mb-1 font-semibold text-gray-900">{label}</p>
-          <SignedTooltipLine label="Gastos" value={-Number(p?.expenses ?? 0)} />
+          <SignedTooltipLine label={t('joint.expenses')} value={-Number(p?.expenses ?? 0)} />
         </>
       );
     }
@@ -314,7 +316,7 @@ export default function JointSimulator() {
       return (
         <>
           <p className="mb-1 font-semibold text-gray-900">{label}</p>
-          <SignedTooltipLine label={String(selectedCategory)} value={-Number(p?.total ?? 0)} />
+          <SignedTooltipLine label={tCategory(selectedCategory)} value={-Number(p?.total ?? 0)} />
         </>
       );
     }
@@ -336,64 +338,66 @@ export default function JointSimulator() {
 
   return (
     <div className="space-y-4 pb-6">
-        <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">Convivencia</h3>
+        <h3 className="py-2 text-base font-bold text-gray-900 uppercase tracking-wider">{t('joint.title')}</h3>
         <p className="text-sm text-gray-500 mt-1 leading-relaxed">
-          Ingresos y gastos conjuntos del hogar, a partir de los extractos importados por cada
-          perfil. Marca categorías como <span className="font-semibold text-gray-700">conjuntas</span>{' '}
-          para ver qué porcentaje aporta cada integrante a los gastos compartidos.
+          {t('joint.intro1')}<span className="font-semibold text-gray-700"> {t('joint.intro2')}</span>{' '}
+          {t('joint.intro3')}
         </p>
 
       {hasData ? (
         <>
           <div className="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
             <SummaryCard
-              label="Ingreso Medio Mensual"
+              label={t('home.preview.avgMonthlyIncome')}
               value={formatSigned(summary.averageMonthlyIncome)}
               variant="info"
-              subtitle={`Mediana: ${formatSigned(summary.medianMonthlyIncome)} · ${summary.incomeMonthCount} meses`}
+              subtitle={t('home.preview.median', { value: formatSigned(summary.medianMonthlyIncome), months: summary.incomeMonthCount })}
             />
             <SummaryCard
-              label="Gasto Medio Mensual"
+              label={t('home.preview.avgMonthlyExpense')}
               value={formatSigned(-summary.averageMonthlyExpenses)}
               variant="negative"
-              subtitle={`Mediana: ${formatSigned(-summary.medianMonthlyExpenses)} · ${summary.expenseMonthCount} meses`}
+              subtitle={t('home.preview.median', { value: formatSigned(-summary.medianMonthlyExpenses), months: summary.expenseMonthCount })}
             />
             <SummaryCard
-              label="Capacidad de Ahorro Media"
+              label={t('joint.avgSavingsCapacity')}
               value={formatSigned(summary.averageMonthlySavings)}
               variant={summary.averageMonthlySavings >= 0 ? 'positive' : 'negative'}
-              subtitle={`Mediana: ${formatSigned(summary.medianMonthlySavings)} · ${summary.savingsMonthCount} meses`}
+              subtitle={t('home.preview.median', { value: formatSigned(summary.medianMonthlySavings), months: summary.savingsMonthCount })}
             />
             <SummaryCard
-              label="Media Último Año"
+              label={t('joint.averageLastYear')}
               value={
                 <IncomeExpenseValue
                   income={summary.lastYearAvgIncome}
                   expenses={summary.lastYearAvgExpenses}
                   savings={summary.lastYearAvgSavings}
                   perMonth
+                  t={t}
                 />
               }
               variant="neutral"
             />
             <SummaryCard
-              label="Mes Actual"
+              label={t('joint.currentMonth')}
               value={
                 <IncomeExpenseValue
                   income={summary.currentMonthIncome}
                   expenses={summary.currentMonthExpenses}
                   savings={summary.currentMonthIncome - summary.currentMonthExpenses}
+                  t={t}
                 />
               }
               variant="neutral"
             />
             <SummaryCard
-              label="Mes Anterior"
+              label={t('joint.previousMonth')}
               value={
                 <IncomeExpenseValue
                   income={summary.previousMonthIncome}
                   expenses={summary.previousMonthExpenses}
                   savings={summary.previousMonthIncome - summary.previousMonthExpenses}
+                  t={t}
                 />
               }
               variant="neutral"
@@ -403,29 +407,29 @@ export default function JointSimulator() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3 mb-3 mt-8">
               <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                Ingresos, gastos y ahorro conjunto por mes
+                {t('joint.chartTitle')}
               </h4>
               <div className="flex-1" />
               <div className="flex flex-wrap items-center gap-3">
                 <Select
                   value={chartView}
                   onChange={setJointView}
-                  ariaLabel="Categoría de la gráfica conjunta"
+                  ariaLabel={t('joint.chartCategoryAria')}
                   className="w-52"
                   options={[
-                    { value: 'all', label: 'Todo' },
-                    { value: 'income', label: 'Ingresos' },
-                    ...(gastosCategories.length > 1 ? [] : [{ value: 'expenses', label: 'Gastos' }]),
+                    { value: 'all', label: t('joint.all') },
+                    { value: 'income', label: t('joint.income') },
+                    ...(gastosCategories.length > 1 ? [] : [{ value: 'expenses', label: t('joint.expenses') }]),
                   ]}
                   groups={
                     gastosCategories.length > 1
                       ? [{
-                          label: 'Gastos',
+                          label: t('joint.expenses'),
                           options: [
-                            { value: 'expenses', label: 'Todos los gastos' },
+                            { value: 'expenses', label: t('joint.allExpenses') },
                             ...gastosCategories.map(cat => ({
                               value: `cat:${cat}`,
-                              label: cat,
+                              label: tCategory(cat),
                               icon: <ExpenseCategoryIcon category={cat} size={12} />,
                             })),
                           ],
@@ -436,9 +440,9 @@ export default function JointSimulator() {
                 <Select
                   value={chartTime.preset}
                   onChange={v => chartTime.selectPreset(v as DateRangePreset)}
-                  ariaLabel="Filtro de tiempo"
+                  ariaLabel={t('dateFilter.aria')}
                   className="w-44"
-                  options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+                  options={PRESET_LABELS.map(o => ({ value: o.value, label: t(`dateFilter.${o.value}`) }))}
                 />
               </div>
               {chartTime.preset === 'custom' && (
@@ -465,19 +469,19 @@ export default function JointSimulator() {
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                 {jointView === 'all' && (
                   <>
-                    <Bar dataKey="income" name="Ingresos" fill="#00bc7d" radius={[3, 3, 0, 0]} maxBarSize={40} />
-                    <Bar dataKey="expenses" name="Gastos" fill="#ff637e" radius={[3, 3, 0, 0]} maxBarSize={40} />
-                    {!isDaily && <Line dataKey="savings" name="Ahorro" stroke="#464541" type="monotone" strokeWidth={2} dot={false} />}
+                    <Bar dataKey="income" name={t('joint.income')} fill="#00bc7d" radius={[3, 3, 0, 0]} maxBarSize={40} />
+                    <Bar dataKey="expenses" name={t('joint.expenses')} fill="#ff637e" radius={[3, 3, 0, 0]} maxBarSize={40} />
+                    {!isDaily && <Line dataKey="savings" name={t('joint.savings')} stroke="#464541" type="monotone" strokeWidth={2} dot={false} />}
                   </>
                 )}
                 {jointView === 'income' && (
-                  <Bar dataKey="income" name="Ingresos" fill="#00bc7d" radius={[3, 3, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="income" name={t('joint.income')} fill="#00bc7d" radius={[3, 3, 0, 0]} maxBarSize={40} />
                 )}
                 {jointView === 'expenses' && (
-                  <Bar dataKey="expenses" name="Gastos" fill="#ff637e" radius={[3, 3, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="expenses" name={t('joint.expenses')} fill="#ff637e" radius={[3, 3, 0, 0]} maxBarSize={40} />
                 )}
                 {isCategoryView && selectedCategory && (
-                  <Bar dataKey="total" name={selectedCategory} fill="#ff637e" radius={[3, 3, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="total" name={tCategory(selectedCategory)} fill="#ff637e" radius={[3, 3, 0, 0]} maxBarSize={40} />
                 )}
               </ComposedChart>
             </ResponsiveContainer>
@@ -489,7 +493,7 @@ export default function JointSimulator() {
                 savings={intervalSummary.savings}
                 perDay={perDay}
                 categoryOnly={isCategoryView}
-                categoryLabel={isCategoryView ? selectedCategory ?? undefined : undefined}
+                categoryLabel={isCategoryView ? tCategory(selectedCategory) ?? undefined : undefined}
               />
             )}
           </div>
@@ -526,12 +530,10 @@ export default function JointSimulator() {
       ) : (
         <div className="py-14 flex flex-col items-center justify-center text-center gap-3">
           <Icon name="home" className="h-14 w-14 text-gray-400" />
-          <p className="text-base font-bold text-gray-900">Aún no hay datos conjuntos</p>
+          <p className="text-base font-bold text-gray-900">{t('joint.emptyTitle')}</p>
           <p className="text-sm text-gray-500 max-w-md leading-relaxed">
-            La vista conjunta empieza a contar desde el primer mes en que{' '}
-            <span className="font-semibold text-gray-700">los dos integrantes tienen datos importados</span>.
-            Sube los extractos CSV/XLS del otro perfil en el Agregador de Finanzas y esta sección se
-            activará automáticamente.
+            {t('joint.empty1')}{' '}<span className="font-semibold text-gray-700">{t('joint.empty2')}</span>
+            {t('joint.empty3')}
           </p>
         </div>
       )}
@@ -539,14 +541,13 @@ export default function JointSimulator() {
       {hasData && (
       <div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-3 mt-8">
-          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Categorías de gasto conjuntas</h4>
-          <span className="text-xs font-semibold text-gray-500">{config.jointCategories.length} seleccionadas</span>
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('joint.jointCategoriesTitle')}</h4>
+          <span className="text-xs font-semibold text-gray-500">{t('joint.categoriesSelected', { n: config.jointCategories.length })}</span>
         </div>
           {config.jointCategories.length === 0 && (
             <p className="flex items-start gap-2 text-sm text-gray-600 leading-relaxed mt-1">
               <Icon name="warning" className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-              <span>Ninguna categoría marcada como conjunta. Marca las categorías que sean gastos del hogar
-                (vivienda, suministros, alimentación…) para analizar la aportación de cada integrante.</span>
+              <span>{t('joint.noJointCategories')}</span>
             </p>
           )}
           <div className="grid grid-cols-1 min-[413px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mt-3">
@@ -568,7 +569,7 @@ export default function JointSimulator() {
                     className="w-4 h-4 accent-gray-700 cursor-pointer"
                   />
                   <ExpenseCategoryIcon category={category} size={12} />
-                  <span className="font-medium">{category}</span>
+                  <span className="font-medium">{tCategory(category)}</span>
                 </label>
               );
             })}
@@ -585,7 +586,7 @@ export default function JointSimulator() {
         </div>
         {summary.jointTotal > 0 && (
           <div className="flex items-center justify-between mb-3 mt-8">
-          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Aportación a los gastos conjuntos</h4>
+          <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">{t('joint.contributionTitle')}</h4>
           {/*summary.jointAverageMonthly > 0 && (
             <span className="text-xs font-semibold text-gray-500">
               Gasto conjunto medio/mes: {formatCurrency(summary.jointAverageMonthly)}
@@ -597,8 +598,7 @@ export default function JointSimulator() {
           {summary.jointTotal === 0 ? (
             <p className="flex items-start gap-2 text-sm text-gray-600 leading-relaxed">
               <Icon name="warning" className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
-              <span>No hay gastos en las categorías conjuntas seleccionadas. Revisa las categorías o
-                importa más movimientos.</span>
+              <span>{t('joint.noJointExpenses')}</span>
             </p>
           ) : (
             <>
@@ -611,19 +611,19 @@ export default function JointSimulator() {
                     </div>
                     <dl className="space-y-1.5 text-sm">
                       <div className="flex items-center justify-between gap-2">
-                        <dt className="text-gray-500">Total conjunto</dt>
+                        <dt className="text-gray-500">{t('joint.memberTotal')}</dt>
                         <dd className="font-semibold text-gray-900">{formatSigned(-member.totalJoint)}</dd>
                       </div>
                       <div className="flex items-center justify-between gap-2 border-t border-gray-100 pt-1.5">
-                        <dt className="text-gray-500">% del total</dt>
+                        <dt className="text-gray-500">{t('joint.memberPctTotal')}</dt>
                         <dd className="font-semibold text-gray-900">{pct(member.totalPct, 1)}</dd>
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <dt className="text-gray-500">Media mensual</dt>
+                        <dt className="text-gray-500">{t('joint.memberMonthlyAverage')}</dt>
                         <dd className="font-semibold text-gray-900">{formatSigned(-member.averageMonthlyJoint)}</dd>
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <dt className="text-gray-500">Esfuerzo (vs. su ingreso)</dt>
+                        <dt className="text-gray-500">{t('joint.effort')}</dt>
                         <dd className="font-semibold text-gray-900">{pct(member.averagePctOfIncome, 1)}</dd>
                       </div>
                     </dl>
@@ -634,12 +634,12 @@ export default function JointSimulator() {
               <div>
                 <ScrollableTable
                   columns={[
-                    { title: 'Mes', align: 'left', minWidth: 114 },
+                    { title: t('joint.month'), align: 'left', minWidth: 114 },
                     ...summary.members.map(m => ({ title: m.name, align: 'right' as const, minWidth: 104 })),
-                    { title: 'Total hogar', align: 'right', minWidth: 104 },
+                    { title: t('joint.householdTotal'), align: 'right', minWidth: 104 },
                   ]}
                   rows={[...summary.monthly].reverse().map(month => [
-                      { content: fmtMonth(month.month), className: 'text-gray-500' },
+                      { content: fmtMonth(month.month, lang), className: 'text-gray-500' },
                       ...summary.members.map((member, mi) => {
                         const row = memberJointFor(mi, month.month);
                         return {
@@ -661,8 +661,7 @@ export default function JointSimulator() {
                     ])}
                 />
                 <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-                  Cada celda muestra el gasto conjunto aportado por el integrante y su porcentaje
-                  sobre el total del hogar ese mes.
+                  {t('joint.tableFootnote')}
                 </p>
               </div>
             </>

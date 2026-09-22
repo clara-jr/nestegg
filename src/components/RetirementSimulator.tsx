@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
 import { calculateNetSalary, calculateTax, formatAxisCurrency, formatCurrency, formatSigned } from '../lib/calculations';
 import { useFontsReady } from '../lib/fonts';
+import { useI18n } from '../lib/i18n';
 import {
   buildPensionSchedule,
   calculateAllRetirementAges,
@@ -45,6 +46,7 @@ import {
 type ViewMode = 'sin-pension' | 'con-pension';
 
 export default function RetirementSimulator() {
+  const { t } = useI18n();
   const defaultMember: MemberConfig = {
     currentAge: 30,
     currentSalary: 0,
@@ -607,7 +609,7 @@ export default function RetirementSimulator() {
   const monthlyNetSalary = totalNet / 12;
   const contributionExceedsSalary = params.monthlyContribution > monthlyNetSalary + 0.01;
   const distributionSliderPeriods: DistributionPeriod[] = visiblePeriods.map(p => ({
-    label: sameDistributionForAll ? 'Todos los tramos' : `${p.startAge}–${p.endAge} años`,
+    label: sameDistributionForAll ? t('retirement.allPeriods') : t('retirement.periodYears', { start: p.startAge, end: p.endAge }),
     pct: sameDistributionForAll ? (params.distributionPeriods[0] ?? 50) : p.pct,
     index: p.index,
   }));
@@ -615,75 +617,76 @@ export default function RetirementSimulator() {
   return storageReady && fontsReady ? (
     <SimulatorLayout>
       <FormContainer>
-        <FormSection title="Datos Personales" cols="single">
+        <FormSection title={t('retirement.personalData')} cols="single">
           <div className="space-y-4">
             {params.members.map((member, i) => (
               <MemberCard key={i} index={i} totalMembers={params.members.length} onRemove={params.members.length > 1 ? () => removeMember(i) : undefined}>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <InputField
-                    label="Edad Actual"
+                    label={t('retirement.currentAge')}
                     value={member.currentAge}
                     onChange={(v) => handleMemberChange(i, 'currentAge', v)}
                   />
                   <InputField
-                    label="Salario Bruto Anual (€)"
+                    label={t('retirement.grossSalary')}
                     value={member.currentSalary}
                     onChange={(v) => handleMemberChange(i, 'currentSalary', v)}
-                    hint="Con este dato y el aporte mensual se deducen los gastos fijos mensuales"
+                    hint={t('retirement.salaryHint')}
                   />
                   <InputField
-                    label="Años Cotizados"
+                    label={t('retirement.yearsContributed')}
                     value={member.yearsContributed}
                     onChange={(v) => handleMemberChange(i, 'yearsContributed', v)}
-                    hint="Años cotizando a la Seguridad Social"
+                    hint={t('retirement.yearsContributedHint')}
                   />
                 </div>
               </MemberCard>
             ))}
-            <AddMemberButton onClick={addMember} />
+            <AddMemberButton onClick={addMember} label={t('common.addMember')} />
           </div>
           <InputField
-            label="Esperanza de Vida"
+            label={t('retirement.lifeExpectancy')}
             value={params.lifeExpectancy}
             onChange={(v) => handleInputChange('lifeExpectancy', v)}
-            error={params.residencyAge > params.lifeExpectancy ? 'La edad de residencia no puede ser mayor que la esperanza de vida' : undefined}
+            error={params.residencyAge > params.lifeExpectancy ? t('retirement.residencyAgeError') : undefined}
           />
         </FormSection>
 
-        <FormSection title="Ahorros Iniciales" cols="double">
+        <FormSection title={t('retirement.initialSavingsTitle')} cols="double">
           <InputField
-            label="Cuenta Remunerada Inicial (€)"
+            label={t('retirement.initialSavingsAccount')}
             value={params.initialSavingsAccount}
             onChange={(v) => handleInputChange('initialSavingsAccount', v)}
           />
           <InputField
-            label="Inversiones Iniciales (€)"
+            label={t('retirement.initialInvestments')}
             value={params.initialInvestments}
             onChange={(v) => handleInputChange('initialInvestments', v)}
           />
           <InputField
-            label="Rentabilidad Cuenta (%)"
+            label={t('retirement.savingsAccountRate')}
             value={params.savingsAccountRate}
             onChange={(v) => handleInputChange('savingsAccountRate', v)}
             step="0.1"
           />
           <InputField
-            label="Rentabilidad Inversiones (%)"
+            label={t('retirement.investmentRate')}
             value={params.investmentRate}
             onChange={(v) => handleInputChange('investmentRate', v)}
             step="0.1"
           />
         </FormSection>
 
-        <FormSection title="Ahorros Mensuales" cols="single">
+        <FormSection title={t('retirement.monthlySavings')} cols="single">
           <InputField
-            label="Aporte Total Mensual (€)"
+            label={t('retirement.monthlyContribution')}
             value={params.monthlyContribution}
             onChange={(v) => handleInputChange('monthlyContribution', v)}
-            hint="Importe destinado íntegramente a cuenta remunerada e inversiones."
-            error={contributionExceedsSalary ? `La aportación mensual no puede superar el salario mensual neto (${formatCurrency(monthlyNetSalary)})` : undefined}
+            hint={t('retirement.monthlyContributionHint')}
+            error={contributionExceedsSalary ? t('retirement.contributionExceedsSalary', { netSalary: formatCurrency(monthlyNetSalary) }) : undefined}
           />
           <DistributionSlider
+            title={t('common.distributionTitle')}
             periods={distributionSliderPeriods}
             sameForAll={sameDistributionForAll}
             showSameForAllToggle={visiblePeriods.length > 1}
@@ -698,54 +701,54 @@ export default function RetirementSimulator() {
           />
         </FormSection>
 
-        <FormSection title="Hipoteca y Préstamo" cols="double">
+        <FormSection title={t('retirement.mortgageAndLoan')} cols="double">
           <InputField
-            label="Cuota Hipoteca Mensual (€)"
+            label={t('retirement.mortgagePayment')}
             value={params.monthlyMortgagePayment}
             onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
-            hint="Al terminar de pagar la hipoteca, la cuota se redirige al ahorro mensual."
+            hint={t('retirement.mortgageRedirectHint')}
           />
           <InputField
-            label="Duración Hipoteca (años)"
+            label={t('retirement.mortgageDuration')}
             value={params.mortgageDurationYears}
             onChange={(v) => handleInputChange('mortgageDurationYears', v)}
-            hint={params.mortgageDurationYears > 0 && params.members.length > 0 ? `Finaliza a los ${params.members[0].currentAge + params.mortgageDurationYears} años${params.members.length > 1 ? ' del integrante nº 1' : ''}.` : undefined}
+            hint={params.mortgageDurationYears > 0 && params.members.length > 0 ? `${t('retirement.endsAtAge', { age: params.members[0].currentAge + params.mortgageDurationYears })}${params.members.length > 1 ? t('retirement.endsAtMember1') : ''}.` : undefined}
           />
           <InputField
-            label="Préstamo Familiar Mensual (€)"
+            label={t('retirement.familyLoanPayment')}
             value={params.familyLoanMonthlyPayment}
             onChange={(v) => handleInputChange('familyLoanMonthlyPayment', v)}
-            hint="0% interés · Al terminar de pagar el préstamo, la cuota se redirige al ahorro mensual."
+            hint={t('retirement.familyLoanHint')}
           />
           <InputField
-            label="Duración Préstamo (años)"
+            label={t('retirement.familyLoanDuration')}
             value={params.familyLoanDurationYears}
             onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
-            hint={params.familyLoanDurationYears > 0 && params.members.length > 0 ? `Finaliza a los ${params.members[0].currentAge + params.familyLoanDurationYears} años${params.members.length > 1 ? ' del integrante nº 1' : ''}.` : undefined}
+            hint={params.familyLoanDurationYears > 0 && params.members.length > 0 ? `${t('retirement.endsAtAge', { age: params.members[0].currentAge + params.familyLoanDurationYears })}${params.members.length > 1 ? t('retirement.endsAtMember1') : ''}.` : undefined}
           />
         </FormSection>
 
-        <FormSection title="Gastos en Jubilación" cols="double">
+        <FormSection title={t('retirement.retirementExpenses')} cols="double">
           <InputField
-            label="Gastos Mensuales en Residencia (€)"
+            label={t('retirement.residencyExpenses')}
             value={params.monthlyExpensesInResidency}
             onChange={(v) => handleInputChange('monthlyExpensesInResidency', v)}
-            hint={"Gastos totales incluyendo a todos los integrantes"}
+            hint={t('retirement.residencyExpensesHint')}
           />
           <InputField
-            label="Edad de Residencia"
+            label={t('retirement.residencyAge')}
             value={params.residencyAge}
             onChange={(v) => handleInputChange('residencyAge', v)}
-            error={params.residencyAge > params.lifeExpectancy ? 'La edad de residencia no puede ser mayor que la esperanza de vida' : undefined}
+            error={params.residencyAge > params.lifeExpectancy ? t('retirement.residencyAgeError') : undefined}
           />
           <SingleRangeSlider
-            title="Retiradas"
+            title={t('retirement.withdrawals')}
             value={params.withdrawalPct}
             min={0}
             max={100}
-            valueLabel={`${params.withdrawalPct}% cuenta | ${100 - params.withdrawalPct}% inversiones`}
-            description="De dónde rescatar el dinero en etapas de ingresos insuficientes (p.ej. mientras no se percibe pensión o en época de residencia)"
-            footer="Cuenta ← → Inversiones"
+            valueLabel={t('common.accountVsInvestments', { acct: params.withdrawalPct, inv: 100 - params.withdrawalPct })}
+            description={t('retirement.withdrawalDescription')}
+            footer={t('common.accountLeftInvestmentsRight')}
             fullWidth
             onChange={(v) => handleInputChange('withdrawalPct', v)}
           />
@@ -755,45 +758,45 @@ export default function RetirementSimulator() {
       {!contributionExceedsSalary && results.length > 0 && (
         <ResultsContainer>
           <ScenarioSection gridCols="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-3">
-            <ScenarioCard label="Ahorros Actuales" value={formatCurrency(params.initialSavingsAccount + params.initialInvestments)} />
-            <ScenarioCard label="Rentabilidades" value={`${params.savingsAccountRate}% cuenta · ${params.investmentRate}% inversiones`} />
-            <ScenarioCard label="Esperanza de Vida" value={`${params.lifeExpectancy} años`} />
+            <ScenarioCard label={t('retirement.currentSavings')} value={formatCurrency(params.initialSavingsAccount + params.initialInvestments)} />
+            <ScenarioCard label={t('retirement.yields')} value={t('retirement.yieldsValue', { acct: params.savingsAccountRate, inv: params.investmentRate })} />
+            <ScenarioCard label={t('retirement.lifeExpectancy')} value={t('retirement.years', { count: params.lifeExpectancy })} />
             <ScenarioCard
-              label="Gastos Fijos Mensuales"
-              value={`${formatCurrency(params.monthlyExpensesPreResidency)}/mes`}
-              hint={`${formatCurrency(Math.round(totalNet / 12))}/mes salario neto − ${formatCurrency(params.monthlyContribution)}/mes aportación − ${formatCurrency(params.monthlyMortgagePayment + params.familyLoanMonthlyPayment)}/mes deuda = ${formatCurrency(params.monthlyExpensesPreResidency)}/mes`}
+              label={t('retirement.fixedExpenses')}
+              value={`${formatCurrency(params.monthlyExpensesPreResidency)}${t('retirement.perMonth')}`}
+              hint={t('retirement.fixedExpensesHint', { net: formatCurrency(Math.round(totalNet / 12)), contribution: formatCurrency(params.monthlyContribution), debt: formatCurrency(params.monthlyMortgagePayment + params.familyLoanMonthlyPayment), expenses: formatCurrency(params.monthlyExpensesPreResidency) })}
             />
             {(params.monthlyMortgagePayment > 0 || params.familyLoanMonthlyPayment > 0) && (<>
               {params.monthlyMortgagePayment > 0 ? (<>
-                <ScenarioCard label="Hipoteca" value={`${formatCurrency(params.monthlyMortgagePayment)}/mes`} />
-                <ScenarioCard label="Edad fin Hipoteca" value={`${params.mortgageEndAge} años`} />
+                <ScenarioCard label={t('retirement.mortgage')} value={`${formatCurrency(params.monthlyMortgagePayment)}${t('retirement.perMonth')}`} />
+                <ScenarioCard label={t('retirement.mortgageEndAge')} value={t('retirement.years', { count: params.mortgageEndAge })} />
               </>) : (
-                <ScenarioCard label="Hipoteca" value="Inactiva" />
+                <ScenarioCard label={t('retirement.mortgage')} value={t('retirement.mortgageInactive')} />
               )}
               {params.familyLoanMonthlyPayment > 0 ? (<>
-                <ScenarioCard label="Préstamo Familiar" value={`${formatCurrency(params.familyLoanMonthlyPayment)}/mes`} />
-                <ScenarioCard label="Edad fin Préstamo Familiar" value={`${params.familyLoanEndAge} años`} />
+                <ScenarioCard label={t('retirement.familyLoan')} value={`${formatCurrency(params.familyLoanMonthlyPayment)}${t('retirement.perMonth')}`} />
+                <ScenarioCard label={t('retirement.familyLoanEndAge')} value={t('retirement.years', { count: params.familyLoanEndAge })} />
               </>) : (
-                <ScenarioCard label="Préstamo Familiar" value="Inactivo" />
+                <ScenarioCard label={t('retirement.familyLoan')} value={t('retirement.loanInactive')} />
               )}
             </>)}
-            <ScenarioCard label="Edad de Residencia" value={`${params.residencyAge} años`} />
-            <ScenarioCard label="Gastos en Residencia" value={`${formatCurrency(params.monthlyExpensesInResidency)}/mes`} />
+            <ScenarioCard label={t('retirement.residencyAge')} value={t('retirement.years', { count: params.residencyAge })} />
+            <ScenarioCard label={t('retirement.residencyExpensesCard')} value={`${formatCurrency(params.monthlyExpensesInResidency)}${t('retirement.perMonth')}`} />
           </ScenarioSection>
 
           <ResultsSection>
             <div className="space-y-4 sm:col-span-2 lg:col-span-4">
               <div>
-                <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Sin Pensión</h4>
+                <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">{t('retirement.withoutPension')}</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <ResultsCard
-                    label="Edad mínima de jubilación"
-                    value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithoutPension ? `${earliestWithoutPension.retirementAge} años` : 'No alcanzable')}
+                    label={t('retirement.minRetirementAge')}
+                    value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithoutPension ? t('retirement.years', { count: earliestWithoutPension.retirementAge }) : t('retirement.notAchievable'))}
                     icon="user"
                   />
                   {params.members.some(m => m.currentSalary > 0) && (
                   <ResultsCard
-                    label={earliestWithoutPension ? `Ahorro necesario a los ${earliestWithoutPension.retirementAge} años` : 'Ahorro sin pensión'}
+                    label={earliestWithoutPension ? t('retirement.savingsNeededAt', { age: earliestWithoutPension.retirementAge }) : t('retirement.savingsWithoutPension')}
                     value={earliestWithoutPension ? formatCurrency(earliestWithoutPension.requiredSavingsWithoutPension) : '—'}
                     icon="wallet"
                   />
@@ -801,24 +804,24 @@ export default function RetirementSimulator() {
                 </div>
                 {earliestWithoutPension && params.members.length > 1 && (
                   <div className="mt-2 text-xs text-gray-600">
-                    <p>Edades al jubilarse: {earliestWithoutPension.memberAges.map((age, i) => `I${i + 1}: ${age} años`).join(', ')}</p>
+                    <p>{t('retirement.memberAgesLabel', { ages: earliestWithoutPension.memberAges.map((age, i) => t('retirement.memberAge', { index: i + 1, age })).join(', ') })}</p>
                   </div>
                 )}
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                  Con Pensión
-                  {earliestWithPension && ` (${formatCurrency(earliestWithPension.memberPensions.reduce((a, b) => a + b, 0))}/mes${params.members.length > 1 ? ' total' : ''})`}
+                  {t('retirement.withPension')}
+                  {earliestWithPension && ` (${formatCurrency(earliestWithPension.memberPensions.reduce((a, b) => a + b, 0))}${t('retirement.perMonth')}${params.members.length > 1 ? ` ${t('retirement.total')}` : ''})`}
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <ResultsCard
-                    label="Edad mínima de jubilación"
-                    value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithPension ? `${earliestWithPension.retirementAge} años` : 'No alcanzable')}
+                    label={t('retirement.minRetirementAge')}
+                    value={params.members.every(m => m.currentSalary === 0) ? '-' : (earliestWithPension ? t('retirement.years', { count: earliestWithPension.retirementAge }) : t('retirement.notAchievable'))}
                     icon="user"
                   />
                   {params.members.some(m => m.currentSalary > 0) && (
                   <ResultsCard
-                    label={earliestWithPension ? `Ahorro necesario a los ${earliestWithPension.retirementAge} años` : 'Ahorro con pensión'}
+                    label={earliestWithPension ? t('retirement.savingsNeededAt', { age: earliestWithPension.retirementAge }) : t('retirement.savingsWithPension')}
                     value={earliestWithPension ? formatCurrency(earliestWithPension.requiredSavingsWithPension) : '—'}
                     icon="wallet"
                   />
@@ -826,16 +829,16 @@ export default function RetirementSimulator() {
                 </div>
                 {earliestWithPension && params.members.length > 1 && (
                   <div className="mt-2 text-xs text-gray-600 space-y-1">
-                    <p>Edades al jubilarse: {earliestWithPension.memberAges.map((age, i) => `I${i + 1}: ${age} años`).join(', ')}</p>
-                    <p>Pensiones: {earliestWithPension.memberPensions.map((p, i) => `I${i + 1}: ${formatCurrency(p)}/mes`).join(', ')}</p>
+                    <p>{t('retirement.memberAgesLabel', { ages: earliestWithPension.memberAges.map((age, i) => t('retirement.memberAge', { index: i + 1, age })).join(', ') })}</p>
+                    <p>{t('retirement.pensionsLabel', { values: earliestWithPension.memberPensions.map((p, i) => t('retirement.memberPension', { index: i + 1, amount: formatCurrency(p) })).join(', ') })}</p>
                   </div>
                 )}
                 {earliestWithPension && earliestWithPension.memberPensions.some(p => p === 0) && (
                   <div className="mt-2 text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2">
                     {params.members.length > 1 ? (
-                      <>Los integrantes con pensión 0€/mes no cumplen los requisitos de cotización (<strong>mínimo 15 años</strong>, al menos <strong>2 en los 15 anteriores</strong> a la edad de pensión).</>
+                      <>{t('retirement.noPensionMulti')} (<strong>{t('retirement.minYearsReq')}</strong>{t('retirement.last2YearsReq')}{t('retirement.atPensionAge')}).</>
                     ) : (
-                      <>No se cumplen los requisitos de cotización (<strong>mínimo 15 años</strong>, al menos <strong>2 en los 15 anteriores</strong> a la edad de pensión): la pensión estimada es 0€/mes.</>
+                      <>{t('retirement.noPensionSingle')} (<strong>{t('retirement.minYearsReq')}</strong>{t('retirement.last2YearsReq')}{t('retirement.atPensionAge')}){t('retirement.estimatedPensionZero', { amount: 0 })}</>
                     )}
                   </div>
                 )}
@@ -845,7 +848,7 @@ export default function RetirementSimulator() {
 
           {showDesglose && params.members.some(m => m.currentSalary > 0) && (
             <CollapsibleSection
-              title="Desglose Anual"
+              title={t('retirement.annualBreakdown')}
               isOpen={showDetail}
               onToggle={() => setShowDetail(!showDetail)}
               headerRight={bothAchievable ? (
@@ -858,7 +861,7 @@ export default function RetirementSimulator() {
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    Sin pensión
+                    {t('retirement.withoutPensionLower')}
                   </button>
                   <button
                     onClick={() => setViewMode('con-pension')}
@@ -868,19 +871,19 @@ export default function RetirementSimulator() {
                         : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
-                    Con pensión
+                    {t('retirement.withPensionLower')}
                   </button>
                 </div>
               ) : (
                 <span className="px-3 py-1.5 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  {viewMode === 'con-pension' ? 'Con pensión' : 'Sin pensión'}
+                  {viewMode === 'con-pension' ? t('retirement.withPensionLower') : t('retirement.withoutPensionLower')}
                 </span>
               )}
             >
               {chartData.length > 0 && selectedEarliest && (
                 <div className="px-6 sm:px-8 pt-5 pb-6 border-b border-gray-200">
                   <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">
-                    Camino del ahorro desde los {selectedEarliest.retirementAge} años ({viewMode === 'con-pension' ? 'con pensión' : 'sin pensión'})
+                    {t('retirement.chartTitle', { age: selectedEarliest.retirementAge, mode: viewMode === 'con-pension' ? t('retirement.chartModeWith') : t('retirement.chartModeWithout') })}
                   </p>
                   <ResponsiveContainer width="100%" height={280}>
                     <LineChart data={chartData} margin={{ top: 5, right: 10, left: 4, bottom: 5 }}>
@@ -888,7 +891,7 @@ export default function RetirementSimulator() {
                       <XAxis
                         dataKey="age"
                         tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
-                        tickFormatter={(v: number) => `${v} años`}
+                        tickFormatter={(v: number) => t('retirement.years', { count: v })}
                         stroke="#d1d5db"
                         type="number"
                         domain={['dataMin', 'dataMax']}
@@ -902,18 +905,18 @@ export default function RetirementSimulator() {
                        <RechartsTooltip content={<ChartTooltip renderContent={(payload) => {
                          const age = (payload[0]?.payload?.age as number) ?? NaN;
                          return (<>
-                           <p style={{ fontWeight: 700, marginBottom: 4, color: '#1b1b18' }}>{age} años</p>
+                           <p style={{ fontWeight: 700, marginBottom: 4, color: '#1b1b18' }}>{t('retirement.years', { count: age })}</p>
                            {payload.map((entry, i) => (
                              <p key={i} style={{ color: entry.color, marginBottom: i < payload.length - 1 ? 2 : 0 }}>
-                               {entry.dataKey === 'total' ? 'Total: ' : 'Mínimo: '}{formatCurrency(entry.value)}
+                               {entry.dataKey === 'total' ? t('retirement.tooltipTotal') : t('retirement.tooltipMinimum')}{formatCurrency(entry.value)}
                              </p>
                            ))}
                          </>);
                        }} />} />
                       <Legend wrapperStyle={{ fontFamily: 'var(--font-sans)', fontSize: '12px' }} />
-                      <Line type="monotone" dataKey="total" name="Total ahorrado" stroke="#1b1b18" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="total" name={t('retirement.chartTotalSaved')} stroke="#1b1b18" strokeWidth={2} dot={false} />
                       {minimumPath.length > 0 && (
-                        <Line type="monotone" dataKey="minimumTotal" name="Ahorro mínimo" stroke="#9b9a95" strokeWidth={2} strokeDasharray="6 3" dot={false} />
+                        <Line type="monotone" dataKey="minimumTotal" name={t('retirement.chartMinimumSavings')} stroke="#9b9a95" strokeWidth={2} strokeDasharray="6 3" dot={false} />
                       )}
                     </LineChart>
                   </ResponsiveContainer>
@@ -923,16 +926,16 @@ export default function RetirementSimulator() {
               <ScrollableTable
                 bordered={false}
                 columns={[
-                  { title: 'Edad', align: 'left' },
-                  ...(viewMode === 'con-pension' ? [{ title: 'Pensión Est.', align: 'right' as const }] : []),
-                  { title: 'Necesario', align: 'right' },
-                  { title: 'Gastos', align: 'right' },
-                  { title: 'Cuenta', align: 'right' },
-                  { title: 'Inversiones', align: 'right' },
-                  { title: 'Total', align: 'right' },
-                  { title: 'A cuenta', align: 'right', muted: true },
-                  { title: 'A inversiones', align: 'right', muted: true },
-                  { title: 'Impuestos', align: 'right' },
+                  { title: t('retirement.colAge'), align: 'left' },
+                  ...(viewMode === 'con-pension' ? [{ title: t('retirement.colPensionEst'), align: 'right' as const }] : []),
+                  { title: t('retirement.colNeeded'), align: 'right' },
+                  { title: t('retirement.colExpenses'), align: 'right' },
+                  { title: t('retirement.colAccount'), align: 'right' },
+                  { title: t('retirement.colInvestments'), align: 'right' },
+                  { title: t('retirement.colTotal'), align: 'right' },
+                  { title: t('retirement.colToAccount'), align: 'right', muted: true },
+                  { title: t('retirement.colToInvestments'), align: 'right', muted: true },
+                  { title: t('retirement.colTaxes'), align: 'right' },
                 ]}
                 rows={evolvedResults.map((r) => [
                   {
@@ -940,38 +943,38 @@ export default function RetirementSimulator() {
                       <span className="inline-flex items-center gap-1.5">
                         {r.age - 1}-{r.age}
                         {r.esJubilacion && (
-                          <Tooltip text="Comienzo jubilación">
+                          <Tooltip text={t('retirement.tooltipRetirementStart')}>
                             <span className="flex items-center justify-center w-4 h-4 rounded-full bg-amber-100 text-amber-700 text-[9px] font-bold leading-none">J</span>
                           </Tooltip>
                         )}
                         {viewMode === 'con-pension' && selectedEarliest && params.members.length === 1 && r.pensionUsada > 0 && r.age > 0 && (() => { const idx = evolvedResults.indexOf(r); return idx >= 2 && evolvedResults[idx - 2].pensionUsada === 0 && evolvedResults[idx - 1].pensionUsada > 0; })() && (
-                          <Tooltip text={`Pensión: ${formatCurrency(r.monthlyPension)}/mes`}>
-                            <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold leading-none">P</span>
-                          </Tooltip>
+<Tooltip text={t('retirement.tooltipPension', { amount: formatCurrency(r.monthlyPension) })}>
+                          <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold leading-none">P</span>
+                        </Tooltip>
                         )}
                         {viewMode === 'con-pension' && selectedEarliest && params.members.length > 1 && buildPensionSchedule(params.members, selectedEarliest.retirementAge).map((p, i) => {
                           const startAge = selectedEarliest.retirementAge + p.startOffset;
                           if (r.age !== startAge + 1 || p.monthlyAmount <= 0) return null;
                           return (
-                            <Tooltip key={`p-${i}`} text={`Pensión I${i + 1}: ${formatCurrency(p.monthlyAmount)}/mes`}>
+                            <Tooltip key={`p-${i}`} text={t('retirement.tooltipMemberPension', { index: i + 1, amount: formatCurrency(p.monthlyAmount) })}>
                               <span className="flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-bold leading-none">P</span>
                             </Tooltip>
                           );
                         })}
                         {r.finHipoteca && (
-                          <Tooltip text="Hipoteca pagada">
+                          <Tooltip text={t('retirement.tooltipMortgagePaid')}>
                             <span className="flex items-center justify-center w-4 h-4 rounded-full bg-sky-100 text-sky-700 text-[9px] font-bold leading-none">H</span>
                           </Tooltip>
                         )}
                         {r.finPrestamo && (
-                          <Tooltip text="Préstamo familiar pagado">
+                          <Tooltip text={t('retirement.tooltipLoanPaid')}>
                             <span className="flex items-center justify-center w-4 h-4 rounded-full bg-purple-100 text-purple-700 text-[9px] font-bold leading-none">F</span>
                           </Tooltip>
                         )}
                         {r.memberAges.map((ma, i) => {
                           if (ma !== params.residencyAge + 1) return null;
                           return (
-                            <Tooltip key={`r-${i}`} text={params.members.length > 1 ? `Residencia I${i + 1}` : 'Entrada en residencia'}>
+                            <Tooltip key={`r-${i}`} text={params.members.length > 1 ? t('retirement.tooltipResidenceMember', { index: i + 1 }) : t('retirement.tooltipResidenceEntry')}>
                               <span className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-700 text-[9px] font-bold leading-none">R</span>
                             </Tooltip>
                           );
@@ -980,18 +983,18 @@ export default function RetirementSimulator() {
                     ),
                     className: 'text-gray-900',
                   },
-                  ...(viewMode === 'con-pension'
-                    ? [{ content: formatCurrency(r.monthlyPension).replace('€', '€/mes'), className: 'whitespace-nowrap' }]
+                  ... (viewMode === 'con-pension'
+                    ? [{ content: formatCurrency(r.monthlyPension).replace('€', `€${t('retirement.perMonth')}`), className: 'whitespace-nowrap' }]
                     : []),
                   {
                     content: r.requiredSavings > 0
                       ? formatCurrency(r.requiredSavings)
                       : r.age === params.lifeExpectancy
-                        ? <Tooltip text={`Los ahorros necesarios a los ${params.lifeExpectancy} años son nulos porque aquí termina la esperanza de vida`}>—</Tooltip>
+                        ? <Tooltip text={t('retirement.tooltipNoSavingsNeeded', { age: params.lifeExpectancy })}>—</Tooltip>
                         : '—',
                     className: r.requiredSavings < 0 ? 'text-gray-400' : r.achievable ? 'text-emerald-600' : 'text-red-600',
                   },
-                  { content: formatSigned(-r.gastosMensuales).replace('€', '€/mes'), className: 'text-gray-600 whitespace-nowrap' },
+                  { content: formatSigned(-r.gastosMensuales).replace('€', `€${t('retirement.perMonth')}`), className: 'text-gray-600 whitespace-nowrap' },
                   formatCurrency(r.cuenta),
                   formatCurrency(r.inversiones),
                   { content: formatCurrency(r.total), className: 'font-semibold text-gray-900' },
@@ -1002,16 +1005,16 @@ export default function RetirementSimulator() {
               />
               <NoteBanner variant="info">
                 <Icon name="info" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-blue-600" />
-                La columna <strong>Necesario</strong> indica el ahorro necesario al <strong>final</strong> de ese año para poder jubilarse. La columna <strong>Total</strong> refleja el ahorro total al <strong>final</strong> del año, tras las aportaciones, inversiones o retiradas realizadas durante el mismo.
-                Si el <strong>Total</strong> supera lo <strong>Necesario</strong>, significa que se puede comenzar la jubilación al completar ese año.
+                {t('retirement.noteA1')} <strong>{t('retirement.colNeeded')}</strong> {t('retirement.noteA2')} <strong>{t('retirement.wordEnd')}</strong> {t('retirement.noteA3')} <strong>{t('retirement.colTotal')}</strong> {t('retirement.noteA4')} <strong>{t('retirement.wordEnd')}</strong> {t('retirement.noteA5')}
+                {t('retirement.noteB1')} <strong>{t('retirement.colTotal')}</strong> {t('retirement.noteB2')} <strong>{t('retirement.colNeeded')}</strong>{t('retirement.noteB3')}
                 {params.members.length > 1 && (
-                  <> La columna <strong>Edad</strong> corresponde a la edad del <strong>Integrante 1</strong>. El resto de integrantes se jubilan el mismo año con edades distintas (reflejadas en el resumen).</>
+                  <> {t('retirement.noteC1')} <strong>{t('retirement.colAge')}</strong> {t('retirement.noteC2')} <strong>{t('retirement.member1')}</strong>. {t('retirement.noteC3')}</>
                 )}
               </NoteBanner>
               <NoteBanner variant="warning">
-                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-amber-600" /> Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
-                Los impuestos a pagar por los intereses de la cuenta remunerada ya están descontados anualmente.
-                Las plusvalías de las inversiones solo tributan al vender; en la columna <strong>Impuestos</strong> se refleja tanto el impuesto anual sobre intereses como el impuesto sobre plusvalías al retirar durante la jubilación.
+                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-amber-600" /> {t('retirement.noteFiscal')}</strong> {t('retirement.noteTaxBase')}
+                {t('retirement.noteTaxInterest')}
+                {t('retirement.noteTaxGainsA')} <strong>{t('retirement.colTaxes')}</strong> {t('retirement.noteTaxGainsB')}
               </NoteBanner>
             </CollapsibleSection>
           )}

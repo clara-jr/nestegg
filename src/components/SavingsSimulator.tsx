@@ -12,6 +12,7 @@ import {
 } from '../lib/calculations';
 import { getSimulatorData, setSimulatorData, subscribe, useLocalStorage } from '../lib/sharedStore';
 import { useFontsReady } from '../lib/fonts';
+import { useI18n } from '../lib/i18n';
 import {
   SimulatorLayout,
   FormContainer,
@@ -102,6 +103,7 @@ export default function SavingsSimulator() {
   const [includeHousePurchase, setIncludeHousePurchase] = useState(false);
 
   const fontsReady = useFontsReady();
+  const { t } = useI18n();
 
   const storageReadyRef = React.useRef(storageReady);
   React.useEffect(() => { storageReadyRef.current = storageReady; });
@@ -158,14 +160,14 @@ export default function SavingsSimulator() {
     const parts: string[] = [];
     const total = params.monthlyContribution + params.monthlyMortgagePayment + (hasFamilyLoan ? familyLoanMonthlyPayment : 0);
     if (params.monthlyMortgagePayment > 0) {
-      parts.push(`la hipoteca (${formatCurrency(params.monthlyMortgagePayment)}/mes)`);
+      parts.push(t('savings.monthlyHintMortgage', { amount: formatCurrency(params.monthlyMortgagePayment) }));
     }
     if (hasFamilyLoan) {
-      parts.push(`el préstamo familiar (${formatCurrency(familyLoanMonthlyPayment)}/mes)`);
+      parts.push(t('savings.monthlyHintFamilyLoan', { amount: formatCurrency(familyLoanMonthlyPayment) }));
     }
     if (parts.length === 0) return undefined;
-    return `Al terminar de pagar ${parts.join(' y ')}, ese importe se redirige al ahorro mensual (${formatCurrency(total)}/mes).`;
-  }, [params.monthlyMortgagePayment, hasFamilyLoan, familyLoanMonthlyPayment]);
+    return t('savings.monthlyHintFinal', { items: parts.join(` ${t('savings.and')} `), amount: formatCurrency(total) });
+  }, [params.monthlyContribution, params.monthlyMortgagePayment, hasFamilyLoan, familyLoanMonthlyPayment, t]);
 
   React.useEffect(() => {
     if (!storageReady) return;
@@ -181,12 +183,18 @@ export default function SavingsSimulator() {
   const totalHouseExpenses = useMemo(() => calculateTotalHouseExpenses(params), [params]);
 
   const totalCostHint = useMemo(() => {
-    if (params.baseCost <= 0) return 'Precio de compra de la vivienda. El gasto final suma impuestos, comisión inmobiliaria y reforma y muebles.';
+    if (params.baseCost <= 0) return t('savings.totalCostHintDefault');
     const realEstateCost = params.baseCost * (params.realEstatePercentage / 100);
     const taxCost = params.baseCost * (params.isNewBuild ? 0.112 : 0.065);
     const reformFurniture = params.reformCosts + params.furnitureCosts;
-    return `El gasto final incluye: precio base (${formatCurrency(params.baseCost)}) + impuestos (${formatCurrency(taxCost)}) + inmobiliaria (${formatCurrency(realEstateCost)}) + reforma y muebles (${formatCurrency(reformFurniture)}) = ${formatCurrency(totalHouseExpenses)}`;
-  }, [params.baseCost, params.realEstatePercentage, params.isNewBuild, params.reformCosts, params.furnitureCosts, totalHouseExpenses]);
+    return t('savings.totalCostHintDetail', {
+      base: formatCurrency(params.baseCost),
+      taxes: formatCurrency(taxCost),
+      realtor: formatCurrency(realEstateCost),
+      furniture: formatCurrency(reformFurniture),
+      total: formatCurrency(totalHouseExpenses),
+    });
+  }, [params.baseCost, params.realEstatePercentage, params.isNewBuild, params.reformCosts, params.furnitureCosts, totalHouseExpenses, t]);
   
   const mortgageGrantedAmount = useMemo(
     () =>
@@ -200,7 +208,7 @@ export default function SavingsSimulator() {
     [params.baseCost, params.monthlyMortgagePayment, params.mortgageAnnualRate, params.mortgageDurationYears],
   );
   const mortgageExceedsBase = params.baseCost > 0 && mortgageGrantedAmount > params.baseCost
-    ? `El préstamo hipotecario (${formatCurrency(mortgageGrantedAmount)}) supera el coste base (${formatCurrency(params.baseCost)})`
+    ? t('savings.mortgageExceedsBase', { granted: formatCurrency(mortgageGrantedAmount), base: formatCurrency(params.baseCost) })
     : undefined;
   const effectiveFamilyLoan =
     params.familyLoanAmount > 0 && params.familyLoanDurationYears > 0 ? params.familyLoanAmount : 0;
@@ -219,9 +227,9 @@ export default function SavingsSimulator() {
   const allocationDifference = initialAvailableForInvestment - totalInitialAllocation;
 
   const computeError = (parsed: ParsedInitialAllocation, amount: number): string | undefined => {
-    if (!parsed.isValid) return 'Introduce un valor válido';
-    if (initialAvailableForInvestment < 0 && amount > 0) return 'No hay disponible para invertir';
-    if (initialAvailableForInvestment >= 0 && amount > initialAvailableForInvestment + 0.01) return 'Supera el disponible para invertir';
+    if (!parsed.isValid) return t('savings.errorInvalidValue');
+    if (initialAvailableForInvestment < 0 && amount > 0) return t('savings.errorNoAvailable');
+    if (initialAvailableForInvestment >= 0 && amount > initialAvailableForInvestment + 0.01) return t('savings.errorExceedsAvailable');
     return undefined;
   };
 
@@ -229,8 +237,8 @@ export default function SavingsSimulator() {
   let investmentsError = computeError(parsedInitialInvestments, parsedInitialInvestments.amount);
 
   if (!savingsError && !investmentsError && initialAvailableForInvestment >= 0 && allocationDifference < -0.01) {
-    if (parsedInitialSavingsAccount.amount > 0) savingsError = 'Supera el disponible para invertir';
-    if (parsedInitialInvestments.amount > 0) investmentsError = 'Supera el disponible para invertir';
+    if (parsedInitialSavingsAccount.amount > 0) savingsError = t('savings.errorExceedsAvailable');
+    if (parsedInitialInvestments.amount > 0) investmentsError = t('savings.errorExceedsAvailable');
   }
 
   const hasValidInitialAllocation =
@@ -436,7 +444,7 @@ export default function SavingsSimulator() {
   };
 
   const distributionPeriods: DistributionPeriod[] = params.distributionPeriods.map((pct, i) => ({
-    label: sameDistributionForAll ? 'Todos los años' : `Años ${i * 10 + 1}–${Math.min((i + 1) * 10, params.timeHorizonYears)}`,
+    label: sameDistributionForAll ? t('savings.allYears') : t('savings.yearsRange', { from: i * 10 + 1, to: Math.min((i + 1) * 10, params.timeHorizonYears) }),
     pct: sameDistributionForAll ? params.distributionPeriods[0] ?? 50 : pct,
     index: i,
   }));
@@ -444,58 +452,58 @@ export default function SavingsSimulator() {
   return storageReady && fontsReady ? (
     <SimulatorLayout>
       <FormContainer>
-        <FormSection title="Horizonte" cols="single">
+        <FormSection title={t('savings.horizon')} cols="single">
           <InputField
-            label="Años a Simular"
+            label={t('savings.yearsToSimulate')}
             value={params.timeHorizonYears}
             onChange={(v) => handleInputChange('timeHorizonYears', v)}
           />
         </FormSection>
 
-        <FormSection title="Ahorros Iniciales" cols="double">
+        <FormSection title={t('savings.initialSavingsTitle')} cols="double">
           <InputField
-            label="Ahorros Totales Iniciales (€)"
+            label={t('savings.initialTotalSavings')}
             value={params.initialTotalSavings}
             onChange={(v) => handleInputChange('initialTotalSavings', v)}
           />
           {(params.baseCost > 0 || hasFamilyLoan || mortgageGrantedAmount > 0 || params.reformCosts > 0 || params.furnitureCosts > 0) && (
             <SummaryCard
-              label="Disponible para Invertir"
+              label={t('savings.availableToInvest')}
               value={formatCurrency(initialAvailableForInvestment)}
-              subtitle="Ahorros totales − gastos finales + hipoteca concedida + préstamo familiar"
+              subtitle={t('savings.availableToInvestSubtitle')}
               variant={initialAvailableForInvestment >= 0 ? 'positive' : 'negative'}
             />
           )}
           <div className="md:col-span-2 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <InputField
-                label="Cuenta Remunerada Inicial (% o €)"
+                label={t('savings.initialSavingsAccount')}
                 value={initialAllocationInputs.savingsAccount}
                 onChange={(v) => handleAllocationChange('savingsAccount', v)}
                 type="text"
-                hint={initialAvailableForInvestment <= 0 ? `${params.initialTotalSavings <= 0 ? 'Introduce ahorros totales' : 'No hay ahorros disponibles'} para invertir · Ej: 40% o 25000` : "Ej: 40% o 25000"}
+                hint={initialAvailableForInvestment <= 0 ? t('savings.hintWithReason', { reason: params.initialTotalSavings <= 0 ? t('savings.enterTotalSavings') : t('savings.noAvailable'), example: t('savings.exampleSavings') }) : t('savings.exampleOnly', { example: t('savings.exampleSavings') })}
                 error={savingsError}
                 disabled={initialAvailableForInvestment <= 0}
-                disabledTitle="No hay disponible para invertir"
+                disabledTitle={t('savings.errorNoAvailable')}
               />
               <InputField
-                label="Inversiones Iniciales (% o €)"
+                label={t('savings.initialInvestments')}
                 value={initialAllocationInputs.investments}
                 onChange={(v) => handleAllocationChange('investments', v)}
                 type="text"
-                hint={initialAvailableForInvestment <= 0 ? `${params.initialTotalSavings <= 0 ? 'Introduce ahorros totales' : 'No hay ahorros disponibles'} para invertir · Ej: 60% o 37500` : "Ej: 60% o 37500"}
+                hint={initialAvailableForInvestment <= 0 ? t('savings.hintWithReason', { reason: params.initialTotalSavings <= 0 ? t('savings.enterTotalSavings') : t('savings.noAvailable'), example: t('savings.exampleInvestments') }) : t('savings.exampleOnly', { example: t('savings.exampleInvestments') })}
                 error={investmentsError}
                 disabled={initialAvailableForInvestment <= 0}
-                disabledTitle="No hay disponible para invertir"
+                disabledTitle={t('savings.errorNoAvailable')}
               />
               <InputField
-                label="Rentabilidad Cuenta (%)"
+                label={t('savings.savingsAccountRate')}
                 value={params.savingsAccountRate}
                 onChange={(v) => handleInputChange('savingsAccountRate', v)}
                 step="0.1"
               />
               <InputField
-                label="Rentabilidad Inversiones (%)"
+                label={t('savings.investmentRate')}
                 value={params.investmentRate}
                 onChange={(v) => handleInputChange('investmentRate', v)}
                 step="0.1"
@@ -504,12 +512,12 @@ export default function SavingsSimulator() {
           </div>
         </FormSection>
 
-        <FormSection title="Ahorros Mensuales" cols="triple">
+        <FormSection title={t('savings.monthlySavings')} cols="triple">
           <InputField
-            label="Aporte Total Mensual (€)"
+            label={t('savings.monthlyContribution')}
             value={params.monthlyContribution}
             onChange={(v) => handleInputChange('monthlyContribution', v)}
-            hint="Importe destinado íntegramente a cuenta remunerada e inversiones."
+            hint={t('savings.monthlyContributionHint')}
           />
           <div className="md:col-span-3">
             <DistributionSlider
@@ -529,18 +537,18 @@ export default function SavingsSimulator() {
         </FormSection>
 
         <CollapsibleFormSection
-          title={<span className="inline-flex items-center gap-2"><Icon name="home" className="h-4 w-4 text-gray-500" />Incluir Compra de Casa</span>}
+          title={<span className="inline-flex items-center gap-2"><Icon name="home" className="h-4 w-4 text-gray-500" />{t('savings.includeHousePurchase')}</span>}
           isOpen={includeHousePurchase}
           onToggle={() => handleToggleHousePurchase(!includeHousePurchase)}
         >
-          <FormSection title="Costes de la Casa" cols="double">
+          <FormSection title={t('savings.houseCosts')} cols="double">
               <InputField
-                label="Coste Base (€)"
+                label={t('savings.baseCost')}
                 value={params.baseCost}
                 onChange={(v) => handleInputChange('baseCost', v)}
               />
               <InputField
-                label="Comisión Inmobiliaria (%)"
+                label={t('savings.realEstatePercentage')}
                 value={params.realEstatePercentage}
                 onChange={(v) => handleInputChange('realEstatePercentage', v)}
                 step="0.1"
@@ -550,60 +558,60 @@ export default function SavingsSimulator() {
                 onChange={(v) => handleInputChange('isNewBuild', v)}
               />
               <InputField
-                label="Reforma y Muebles (€)"
+                label={t('savings.reformFurniture')}
                 value={params.reformCosts + params.furnitureCosts}
                 onChange={(v) => handleReformaMueblesChange(v)}
               />
               <SummaryCard
-                label="Gastos Finales de la Casa"
+                label={t('savings.finalHouseCosts')}
                 value={formatCurrency(totalHouseExpenses)}
                 variant="info"
               />
             </FormSection>
 
-            <FormSection title="Financiación" cols="triple">
+            <FormSection title={t('savings.financing')} cols="triple">
               <InputField
-                label="Cuota Hipoteca Mensual (€)"
+                label={t('savings.monthlyMortgagePayment')}
                 value={params.monthlyMortgagePayment}
                 onChange={(v) => handleInputChange('monthlyMortgagePayment', v)}
                 disabled={params.baseCost === 0}
                 error={mortgageExceedsBase}
-                hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : 'Al terminar de pagar la hipoteca, la cuota se redirige al ahorro mensual.'}
+                hint={params.baseCost === 0 ? t('savings.enterHouseCost') : t('savings.mortgageRedirectHint')}
               />
               <InputField
-                label="TAE Hipoteca (%)"
+                label={t('savings.mortgageAPR')}
                 value={params.mortgageAnnualRate}
                 onChange={(v) => handleInputChange('mortgageAnnualRate', v)}
                 step="0.1"
                 disabled={params.baseCost === 0}
-                hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : undefined}
+                hint={params.baseCost === 0 ? t('savings.enterHouseCost') : undefined}
               />
               <InputField
-                label="Duración Hipoteca (años)"
+                label={t('savings.mortgageDuration')}
                 value={params.mortgageDurationYears}
                 onChange={(v) => handleInputChange('mortgageDurationYears', v)}
                 disabled={params.baseCost === 0}
                 error={mortgageExceedsBase || undefined}
-                hint={params.baseCost === 0 ? 'Introduce un coste de casa para activar la hipoteca' : undefined}
+                hint={params.baseCost === 0 ? t('savings.enterHouseCost') : undefined}
               />
               <div className="flex flex-col gap-1.5">
                 <SummaryCard
-                  label="Préstamo Hipotecario Estimado"
+                  label={t('savings.estimatedMortgage')}
                   value={<>{formatCurrency(mortgageGrantedAmount)}{params.baseCost > 0 && <span className="text-sm font-normal text-gray-500"> ({Math.round(mortgageGrantedAmount / params.baseCost * 100)}%)</span>}</>}
                   className={params.baseCost === 0 ? 'bg-zinc-100 !border-gray-200' : undefined}
                   variant="info"
                 />
-                {params.baseCost === 0 && <p className="text-xs text-gray-400">Introduce un coste de casa para activar la hipoteca</p>}
+                {params.baseCost === 0 && <p className="text-xs text-gray-400">{t('savings.enterHouseCost')}</p>}
               </div>
               <InputField
-                label="Préstamo Familiar (€)"
+                label={t('savings.familyLoan')}
                 value={params.familyLoanAmount}
                 onChange={(v) => handleInputChange('familyLoanAmount', v)}
-                hint="0% interés · Al terminar de pagar el préstamo, la cuota se redirige al ahorro mensual."
+                hint={t('savings.familyLoanHint')}
                 error={undefined}
               />
               <InputField
-                label="Duración Préstamo (años)"
+                label={t('savings.familyLoanDuration')}
                 value={params.familyLoanDurationYears}
                 onChange={(v) => handleInputChange('familyLoanDurationYears', v)}
               />
@@ -614,44 +622,44 @@ export default function SavingsSimulator() {
       {result && (
         <ResultsContainer>
           <ScenarioSection>
-            <ScenarioCard label="Ahorro Inicial Invertible" value={formatCurrency(result.initialAvailableForInvestment)} />
-            <ScenarioCard label="Aporte Mensual" value={formatCurrency(params.monthlyContribution)} hint={monthlyHint} />
+            <ScenarioCard label={t('savings.investableInitialSavings')} value={formatCurrency(result.initialAvailableForInvestment)} />
+            <ScenarioCard label={t('savings.monthlyContributionCard')} value={formatCurrency(params.monthlyContribution)} hint={monthlyHint} />
             {params.baseCost > 0 && (
-              <ScenarioCard label="Coste Casa" value={formatCurrency(result.totalHouseExpenses)} hint={totalCostHint} />
+              <ScenarioCard label={t('savings.houseCost')} value={formatCurrency(result.totalHouseExpenses)} hint={totalCostHint} />
             )}
             {(params.monthlyMortgagePayment > 0 || hasFamilyLoan) && (<>
               {params.monthlyMortgagePayment > 0 ? (<>
-                <ScenarioCard label="Préstamo Hipotecario" value={formatCurrency(result.mortgageGrantedAmount)} />
-                <ScenarioCard label="Cuota Hipoteca" value={formatCurrency(params.monthlyMortgagePayment)} />
-                <ScenarioCard label="Duración Hipoteca" value={`${params.mortgageDurationYears} años`} />
+                <ScenarioCard label={t('savings.mortgageLoan')} value={formatCurrency(result.mortgageGrantedAmount)} />
+                <ScenarioCard label={t('savings.mortgagePayment')} value={formatCurrency(params.monthlyMortgagePayment)} />
+                <ScenarioCard label={t('savings.mortgageDurationCard')} value={t('savings.yearsCount', { count: params.mortgageDurationYears })} />
               </>) : (
-                <ScenarioCard label="Préstamo Hipotecario" value="Inactivo" />
+                <ScenarioCard label={t('savings.mortgageLoan')} value={t('savings.inactive')} />
               )}
               {hasFamilyLoan ? (<>
-                <ScenarioCard label="Cuota Préstamo Familiar" value={formatCurrency(familyLoanMonthlyPayment)} />
-                <ScenarioCard label="Duración Préstamo Familiar" value={`${params.familyLoanDurationYears} años`} />
+                <ScenarioCard label={t('savings.familyLoanPayment')} value={formatCurrency(familyLoanMonthlyPayment)} />
+                <ScenarioCard label={t('savings.familyLoanDurationCard')} value={t('savings.yearsCount', { count: params.familyLoanDurationYears })} />
               </>) : (
-                <ScenarioCard label="Préstamo Familiar" value="Inactivo" />
+                <ScenarioCard label={t('savings.familyLoanCard')} value={t('savings.inactive')} />
               )}
             </>)}
-            <ScenarioCard label="Horizonte" value={`${params.timeHorizonYears} años`} />
+            <ScenarioCard label={t('savings.horizon')} value={t('savings.yearsCount', { count: params.timeHorizonYears })} />
           </ScenarioSection>
 
-          <ResultsSection title="Resultados" gridCols="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <ResultsCard label="Total Ahorrado" value={formatCurrency(result.totalSavings)} icon="wallet" />
-            <ResultsCard label="Cuenta Remunerada" value={formatCurrency(result.finalSavingsAccount)} icon="bank" />
-            <ResultsCard label="Inversiones" value={formatCurrency(result.finalInvestments)} icon="trendingUp" />
+          <ResultsSection title={t('savings.results')} gridCols="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <ResultsCard label={t('savings.totalSaved')} value={formatCurrency(result.totalSavings)} icon="wallet" />
+            <ResultsCard label={t('savings.remuneratedAccount')} value={formatCurrency(result.finalSavingsAccount)} icon="bank" />
+            <ResultsCard label={t('savings.investments')} value={formatCurrency(result.finalInvestments)} icon="trendingUp" />
           </ResultsSection>
 
           {(params.baseCost > 0 || params.monthlyContribution > 0 || parsedInitialSavingsAccount.amount > 0 || parsedInitialInvestments.amount > 0) && (
             <CollapsibleSection
-              title="Desglose Anual"
+              title={t('savings.annualBreakdown')}
               isOpen={showDetail}
               onToggle={() => setShowDetail(!showDetail)}
             >
               <div className="px-6 sm:px-8 pt-5 pb-6 border-b border-gray-200">
                 <p className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-4">
-                  Aportado vs Total
+                  {t('savings.contributedVsTotal')}
                 </p>
                 <ResponsiveContainer width="100%" height={280}>
                   <LineChart data={chartData} margin={{ top: 5, right: 10, left: 4, bottom: 5 }}>
@@ -659,7 +667,7 @@ export default function SavingsSimulator() {
                     <XAxis
                       dataKey="year"
                       tick={{ fontSize: 12, fill: '#706f6c', fontFamily: 'var(--font-sans)' }}
-                      tickFormatter={(v: number) => v === 0 ? 'Inicio' : `${v}º`}
+                      tickFormatter={(v: number) => v === 0 ? t('savings.start') : t('savings.yearTick', { year: v })}
                       stroke="#d1d5db"
                     />
                     <YAxis
@@ -671,33 +679,33 @@ export default function SavingsSimulator() {
                     <RechartsTooltip content={<ChartTooltip renderContent={(payload) => {
                       const { year, contributed, total } = payload[0].payload as { year: number; contributed: number; total: number };
                       return (<>
-                        <p style={{ fontWeight: 700, marginBottom: 4, color: '#1b1b18' }}>{year === 0 ? 'Inicio' : `Año ${year}`}</p>
+                        <p style={{ fontWeight: 700, marginBottom: 4, color: '#1b1b18' }}>{year === 0 ? t('savings.start') : t('savings.tooltipYear', { year })}</p>
                         <p style={{ color: '#00bc7d', marginBottom: 2 }}>{formatCurrency(total)}</p>
                         <p style={{ color: '#706f6c', marginBottom: 2 }}>{formatCurrency(contributed)}</p>
                         <p style={{ color: '#aeb0b4' }}>(+ {formatCurrency(total - contributed)})</p>
                       </>);
                     }} />} />
                     <Legend wrapperStyle={{ fontFamily: 'var(--font-sans)', fontSize: '12px' }} />
-                    <Line type="monotone" dataKey="contributed" name="Aportado" stroke="#706f6c" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="total" name="Total" stroke="#00bc7d" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="contributed" name={t('savings.contributed')} stroke="#706f6c" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="total" name={t('savings.total')} stroke="#00bc7d" strokeWidth={2} dot={false} />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
               <ScrollableTable
                 bordered={false}
                 columns={[
-                  { title: 'Año', align: 'left' },
-                  { title: 'Cuenta', align: 'right' },
-                  { title: 'Inversiones', align: 'right' },
-                  { title: 'Total', align: 'right' },
-                  { title: 'A cuenta', align: 'right', muted: true },
-                  { title: 'A inversiones', align: 'right', muted: true },
-                  { title: 'Impuestos', align: 'right' },
+                  { title: t('savings.colYear'), align: 'left' },
+                  { title: t('savings.colAccount'), align: 'right' },
+                  { title: t('savings.investments'), align: 'right' },
+                  { title: t('savings.total'), align: 'right' },
+                  { title: t('savings.colToAccount'), align: 'right', muted: true },
+                  { title: t('savings.colToInvestments'), align: 'right', muted: true },
+                  { title: t('savings.colTaxes'), align: 'right' },
                 ]}
                 rows={result.monthlyBreakdown
                   .filter((m, i, arr) => m.month === 12 || i === arr.length - 1)
                   .map((entry) => [
-                    { content: `${entry.year}º`, className: 'font-medium text-gray-900' },
+                    { content: t('savings.yearTick', { year: entry.year }), className: 'font-medium text-gray-900' },
                     formatCurrency(entry.savingsAccount),
                     formatCurrency(entry.investments),
                     { content: formatCurrency(entry.savingsAccount + entry.investments), className: 'font-semibold text-gray-900' },
@@ -707,11 +715,9 @@ export default function SavingsSimulator() {
                   ])}
               />
               <NoteBanner variant="warning">
-                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-amber-600" /> Nota fiscal:</strong> Los beneficios tributan en la base del ahorro (19%–26%).
-                Los impuestos a pagar por los intereses de la cuenta remunerada ya están descontados anualmente.
-                Las plusvalías de inversiones solo tributan al vender, por lo que no se han descontado en la simulación al asumir <i>buy-and-hold</i>;
-                si se vendieran al final del horizonte, se pagarían <strong>{formatCurrency(result.investmentSaleTax)}</strong> en impuestos,
-                con lo que el dinero total neto resultante de la simulación sería <strong>{formatCurrency(result.totalSavings - result.investmentSaleTax)}</strong>.
+                <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-amber-600" /> {t('savings.noteFiscal')}</strong> {t('savings.note1')}
+                {t('savings.note2')}
+                {t('savings.note3a')} <i>buy-and-hold</i>{t('savings.note3b')} <strong>{formatCurrency(result.investmentSaleTax)}</strong> {t('savings.note4')} <strong>{formatCurrency(result.totalSavings - result.investmentSaleTax)}</strong>.
               </NoteBanner>
             </CollapsibleSection>
           )}

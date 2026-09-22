@@ -1,0 +1,65 @@
+---
+import SimplePage from '../layouts/SimplePage.astro';
+import { Icon } from '../components/common';
+
+const base = import.meta.env.BASE_URL;
+
+interface GuideSection {
+  titleKey: string;
+  textKey: string;
+  icon: string;
+  stepKeys: string[];
+}
+
+const sections: GuideSection[] = [
+  { titleKey: 'page.guia.savingsTitle', textKey: 'page.guia.savingsText', icon: 'wallet', stepKeys: ['page.guia.savingsStep1', 'page.guia.savingsStep2', 'page.guia.savingsStep3', 'page.guia.savingsStep4', 'page.guia.savingsStep5'] },
+  { titleKey: 'page.guia.retirementTitle', textKey: 'page.guia.retirementText', icon: 'calendar', stepKeys: ['page.guia.retirementStep1', 'page.guia.retirementStep2', 'page.guia.retirementStep3', 'page.guia.retirementStep4', 'page.guia.retirementStep5'] },
+  { titleKey: 'page.guia.homeTitle', textKey: 'page.guia.homeText', icon: 'home', stepKeys: ['page.guia.homeStep1', 'page.guia.homeStep2', 'page.guia.homeStep3', 'page.guia.homeStep4', 'page.guia.homeStep5'] },
+  { titleKey: 'page.guia.financesTitle', textKey: 'page.guia.financesText', icon: 'trendingUp', stepKeys: ['page.guia.financesStep1', 'page.guia.financesStep2', 'page.guia.financesStep3', 'page.guia.financesStep4', 'page.guia.financesStep5', 'page.guia.financesStep6'] },
+  { titleKey: 'page.guia.profilesTitle', textKey: 'page.guia.profilesText', icon: 'users', stepKeys: ['page.guia.profilesStep1', 'page.guia.profilesStep2', 'page.guia.profilesStep3', 'page.guia.profilesStep4', 'page.guia.profilesStep5'] },
+  { titleKey: 'page.guia.backupTitle', textKey: 'page.guia.backupText', icon: 'floppy', stepKeys: ['page.guia.backupStep1', 'page.guia.backupStep2', 'page.guia.backupStep3', 'page.guia.backupStep4', 'page.guia.backupStep5'] },
+];
+---
+
+<SimplePage
+  dataTitle="page.guia.title"
+  dataDescription="page.guia.metaDescription"
+  description="Guía de uso de NestEgg: simulador de ahorros, calculadora de jubilación, calculadora de hogar y agregador de finanzas."
+>
+  <header class="px-3 sm:px-4 lg:px-8 pt-4 sm:pt-5 lg:pt-6">
+    <div class="mx-auto max-w-6xl">
+      <a href={base} class="inline-flex items-center gap-1.5 text-sm font-semibold text-gray-600 transition-colors hover:text-gray-900">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        <span data-i18n="page.backHome"></span>
+      </a>
+    </div>
+  </header>
+
+  <div class="px-3 sm:px-4 lg:px-8 py-10 sm:py-14">
+    <div class="mx-auto max-w-4xl">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight" data-i18n="page.guia.title"></h1>
+      <p class="mt-3 leading-relaxed text-gray-500" data-i18n="page.guia.subtitle"></p>
+
+      <div class="mt-10 flex flex-col gap-6">
+        {sections.map((s) => (
+          <section class="bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6">
+            <div class="flex items-center gap-3">
+              <span class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-900 text-white flex items-center justify-center"><Icon name={s.icon} className="w-5 h-5" /></span>
+              <h2 class="text-lg font-bold text-gray-900 tracking-tight" data-i18n={s.titleKey}></h2>
+            </div>
+            <p class="mt-3 leading-relaxed text-gray-500" data-i18n={s.textKey}></p>
+            <p class="mt-5 text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="page.guia.howtoLabel"></p>
+            <ol class="mt-3 space-y-2.5">
+              {s.stepKeys.map((step, j) => (
+                <li class="flex items-start gap-2.5">
+                  <span class="flex-shrink-0 w-5 h-5 rounded-full bg-zinc-100 text-gray-700 text-[11px] font-bold flex items-center justify-center mt-0.5">{j + 1}</span>
+                  <p class="leading-relaxed text-gray-600" data-i18n={step}></p>
+                </li>
+              ))}
+            </ol>
+          </section>
+        ))}
+      </div>
+    </div>
+  </div>
+</SimplePage>

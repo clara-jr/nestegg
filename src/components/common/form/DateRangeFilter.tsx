@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useI18n } from '../../../lib/i18n';
 import { currentMonthKey } from '../../../lib/investments';
 import { DateInput } from './DateInput';
 import { Select } from './Select';
@@ -130,13 +131,14 @@ export interface CustomRangeInputsProps {
 
 /** Par de selectores de fecha (inicio → fin) de «Personalizado». */
 export function CustomRangeInputs({ from, to, min, max, onChange }: CustomRangeInputsProps) {
+  const { t } = useI18n();
   return (
     <span className="inline-flex items-center gap-2 whitespace-nowrap">
       <DateInput
         value={from}
         min={min}
         max={to}
-        ariaLabel="Fecha inicio"
+        ariaLabel={t('dateFilter.fromAria')}
         onChange={value => {
           const nextTo = value > to ? value : to;
           onChange(value, nextTo);
@@ -147,7 +149,7 @@ export function CustomRangeInputs({ from, to, min, max, onChange }: CustomRangeI
         value={to}
         min={from}
         max={max ?? todayISO()}
-        ariaLabel="Fecha fin"
+        ariaLabel={t('dateFilter.toAria')}
         onChange={value => {
           const nextFrom = value < from ? value : from;
           onChange(nextFrom, value);
@@ -160,6 +162,7 @@ export function CustomRangeInputs({ from, to, min, max, onChange }: CustomRangeI
 /** Selector de intervalo de fechas para las gráficas: predefinidos (último
  *  mes, 6 meses, año, todo) o un rango personalizado de meses. */
 export function DateRangeFilter({ min, max, defaultFrom, defaultTo, onChange, className = '' }: DateRangeFilterProps) {
+  const { t } = useI18n();
   const { preset, customFrom, customTo, selectPreset, applyCustom } = useDateRangeFilter(
     min,
     max,
@@ -173,9 +176,9 @@ export function DateRangeFilter({ min, max, defaultFrom, defaultTo, onChange, cl
       <Select
         value={preset}
         onChange={v => selectPreset(v as DateRangePreset)}
-        ariaLabel="Filtro de tiempo"
+        ariaLabel={t('dateFilter.aria')}
         className="w-44"
-        options={PRESET_LABELS.map(o => ({ value: o.value, label: o.label }))}
+        options={PRESET_LABELS.map(o => ({ value: o.value, label: t(`dateFilter.${o.value}`) }))}
       />
       {preset === 'custom' && (
         <CustomRangeInputs

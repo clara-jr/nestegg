@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { dayHeaders, monthNames, useI18n } from '../../../lib/i18n';
 
 export interface DateInputProps {
   value: string;
@@ -8,11 +9,6 @@ export interface DateInputProps {
   ariaLabel?: string;
 }
 
-const MONTH_NAMES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
-];
-const DAY_HEADERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const MIN_YEAR = 1900;
 const MAX_YEAR = 2100;
 const YEAR_PAGE = 12;
@@ -65,6 +61,9 @@ function isAfter(a: string, b: string): boolean {
 }
 
 export function DateInput({ value, min, max, onChange, ariaLabel }: Readonly<DateInputProps>) {
+  const { t, lang } = useI18n();
+  const months = monthNames(lang);
+  const days = dayHeaders(lang);
   const parsed = parseDate(value);
   const [open, setOpen] = useState(false);
   const [showYearPick, setShowYearPick] = useState(false);
@@ -154,8 +153,8 @@ export function DateInput({ value, min, max, onChange, ariaLabel }: Readonly<Dat
           inputMode="numeric"
           autoComplete="off"
           spellCheck={false}
-          placeholder="DD/MM/AAAA"
-          aria-label={ariaLabel ?? 'Fecha en formato DD/MM/AAAA'}
+          placeholder={t('calendar.inputPlaceholder')}
+          aria-label={ariaLabel ?? t('calendar.inputAria')}
           value={draft ?? (value ? formatDisplay(value) : '')}
           onChange={e => setDraft(e.target.value)}
           onBlur={commitDraft}
@@ -173,7 +172,7 @@ export function DateInput({ value, min, max, onChange, ariaLabel }: Readonly<Dat
         <button
           type="button"
           onClick={toggleOpen}
-          aria-label="Abrir calendario"
+          aria-label={t('calendar.openCalendar')}
           className="p-2 mr-1 rounded-lg text-gray-400 cursor-pointer focus:outline-none"
         >
           <svg
@@ -203,7 +202,7 @@ export function DateInput({ value, min, max, onChange, ariaLabel }: Readonly<Dat
               type="button"
               onClick={() => (showYearPick ? navigateYear(-YEAR_PAGE) : navigate(-1))}
               className="p-1 rounded hover:bg-zinc-100 text-gray-500 cursor-pointer"
-              aria-label={showYearPick ? 'Años anteriores' : 'Mes anterior'}
+              aria-label={showYearPick ? t('calendar.prevYear') : t('calendar.prevMonth')}
             >
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
             </button>
@@ -211,15 +210,15 @@ export function DateInput({ value, min, max, onChange, ariaLabel }: Readonly<Dat
               type="button"
               onClick={() => setShowYearPick(s => !s)}
               className="px-2 py-0.5 rounded-lg hover:bg-zinc-100 text-sm font-semibold text-gray-700 select-none cursor-pointer"
-              aria-label={showYearPick ? 'Volver al mes' : 'Cambiar el año'}
+              aria-label={showYearPick ? t('calendar.backToMonth') : t('calendar.changeYear')}
             >
-              {showYearPick ? `${yearStart} – ${yearStart + YEAR_PAGE - 1}` : `${MONTH_NAMES[viewMonth]} ${viewYear}`}
+              {showYearPick ? `${yearStart} – ${yearStart + YEAR_PAGE - 1}` : `${months[viewMonth]} ${viewYear}`}
             </button>
             <button
               type="button"
               onClick={() => (showYearPick ? navigateYear(YEAR_PAGE) : navigate(1))}
               className="p-1 rounded hover:bg-zinc-100 text-gray-500 cursor-pointer"
-              aria-label={showYearPick ? 'Años siguientes' : 'Mes siguiente'}
+              aria-label={showYearPick ? t('calendar.nextYear') : t('calendar.nextMonth')}
             >
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" /></svg>
             </button>
@@ -249,7 +248,7 @@ export function DateInput({ value, min, max, onChange, ariaLabel }: Readonly<Dat
             <>
               {/* Cabecera: días de la semana */}
               <div className="grid grid-cols-7 mb-1">
-                {DAY_HEADERS.map(h => (
+                {days.map(h => (
                   <div key={h} className="text-center text-[10px] font-semibold text-gray-400 select-none">
                     {h}
                   </div>

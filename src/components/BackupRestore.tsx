@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Select, Icon } from './common';
+import { useI18n } from '../lib/i18n';
 import {
   DATA_CHANGED_EVENT,
   PROFILE_CHANGED_EVENT,
@@ -115,6 +116,7 @@ function download(payload: BackupPayload, filename: string) {
 }
 
 export default function BackupRestore() {
+  const { t } = useI18n();
   const { profiles } = useProfiles();
   const [open, setOpen] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
@@ -153,14 +155,14 @@ export default function BackupRestore() {
       const profile = getProfile(selectedId);
       const payload = collectProfileBackup(selectedId);
       if (!payload || !profile) {
-        setFeedback({ kind: 'warning', text: 'No se encontró el perfil seleccionado.' });
+        setFeedback({ kind: 'warning', text: t('backup.profileNotFound') });
         return;
       }
-      download(payload, `nestegg-perfil-${profile.name}-${new Date().toISOString().slice(0, 10)}.json`);
-      setFeedback({ kind: 'success', text: `Copia del perfil «${profile.name}» descargada.` });
+      download(payload, `${t('backup.fileNameProfile')}${profile.name}-${new Date().toISOString().slice(0, 10)}.json`);
+      setFeedback({ kind: 'success', text: t('backup.profileDownloaded', { name: profile.name }) });
     } else {
-      download(collectAllBackup(), `nestegg-copia-completa-${new Date().toISOString().slice(0, 10)}.json`);
-      setFeedback({ kind: 'success', text: 'Copia completa descargada (perfiles + datos globales).' });
+      download(collectAllBackup(), `${t('backup.fileNameFull')}${new Date().toISOString().slice(0, 10)}.json`);
+      setFeedback({ kind: 'success', text: t('backup.fullDownloaded') });
     }
     setKind(null);
   };
@@ -175,9 +177,9 @@ export default function BackupRestore() {
     if (!pendingSingleFull) return;
     const { payload, profileId, profileName } = pendingSingleFull;
     restoreSingleProfileAuthoritative(payload, profileId, profileName);
-    const name = getProfile(profileId)?.name ?? 'perfil restaurado';
+    const name = getProfile(profileId)?.name ?? t('backup.restoredProfileName');
     setPendingSingleFull(null);
-    setFeedback({ kind: 'success', text: `«${name}» restaurado y perfiles sobrantes eliminados.` });
+    setFeedback({ kind: 'success', text: t('backup.singleRestored', { name }) });
     dispatchDataChanged();
     window.dispatchEvent(new CustomEvent(PROFILE_CHANGED_EVENT));
   };
@@ -188,14 +190,14 @@ export default function BackupRestore() {
     const chosen = pendingChoice.fileProfiles.find(p => p.id === fileProfileId);
     const result = applySingleProfileFromAllBackup(payload, fileProfileId, targetId);
     if (result.sections === 0) {
-      setFeedback({ kind: 'warning', text: 'El perfil elegido de la copia no contiene datos del Agregador.' });
+      setFeedback({ kind: 'warning', text: t('backup.choiceNoData') });
       setPendingChoice(null);
       return;
     }
     setPendingChoice(null);
     setFeedback({
       kind: 'success',
-      text: `Agregador de «${targetName}» restaurado desde «${chosen?.name ?? 'perfil'}».`,
+      text: t('backup.choiceRestored', { target: targetName, source: chosen?.name ?? t('backup.profile') }),
     });
     dispatchDataChanged();
     window.dispatchEvent(new CustomEvent(PROFILE_CHANGED_EVENT));
@@ -211,7 +213,7 @@ export default function BackupRestore() {
         const payload = JSON.parse(String(reader.result)) as BackupPayload & { kind?: unknown; data?: unknown };
         const data = (payload.data ?? {}) as Record<string, unknown>;
         if (typeof data !== 'object' || Array.isArray(data) || Object.keys(data).length === 0) {
-          setFeedback({ kind: 'warning', text: 'El fichero no contiene datos de NestEgg reconocibles.' });
+          setFeedback({ kind: 'warning', text: t('backup.noRecognizableData') });
           return;
         }
         let result: ImportResult | null;
@@ -220,7 +222,7 @@ export default function BackupRestore() {
         if (target?.scope === 'profile') {
           const listed = fileProfilesList(payload as BackupPayload);
           const targetProfile = getProfile(target.selectedId);
-          const targetName = targetProfile?.name ?? 'perfil';
+          const targetName = targetProfile?.name ?? t('backup.profile');
           const withId = (listed ?? []).filter(p => typeof p?.id === 'string' && p.id);
           const targetNameKey = targetName.trim().toLowerCase();
           const matched = withId.find(fp => (fp.name ?? '').trim().toLowerCase() === targetNameKey);
@@ -229,8 +231,8 @@ export default function BackupRestore() {
             // destino: se usa ese perfil directamente (se informa del resto).
             result = applySingleProfileFromAllBackup(payload as BackupPayload, matched.id, target.selectedId);
             note = withId.length > 1
-              ? `Se ha restaurado el Agregador de «${targetName}» desde el perfil «${matched.name ?? targetName}» de los ${withId.length} encontrados en el fichero`
-              : `Agregador de «${targetName}» restaurado`;
+              ? t('backup.restoredFromAmong', { target: targetName, source: matched.name ?? targetName, count: withId.length })
+              : t('backup.aggregatorRestored', { target: targetName });
           } else if (withId.length > 1 || (withId.length === 1 && (withId[0]?.name ?? '').trim().toLowerCase() !== targetNameKey)) {
             // Varios perfiles sin coincidencia de nombre (o uno solo con nombre
             // distinto): hay que elegir de cuál tomar los datos y confirmarlo.
@@ -246,14 +248,14 @@ export default function BackupRestore() {
             // Un único perfil documentado y coincide con el destino: importación
             // directa del Agregador (claves namespaced o planas según el fichero).
             result = applySingleProfileFromAllBackup(payload as BackupPayload, withId[0].id, target.selectedId);
-            note = `Agregador de «${targetName}» restaurado`;
+            note = t('backup.aggregatorRestored', { target: targetName });
           } else if (payload.kind === 'all') {
             // Copia completa sin listado de perfiles: no se puede desgranar.
             result = applyBackup(payload as BackupPayload);
-            note = 'El fichero es una copia completa y no se puede restaurar a un solo perfil; se restaurará todo.';
+            note = t('backup.fullNoPartial');
           } else {
             result = applyBackup(payload as BackupPayload, target.selectedId);
-            note = `Agregador de «${targetName}» restaurado`;
+            note = t('backup.aggregatorRestored', { target: targetName });
           }
         } else {
           const singleInfo = fileSingleProfileInfo(payload as BackupPayload);
@@ -269,30 +271,30 @@ export default function BackupRestore() {
             }
             // No hay otros perfiles que se eliminen: se restaura directamente.
             result = restoreSingleProfileAuthoritative(payload as BackupPayload, profileId, profileName);
-            note = `Se han restaurado ${result?.sections ?? 0} secciones`;
+            note = t('backup.sectionsRestored', { count: result?.sections ?? 0 });
           } else {
             result = applyBackup(payload as BackupPayload);
             if (result?.kind === 'profile') {
-              note = 'El fichero solo contiene la copia de un perfil; se ha restaurado únicamente ese perfil.';
+              note = t('backup.onlySingleRestored');
             } else {
-              note = `Se han restaurado ${result?.sections ?? 0} secciones`;
+              note = t('backup.sectionsRestored', { count: result?.sections ?? 0 });
             }
           }
         }
 
         if (!result) {
-          setFeedback({ kind: 'error', text: 'No se pudo leer el fichero. ¿Es una copia de NestEgg?' });
+          setFeedback({ kind: 'error', text: t('backup.unreadableFile') });
           return;
         }
         if (result.sections === 0) {
-          setFeedback({ kind: 'warning', text: 'El fichero no contiene datos de NestEgg reconocibles.' });
+          setFeedback({ kind: 'warning', text: t('backup.noRecognizableData') });
           return;
         }
         setFeedback({ kind: 'success', text: `${note}.` });
         dispatchDataChanged();
         window.dispatchEvent(new CustomEvent(PROFILE_CHANGED_EVENT));
       } catch {
-        setFeedback({ kind: 'error', text: 'No se pudo leer el fichero. ¿Es una copia de NestEgg?' });
+        setFeedback({ kind: 'error', text: t('backup.unreadableFile') });
       }
     };
     reader.readAsText(file);
@@ -304,11 +306,11 @@ export default function BackupRestore() {
         {open && (
           <div className="bg-[#fdfdfe] border border-gray-200 rounded-xl shadow-lg p-4 w-72 text-sm">
             <div className="flex items-start justify-between gap-2 mb-1.5">
-              <p className="font-semibold text-gray-900">Copia de seguridad</p>
+              <p className="font-semibold text-gray-900">{t('backup.title')}</p>
               <button
                 type="button"
                 onClick={() => { setOpen(false); setFeedback(null); }}
-                aria-label="Cerrar"
+                aria-label={t('backup.close')}
                 className="shrink-0 -m-1 p-1 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
               >
                 <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
@@ -317,8 +319,7 @@ export default function BackupRestore() {
               </button>
             </div>
             <p className="text-xs text-gray-500 leading-relaxed mb-2">
-              Descarga o restaura los datos guardados en este navegador. Puedes elegir entre un solo
-              perfil (solo su parte del Agregador de Finanzas) o todos los datos.
+              {t('backup.description')}
             </p>
             <div className="flex flex-col gap-2">
               <button
@@ -327,7 +328,7 @@ export default function BackupRestore() {
                 className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
               >
                 <Icon name="download" className="h-4 w-4 inline mr-1.5 -mt-0.5" />
-                Descargar copia
+                {t('backup.downloadCopy')}
               </button>
               <button
                 type="button"
@@ -335,7 +336,7 @@ export default function BackupRestore() {
                 className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
               >
                 <Icon name="upload" className="h-4 w-4 inline mr-1.5 -mt-0.5" />
-                Restaurar copia
+                {t('backup.restoreCopy')}
               </button>
               <input
                 ref={fileInputRef}
@@ -360,7 +361,7 @@ export default function BackupRestore() {
         <Modal
           open={kind === 'download'}
           onClose={() => setKind(null)}
-          title="Descargar copia de seguridad"
+          title={t('backup.downloadTitle')}
         >
           <div className="space-y-4">
             <div className="space-y-2">
@@ -373,8 +374,8 @@ export default function BackupRestore() {
                   className="mt-1"
                 />
                 <span>
-                  <span className="font-semibold text-gray-900 text-sm">Todo</span>
-                  <span className="block text-xs text-gray-500">Perfiles, datos del Agregador y calculadoras compartidas.</span>
+                  <span className="font-semibold text-gray-900 text-sm">{t('backup.everything')}</span>
+                  <span className="block text-xs text-gray-500">{t('backup.downloadAllDesc')}</span>
                 </span>
               </label>
               <label className="flex items-start gap-2 cursor-pointer">
@@ -386,8 +387,8 @@ export default function BackupRestore() {
                   className="mt-1"
                 />
                 <span>
-                  <span className="font-semibold text-gray-900 text-sm">Un solo perfil</span>
-                  <span className="block text-xs text-gray-500">Solo su parte del Agregador de Finanzas.</span>
+                  <span className="font-semibold text-gray-900 text-sm">{t('backup.singleProfile')}</span>
+                  <span className="block text-xs text-gray-500">{t('backup.downloadSingleDesc')}</span>
                 </span>
               </label>
             </div>
@@ -396,7 +397,7 @@ export default function BackupRestore() {
                 value={selectedId}
                 size="md"
                 fullWidth
-                ariaLabel="Perfil"
+                ariaLabel={t('backup.profileLabel')}
                 onChange={setSelectedId}
                 options={profiles.map(p => ({
                   value: p.id,
@@ -411,7 +412,7 @@ export default function BackupRestore() {
                 onClick={() => setKind(null)}
                 className="px-4 py-2 rounded-xl border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
               >
-                Cancelar
+                {t('backup.cancel')}
               </button>
               <button
                 type="button"
@@ -419,7 +420,7 @@ export default function BackupRestore() {
                 disabled={!profiles.length}
                 className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40 cursor-pointer"
               >
-                Descargar
+                {t('backup.download')}
               </button>
             </div>
           </div>
@@ -428,7 +429,7 @@ export default function BackupRestore() {
         <Modal
           open={kind === 'restore'}
           onClose={() => setKind(null)}
-          title="Restaurar copia de seguridad"
+          title={t('backup.restoreTitle')}
         >
           <div className="space-y-4">
             <div className="space-y-2">
@@ -441,8 +442,8 @@ export default function BackupRestore() {
                   className="mt-1"
                 />
                 <span>
-                  <span className="font-semibold text-gray-900 text-sm">Todo</span>
-                  <span className="block text-xs text-gray-500">Restaura perfiles y datos globales del fichero. Si la copia contiene menos perfiles que los actuales, se eliminarán los que no estén en ella.</span>
+                  <span className="font-semibold text-gray-900 text-sm">{t('backup.everything')}</span>
+                  <span className="block text-xs text-gray-500">{t('backup.restoreAllDesc')}</span>
                 </span>
               </label>
               <label className="flex items-start gap-2 cursor-pointer">
@@ -454,8 +455,8 @@ export default function BackupRestore() {
                   className="mt-1"
                 />
                 <span>
-                  <span className="font-semibold text-gray-900 text-sm">Un solo perfil</span>
-                  <span className="block text-xs text-gray-500">Aplica el fichero solo al Agregador del perfil elegido. Si la copia trae varios perfiles podrás elegir cuál importar.</span>
+                  <span className="font-semibold text-gray-900 text-sm">{t('backup.singleProfile')}</span>
+                  <span className="block text-xs text-gray-500">{t('backup.restoreSingleDesc')}</span>
                 </span>
               </label>
             </div>
@@ -464,7 +465,7 @@ export default function BackupRestore() {
                 value={selectedId}
                 size="md"
                 fullWidth
-                ariaLabel="Perfil"
+                ariaLabel={t('backup.profileLabel')}
                 onChange={setSelectedId}
                 options={profiles.map(p => ({
                   value: p.id,
@@ -479,7 +480,7 @@ export default function BackupRestore() {
                 onClick={() => setKind(null)}
                 className="px-4 py-2 rounded-xl border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
               >
-                Cancelar
+                {t('backup.cancel')}
               </button>
               <button
                 type="button"
@@ -487,7 +488,7 @@ export default function BackupRestore() {
                 disabled={!profiles.length}
                 className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-40 cursor-pointer"
               >
-                Elegir fichero
+                {t('backup.chooseFile')}
               </button>
             </div>
           </div>
@@ -496,28 +497,28 @@ export default function BackupRestore() {
         <Modal
           open={pendingChoice !== null}
           onClose={() => setPendingChoice(null)}
-          title="Restaurar un perfil desde la copia"
+          title={t('backup.chooseTitle')}
         >
           <div className="space-y-4">
             <p className="text-sm text-gray-600 leading-relaxed">
-              La copia trae <span className="font-semibold text-gray-900">{pendingChoice?.fileProfiles.length ?? 0} perfil{pendingChoice && pendingChoice.fileProfiles.length !== 1 ? 'es' : ''}</span>{' '}
-              y has elegido restaurar uno solo. No se tocarán las calculadoras compartidas ni el
-              resto de perfiles.
+              {t('backup.choosePrompt', {
+                count: pendingChoice?.fileProfiles.length ?? 0,
+                plural: pendingChoice && pendingChoice.fileProfiles.length !== 1 ? 'es' : '',
+              })}
             </p>
             {pendingChoice && (
               <>
                 {!pendingChoice.fileProfiles.some(fp =>
                   (fp.name ?? '').trim().toLowerCase() === pendingChoice.targetName.trim().toLowerCase()) && (
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-2.5 leading-relaxed">
-                    Ninguno de los perfiles de la copia se llama «{pendingChoice.targetName}». Indica a
-                    continuación de qué perfil de la copia quieres tomar los datos.
+                    {t('backup.noMatchPrompt', { target: pendingChoice.targetName })}
                   </p>
                 )}
                 <Select
                   value={fileProfileId}
                   size="md"
                   fullWidth
-                  ariaLabel="Perfil de la copia"
+                  ariaLabel={t('backup.copyProfileLabel')}
                   onChange={setFileProfileId}
                   options={pendingChoice.fileProfiles.map(p => ({
                     value: p.id,
@@ -531,14 +532,14 @@ export default function BackupRestore() {
                     onClick={() => setPendingChoice(null)}
                     className="px-4 py-2 rounded-xl border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
                   >
-                    Cancelar
+                    {t('backup.cancel')}
                   </button>
                   <button
                     type="button"
                     onClick={confirmChoice}
                     className="px-4 py-2 rounded-xl bg-zinc-100 border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-200 transition-colors cursor-pointer"
                   >
-                    Restaurar en «{pendingChoice.targetName}»
+                    {t('backup.restoreInto', { target: pendingChoice.targetName })}
                   </button>
                 </div>
               </>
@@ -549,21 +550,14 @@ export default function BackupRestore() {
         <Modal
           open={pendingSingleFull !== null}
           onClose={() => setPendingSingleFull(null)}
-          title="Restaurar todo desde un único perfil"
+          title={t('backup.restoreAllSingleTitle')}
         >
           <div className="space-y-4">
             <p className="text-sm text-gray-600 leading-relaxed">
-              {pendingSingleFull?.profileName ? (
-                <>
-                  El fichero seleccionado solo contiene el perfil{' '}
-                  <span className="font-semibold text-gray-900">«{pendingSingleFull.profileName}»</span>.{' '}
-                </>
-              ) : (
-                'El fichero seleccionado solo contiene un perfil. '
-              )}
-              Al restaurar <span className="font-semibold">todo</span>, la navegación quedará con ese
-              único perfil y los perfiles actuales que no estén en la copia se eliminarán
-              definitivamente.
+              {pendingSingleFull?.profileName
+                ? t('backup.singleOnlyNamed', { name: pendingSingleFull.profileName })
+                : t('backup.singleOnlyUnnamed')}{' '}
+              {t('backup.singleAllWarning')}
             </p>
             <div className="flex justify-end gap-2">
               <button
@@ -571,14 +565,14 @@ export default function BackupRestore() {
                 onClick={() => setPendingSingleFull(null)}
                 className="px-4 py-2 rounded-xl border border-gray-200 text-gray-900 text-sm font-semibold hover:bg-zinc-100 transition-colors cursor-pointer"
               >
-                Cancelar
+                {t('backup.cancel')}
               </button>
               <button
                 type="button"
                 onClick={confirmSingleFull}
                 className="px-4 py-2 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
               >
-                Restaurar y eliminar el resto
+                {t('backup.restoreAndDeleteRest')}
               </button>
             </div>
           </div>
@@ -587,7 +581,7 @@ export default function BackupRestore() {
         <button
           type="button"
           onClick={() => { setOpen(o => !o); setFeedback(null); }}
-          aria-label="Copia de seguridad de tus datos"
+          aria-label={t('backup.fabAria')}
           className="w-12 h-12 flex items-center justify-center rounded-full bg-zinc-100 border border-gray-200 text-gray-900 hover:bg-zinc-200 cursor-pointer"
         >
           <Icon name="floppy" className="h-6 w-6" />
