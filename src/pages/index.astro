@@ -156,7 +156,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                   <p class="mx-auto mt-2 max-w-xl leading-relaxed text-gray-500" data-i18n="home.previewSubtitle"></p>
                 </div>
 
-              <div class="mt-6 flex items-center justify-center gap-3">
+              <div class="mt-6 flex items-center justify-center gap-3 max-[509px]:-ml-6 max-[509px]:-mr-6">
                 <button
                   data-preview-nav="prev"
                   aria-label="Anterior vista previa"
@@ -165,9 +165,9 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                 >
                   <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
                 </button>
-                <div class="relative min-w-0 w-full max-w-[360px] min-[494px]:max-w-[430px] min-[921px]:max-w-[876px]">
+                <div class="relative min-w-0 w-full max-w-[360px] max-[509px]:max-w-none min-[509px]:max-w-[430px] min-[921px]:max-w-[876px]">
                 <div id="preview-track" class="no-scrollbar flex w-full gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth">
-                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                <div class="snap-start flex-shrink-0 w-[360px] max-[509px]:w-full min-[509px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
                   <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.savingsLabel"></p>
                   <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.savingsTitle"></h3>
                   <div class="mt-4 border-t border-gray-200 pt-4">
@@ -222,7 +222,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                   </div>
                 </div>
 
-                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                <div class="snap-start flex-shrink-0 w-[360px] max-[509px]:w-full min-[509px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
                   <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.retirementLabel"></p>
                   <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.retirementTitle"></h3>
                   <div class="mt-4 border-t border-gray-200 pt-4">
@@ -271,7 +271,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                   </div>
                 </div>
 
-                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                <div class="snap-start flex-shrink-0 w-[360px] max-[509px]:w-full min-[509px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
                   <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.homeLabel"></p>
                   <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.homeTitle"></h3>
                   <div class="mt-4 border-t border-gray-200 pt-4">
@@ -326,7 +326,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                   </div>
                 </div>
 
-                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                <div class="snap-start flex-shrink-0 w-[360px] max-[509px]:w-full min-[509px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
                   <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.financeLabel"></p>
                   <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.accountEvolution"></h3>
                   <div class="mt-4 border-t border-gray-200 pt-4">
@@ -348,13 +348,13 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                     </div>
                     <div class="mt-5 border-t border-gray-200 pt-4">
                       <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3" data-i18n="home.preview.balanceByAccount"></p>
-                      <table class="w-full text-sm">
+                      <table class="w-full text-[0.7rem] min-[390px]:text-xs">
                         <thead>
                           <tr>
-                            <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2" data-i18n="home.preview.bank"></th>
-                            <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2 min-w-[3.65rem]" data-i18n="home.preview.invested"></th>
-                            <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2 min-w-[3.65rem]" data-i18n="home.preview.balance"></th>
-                            <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 min-w-[3.55rem]" data-i18n="home.preview.interests"></th>
+                            <th class="text-left text-[0.7rem] min-[390px]:text-xs max-[410px]:w-[1rem] font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2" data-i18n="home.preview.bank"></th>
+                            <th class="text-right text-[0.7rem] min-[390px]:text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2 min-w-[3.65rem] max-[390px]:min-w-[3.45rem]" data-i18n="home.preview.invested"></th>
+                            <th class="text-right text-[0.7rem] min-[390px]:text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 pr-2 min-w-[3.65rem] max-[390px]:min-w-[3rem]" data-i18n="home.preview.balance"></th>
+                            <th class="text-right text-[0.7rem] min-[390px]:text-xs font-semibold text-gray-500 uppercase tracking-wider pb-2 min-w-[3.55rem] max-[390px]:min-w-[3.35rem]" data-i18n="home.preview.interests"></th>
                           </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -408,7 +408,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                   </div>
                 </div>
 
-                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                <div class="snap-start flex-shrink-0 w-[360px] max-[509px]:w-full min-[509px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
                   <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.financeLabel"></p>
                   <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.financeSummary"></h3>
                   <div class="mt-4 border-t border-gray-200 pt-4">
@@ -442,7 +442,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                   </div>
                 </div>
 
-                <div class="snap-start flex-shrink-0 w-[360px] min-[494px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
+                <div class="snap-start flex-shrink-0 w-[360px] max-[509px]:w-full min-[509px]:w-[430px] min-[921px]:w-[calc(50%-8px)] bg-[#fdfdfe] border border-gray-200 rounded-2xl p-5 sm:p-6 flex flex-col">
                   <p class="text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="home.preview.financeLabel"></p>
                   <h3 class="mt-1.5 text-lg font-bold text-gray-900 tracking-tight" data-i18n="home.preview.expensesByCategory"></h3>
                   <div class="mt-4 border-t border-gray-200 pt-4">
@@ -464,7 +464,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                             <li class="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
                               <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">
                                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                                <span class="hidden min-[494px]:inline" data-i18n="home.preview.group"></span>
+                                <span class="hidden min-[509px]:inline" data-i18n="home.preview.group"></span>
                               </span>
                               <span class="flex items-center gap-1.5 text-xs font-medium text-gray-700">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/></svg>
@@ -475,7 +475,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                             <li class="flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5">
                               <span class="inline-flex items-center gap-1 rounded-md bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-gray-700">
                                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                                <span class="hidden min-[494px]:inline" data-i18n="home.preview.individual"></span>
+                                <span class="hidden min-[509px]:inline" data-i18n="home.preview.individual"></span>
                               </span>
                               <span class="flex items-center gap-1.5 text-xs font-medium text-gray-700">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M7 3v18"/><path d="M17 3v18"/><path d="M3 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 7.5h4"/><path d="M17 16.5h4"/></svg>
@@ -566,7 +566,6 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
                   </div>
                 </div>
               </div>
-              <div id="preview-shade" aria-hidden="true" class="pointer-events-none absolute inset-y-0 right-0 w-14 rounded-r-2xl bg-gradient-to-l from-[#fdfdfe] to-transparent min-[422px]:hidden"></div>
                 </div>
                 <button
                   data-preview-nav="next"
@@ -896,7 +895,6 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
       });
 
       const previewTrack = document.getElementById('preview-track');
-      const previewShade = document.getElementById('preview-shade');
       const previewDots = document.querySelectorAll('.preview-dot');
       const previewNavBtns = document.querySelectorAll('[data-preview-nav]');
       if (previewTrack) {
@@ -928,12 +926,8 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
             dot.classList.toggle('bg-gray-300', i !== index);
           });
         };
-        const updatePreviewShade = () => {
-          if (previewShade) previewShade.classList.toggle('hidden', window.innerWidth >= 444);
-        };
         const updatePreviewNav = () => {
           updatePreviewDots();
-          updatePreviewShade();
         };
         previewTrack.addEventListener('scroll', updatePreviewNav);
         previewDots.forEach((dot, i) => {
