@@ -828,7 +828,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
         setMobileMenu(false);
       }
 
-      function switchTab(tab: string) {
+      function switchTab(tab: string, scrollToTop = false) {
         localStorage.setItem('nestegg-tab', tab);
         tabBtns.forEach(btn => {
           const isActive = (btn as HTMLElement).dataset.tab === tab;
@@ -849,14 +849,21 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
         });
         window.dispatchEvent(new CustomEvent('nestegg-tab-changed', { detail: { tab } }));
         closeMobile();
+        if (scrollToTop) window.scrollTo(0, 0);
       }
 
       tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => switchTab((btn as HTMLElement).dataset.tab ?? ''));
+        btn.addEventListener('click', () => {
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+          switchTab((btn as HTMLElement).dataset.tab ?? '', true);
+        });
       });
 
       document.querySelectorAll('.home-tab').forEach(btn => {
-        btn.addEventListener('click', () => switchTab((btn as HTMLElement).dataset.tab ?? 'home'));
+        btn.addEventListener('click', () => {
+          history.replaceState(null, '', window.location.pathname + window.location.search);
+          switchTab((btn as HTMLElement).dataset.tab ?? 'home', true);
+        });
       });
 
       document.querySelectorAll('.home-scroll').forEach(btn => {
@@ -885,7 +892,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
 
       window.addEventListener('hashchange', () => {
         const tab = window.location.hash.slice(1);
-        if (contents[tab]) switchTab(tab);
+        if (contents[tab]) switchTab(tab, true);
       });
 
       const previewTrack = document.getElementById('preview-track');
