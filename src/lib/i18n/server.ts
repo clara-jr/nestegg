@@ -48,8 +48,9 @@ export function serverTranslate(
   key: string,
   vars?: Record<string, string | number>,
 ): string {
-  const raw = i18n.__({ phrase: key, locale: lang });
-  const text = typeof raw === 'string' && raw.length > 0 ? raw : key;
+  const catalog = getCatalog(lang);
+  const defaultCatalog = getCatalog('es');
+  const text = catalog[key] ?? defaultCatalog[key] ?? key;
   return interpolate(text, vars);
 }
 
