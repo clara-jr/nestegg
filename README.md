@@ -22,6 +22,7 @@ Vibe-coded financial simulator in Spanish that projects personal wealth — savi
 - **`src/components/JointSimulator.tsx`** — joint finances: aggregated income/expenses/savings across profiles (Convivencia)
 - **`src/components/ProfileSelector.tsx`** — manage family profiles, per-profile color and contributions
 - **`src/components/BackupRestore.tsx`** — export/restore full or per-profile backups (JSON)
+- **`src/components/DriveSync.tsx`** — optional Google Drive connection and synchronization status panel
 - **`src/components/common/`** — shared UI: custom `Select` (replaces native `<select>`), `DateRangeFilter` + `DateInput`, `SummaryCard`, `ExpenseCategoryIcon`, tooltips, scrollable tables, form/result sections
 - **`src/lib/calculations.ts`** — pure functions: savings projection, mortgage, taxes
 - **`src/lib/retirement.ts`** — retirement logic: pension estimation, age simulation, required savings
@@ -32,6 +33,9 @@ Vibe-coded financial simulator in Spanish that projects personal wealth — savi
 - **`src/lib/prices.ts`** — current price fetch (Yahoo via CORS proxies)
 - **`src/lib/sharedStore.ts`** — cross-simulator state sync + `useLocalStorage` hook
 - **`src/lib/profiles.ts`** — profile model, colors, default config
+- **`src/lib/driveAuth.ts`** — Google Identity Services token handling
+- **`src/lib/driveApi.ts`** — Google Drive API access for the NestEgg folder and backup file
+- **`src/lib/driveSync.ts`** — local/remote snapshot synchronization and conflict handling
 - **`src/styles/global.css`** — Tailwind theme, brand palette, fonts, global styles
 
 ## Styling tokens
@@ -53,6 +57,10 @@ npm run test         # Vitest unit tests
 ## Deployment
 
 Automatically deployed to GitHub Pages on every push to `main` via `.github/workflows/deploy.yml`.
+
+## Google Drive sync
+
+Google Drive synchronization is optional. The user connects from the navigation menu through Google Identity Services. With the `drive.file` scope, NestEgg creates or reuses a `NestEgg` folder in the user's Drive and stores the synchronized snapshot as `nestegg-backup.json`. Local browser storage remains the working copy; Drive is the remote backup and can be opened from the sync panel. Disconnecting signs out of the app but does not delete the remote folder or file.
 
 ## Regional settings
 

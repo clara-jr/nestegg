@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { notifyDataWrite } from './syncBus';
 
 /**
  * Perfiles de la aplicación. Cada perfil representa un integrante de la casa y
@@ -23,6 +24,8 @@ export interface JointConfig {
 export const STORAGE_KEY_PROFILES = 'nestegg-profiles';
 export const STORAGE_KEY_ACTIVE = 'nestegg-active-profile';
 export const JOINT_CONFIG_KEY = 'nestegg-joint-config';
+/** Fecha de la última modificación de datos (se ignora la pestaña activa). */
+export const DATA_REVISION_KEY = 'nestegg-data-rev';
 
 export const PROFILE_PREFIX = 'nestegg:p:';
 /** Datos del Agregador de Finanzas: únicos que son privados de cada perfil. */
@@ -268,10 +271,36 @@ export function getProfileData(profileId: string, rawKey: string): unknown {
 
 export function setProfileData(profileId: string, rawKey: string, value: unknown) {
   localStorage.setItem(profileStorageKey(profileId, rawKey), JSON.stringify(value));
+  notifyDataWrite();
 }
 
 export function dispatchDataChanged() {
   window.dispatchEvent(new CustomEvent(DATA_CHANGED_EVENT));
+}
+
+/** Devuelve el número de revisión actual de los datos, o null si nunca se escribió. */
+export function readDataRevision(): number | null {
+  if (isServer()) return null;
+  try {
+    const raw = localStorage.getItem(DATA_REVISION_KEY);
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw);
+    return typeof parsed === 'number' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Marca una modificación de datos: actualiza la revisión de forma monótona. */
+export function touchDataRevision(): void {
+  if (isServer()) return;
+  try {
+    const prev = readDataRevision() ?? 0;
+    const next = Math.max(Date.now(), prev + 1);
+    localStorage.setItem(DATA_REVISION_KEY, JSON.stringify(next));
+  } catch {
+    // almacenamiento no disponible: ignorar
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -363,6 +392,8 @@ export function collectAllBackup(): BackupPayload {
   }
   const jointRaw = localStorage.getItem(JOINT_CONFIG_KEY);
   if (jointRaw !== null) data[JOINT_CONFIG_KEY] = safeParse(jointRaw);
+  const revision = readDataRevision();
+  if (revision !== null) data[DATA_REVISION_KEY] = revision;
   data[STORAGE_KEY_PROFILES] = readProfilesRaw();
   const activeId = localStorage.getItem(STORAGE_KEY_ACTIVE) ?? readProfilesRaw()[0]?.id ?? '';
   data[STORAGE_KEY_ACTIVE] = activeId;
@@ -698,6 +729,7 @@ export function useProfileLocalStorage<T>(
       } catch {}
       return next;
     });
+    notifyDataWrite();
   };
 
   return [stored, setValue, hydrated];

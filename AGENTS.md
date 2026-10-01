@@ -31,6 +31,7 @@ src/
     JointSimulator.tsx           — Aggregated income/expenses/savings + joint expenses (Convivencia)
     ProfileSelector.tsx          — Family profiles, colors, contributions
     BackupRestore.tsx            — Export/restore backups (JSON, full or per-profile)
+    DriveSync.tsx                — Optional Google Drive authentication, backup sync and status panel
     common/
       form/Select.tsx            — Custom Select (replaces native <select>) with groups/icons/sizes
       form/DateRangeFilter.tsx   — Preset time filter (month/3m/6m/year/custom)
@@ -49,6 +50,9 @@ src/
     prices.ts                    — Current price fetch (Yahoo via CORS proxies)
     sharedStore.ts               — Cross-simulator state sync + useLocalStorage hook
     profiles.ts                  — Profile model, colors, default config
+    driveAuth.ts                 — Google Identity Services token handling
+    driveApi.ts                  — Google Drive API access for the NestEgg folder and snapshot
+    driveSync.ts                 — Local/remote snapshot synchronization and conflict handling
     utils.ts                     — Shared helpers
     __tests__/                   — Vitest unit tests (calculations, retirement, affordability, investments, bankImports, prices, profiles)
   styles/global.css              — Tailwind v4 theme, fonts (Signika + IBM Plex Sans), brand palette, surfaces
@@ -82,6 +86,7 @@ src/
 - Investments simulator: import bank statements (CSV/XLS) and analyze portfolio, interests and expenses by category
 - Joint simulator (Convivencia): aggregated income/expenses/savings across profiles + per-member contribution to shared categories
 - Shared store syncs data between simulators (mortgage params, contribution, rates, profiles)
+- Google Drive sync is optional: `drive.file` access stores `nestegg-backup.json` in the `NestEgg` folder; local storage remains the working copy
 - Locale: `es-ES`, currency: `EUR`
 - Tax: Spanish savings bracket scale (19%–26%)
 - Tests: Vitest unit tests for pure libs; no linter/formatter config

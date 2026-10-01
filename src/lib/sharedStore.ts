@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DATA_CHANGED_EVENT } from './profiles';
+import { notifyDataWrite } from './syncBus';
 
 type Listener = () => void;
 
@@ -103,6 +104,7 @@ export function useLocalStorage<T>(
       } catch {}
       return next;
     });
+    notifyDataWrite();
   };
 
   return [stored, setValue, hydrated];

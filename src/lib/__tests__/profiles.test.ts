@@ -17,11 +17,13 @@ import {
   getProfileData,
   getProfiles,
   profileStorageKey,
+  readDataRevision,
   renameProfile,
   restoreSingleProfileAuthoritative,
   saveJointConfig,
   setActiveProfileId,
   setProfileData,
+  touchDataRevision,
 } from '../profiles';
 import type { BackupPayload } from '../profiles';
 
@@ -435,6 +437,10 @@ describe('backup and restore', () => {
   });
 });
 
+function getActiveId(): string | null {
+  return localStorage.getItem(STORAGE_KEY_ACTIVE);
+}
+
 describe('joint config', () => {
   beforeEach(() => localStorage.clear());
 
@@ -448,6 +454,26 @@ describe('joint config', () => {
   });
 });
 
-function getActiveId(): string | null {
-  return localStorage.getItem(STORAGE_KEY_ACTIVE);
-}
+describe('data revision', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('starts without a revision', () => {
+    expect(readDataRevision()).toBeNull();
+  });
+
+  it('stores a monotonic revision on touch', () => {
+    touchDataRevision();
+    const first = readDataRevision();
+    expect(typeof first).toBe('number');
+
+    touchDataRevision();
+    const second = readDataRevision();
+    expect(second).toBeGreaterThanOrEqual(first! + 1);
+  });
+
+  it('is included in the full backup', () => {
+    touchDataRevision();
+    const payload = collectAllBackup();
+    expect(payload.data['nestegg-data-rev']).toBe(readDataRevision());
+  });
+});

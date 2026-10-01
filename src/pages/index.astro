@@ -4,6 +4,7 @@ import RetirementSimulator from '../components/RetirementSimulator';
 import AffordabilitySimulator from '../components/AffordabilitySimulator';
 import InvestmentsSimulator from '../components/InvestmentsSimulator';
 import BackupRestore from '../components/BackupRestore';
+import DriveSync from '../components/DriveSync';
 import SiteFooter from '../components/SiteFooter.astro';
 import '../styles/global.css';
 
@@ -86,6 +87,7 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
               <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
               <span data-i18n="home.navFinances"></span>
             </button>
+            <DriveSync client:load variant="nav" />
           </nav>
 
           <!-- Mobile trigger -->
@@ -123,6 +125,8 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
             <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
             <span data-i18n="home.menuFinances"></span>
           </button>
+          <div class="border-t border-gray-100"></div>
+          <DriveSync client:load variant="menu" />
         </div>
       </div>
     </header>
@@ -801,7 +805,8 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
     </div>
     <BackupRestore client:load />
     <script>
-      const contents = {
+      import { notifyDataWrite } from '../lib/syncBus';
+      const contents: Record<string, HTMLElement | null> = {
         home: document.getElementById('tab-home'),
         savings: document.getElementById('tab-savings'),
         retirement: document.getElementById('tab-retirement'),
@@ -828,7 +833,21 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
       }
 
       function switchTab(tab: string, scrollToTop = false) {
+        if (!contents[tab]) tab = 'home';
+        const prevRaw = localStorage.getItem('nestegg-tab');
+        let prev: string | null = prevRaw;
+        if (prevRaw) {
+          try {
+            const parsed = JSON.parse(prevRaw);
+            if (typeof parsed === 'string') prev = parsed;
+          } catch {
+            // valor plano escrito directamente por switchTab
+          }
+        }
         localStorage.setItem('nestegg-tab', tab);
+        // La pestaña también cuenta como cambio local: la fecha de revisión se
+        // actualiza y se propaga a la nube si hay sesión iniciada.
+        if (prev !== tab) notifyDataWrite();
         tabBtns.forEach(btn => {
           const isActive = (btn as HTMLElement).dataset.tab === tab;
           if (btn.closest('#nav-mobile-menu')) {
@@ -883,10 +902,22 @@ const description = 'Analiza tus movimientos bancarios, simula tus ahorros e inv
         });
       }
 
+      const readStoredTab = (): string => {
+        const raw = localStorage.getItem('nestegg-tab');
+        if (!raw) return 'home';
+        let value: string = raw;
+        try {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed === 'string') value = parsed;
+        } catch {
+          // raw está en formato plano (escrito directamente por switchTab)
+        }
+        return contents[value] ? value : 'home';
+      };
       const savedTab =
-        (window.location.hash && contents[window.location.hash.slice(1)]) ?
+        window.location.hash && contents[window.location.hash.slice(1)] ?
           window.location.hash.slice(1) :
-          (localStorage.getItem('nestegg-tab') || 'home');
+          readStoredTab();
       switchTab(savedTab);
 
       window.addEventListener('hashchange', () => {
