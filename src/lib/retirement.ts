@@ -25,6 +25,7 @@ export interface RetirementParams {
   familyLoanDurationYears: number;
   distributionPeriods: number[];
   withdrawalPct: number;
+  inflationRate: number;
 }
 
 export interface RetirementAgeResult {
@@ -49,6 +50,17 @@ export interface PensionEntry {
 }
 
 export const MIN_CONTRIBUTORY_YEARS = 15;
+
+export const DEFAULT_INFLATION_RATE = 3;
+
+// Factor de inflación acumulado tras `years` años al ritmo anual `inflationRate` (%).
+// Los gastos fijos están expresados en euros de hoy, así que se actualizan al poder
+// adquisitivo de cada edad futura. Las cuotas de hipoteca/préstamo son nominales fijas
+// y por eso no se actualizan.
+export function getInflationFactor(years: number, inflationRate: number): number {
+  const rate = Number.isFinite(inflationRate) ? inflationRate : 0;
+  return Math.pow(1 + rate / 100, Math.max(0, years));
+}
 
 interface FullAgeEntry {
   year: number;
@@ -170,20 +182,32 @@ function getTotalPensionAtAge(
     .reduce((sum, p) => sum + p.monthlyAmount, 0);
 }
 
-function getTotalExpenses(
+export function getTotalExpenses(
   referenceAge: number,
   params: RetirementParams,
 ): number {
   const refCurrentAge = params.members[0].currentAge;
   const numMembers = params.members.length;
+  const inflationFactor = getInflationFactor(
+    referenceAge - refCurrentAge,
+    params.inflationRate ?? DEFAULT_INFLATION_RATE,
+  );
   let total = 0;
   for (const m of params.members) {
     const memberAge = m.currentAge + (referenceAge - refCurrentAge);
-    total += memberAge >= params.residencyAge
+    total += (memberAge >= params.residencyAge
       ? params.monthlyExpensesInResidency / numMembers
-      : params.monthlyExpensesPreResidency / numMembers;
+      : params.monthlyExpensesPreResidency / numMembers) * inflationFactor;
   }
   return Math.round(total * 100) / 100;
+}
+
+// Gastos mensuales que la inflación añade a los de hoy a la edad `age`. Ese
+// incremento se descuenta de la aportación: lo que los gastos se llevan, sale
+// del ahorro, así que el ingreso nominal solo se reparte entre ambas cosas.
+export function getInflationExpenseDelta(age: number, params: RetirementParams): number {
+  const today = getTotalExpenses(params.members[0].currentAge, params);
+  return Math.max(0, getTotalExpenses(age, params) - today);
 }
 
 export function simulateRetirementPhase(
@@ -360,20 +384,13 @@ export function findRequiredSavings(
 }
 
 export function simulateAccumulationPhase(
-  currentAge: number,
+  params: RetirementParams,
   retirementAge: number,
-  initialSavingsAccount: number,
-  initialInvestments: number,
-  grossMonthlyContribution: number,
-  savingsAccountRate: number,
-  investmentRate: number,
-  distributionPeriods: number[],
-  lifeExpectancy: number,
-  monthlyMortgagePayment: number,
-  mortgageEndAge: number,
-  familyLoanMonthlyPayment: number,
-  familyLoanEndAge: number,
 ): { savingsAccount: number; investments: number; total: number; investmentCostBasis: number } {
+  const currentAge = params.members[0].currentAge;
+  const initialSavingsAccount = params.initialSavingsAccount;
+  const initialInvestments = params.initialInvestments;
+
   if (retirementAge <= currentAge) {
     return {
       savingsAccount: initialSavingsAccount,
@@ -383,8 +400,9 @@ export function simulateAccumulationPhase(
     };
   }
 
-  const monthlyAccountRate = savingsAccountRate / 12 / 100;
-  const monthlyInvestmentRate = investmentRate / 12 / 100;
+  const monthlyAccountRate = params.savingsAccountRate / 12 / 100;
+  const monthlyInvestmentRate = params.investmentRate / 12 / 100;
+  const distributionPeriods = params.distributionPeriods;
 
   let savingsAccount = initialSavingsAccount;
   let investments = initialInvestments;
@@ -407,14 +425,15 @@ export function simulateAccumulationPhase(
 
     const netContrib = getNetMonthlyContribution(
       currentAgeAtMonth,
-      grossMonthlyContribution,
-      monthlyMortgagePayment,
-      mortgageEndAge,
-      familyLoanMonthlyPayment,
-      familyLoanEndAge,
+      params.monthlyContribution,
+      params.monthlyMortgagePayment,
+      params.mortgageEndAge,
+      params.familyLoanMonthlyPayment,
+      params.familyLoanEndAge,
+      getInflationExpenseDelta(currentAgeAtMonth, params),
     );
 
-    const periodIndex = getDistributionPeriodIndex(currentAgeAtMonth, lifeExpectancy, distributionPeriods.length);
+    const periodIndex = getDistributionPeriodIndex(currentAgeAtMonth, params.lifeExpectancy, distributionPeriods.length);
     const savingsPct = distributionPeriods[periodIndex] ?? 50;
 
     const accountInterest = savingsAccount * monthlyAccountRate;
@@ -466,7 +485,6 @@ export function calculateAllRetirementAges(
   const refMember = params.members[0];
   const minRetirementAge = Math.max(30, refMember.currentAge + 1);
   const maxRetirementAge = Math.min(params.lifeExpectancy - 1, 85);
-  const periods = params.distributionPeriods;
 
   for (let refAge = minRetirementAge; refAge <= maxRetirementAge; refAge++) {
     const pensions = buildPensionSchedule(params.members, refAge);
@@ -476,21 +494,7 @@ export function calculateAllRetirementAges(
       estimatePension(params.members[i].currentSalary, params.members[i].currentAge, params.members[i].yearsContributed, age),
     );
 
-    const accResult = simulateAccumulationPhase(
-      refMember.currentAge,
-      refAge,
-      params.initialSavingsAccount,
-      params.initialInvestments,
-      params.monthlyContribution,
-      params.savingsAccountRate,
-      params.investmentRate,
-      periods,
-      params.lifeExpectancy,
-      params.monthlyMortgagePayment,
-      params.mortgageEndAge,
-      params.familyLoanMonthlyPayment,
-      params.familyLoanEndAge,
-    );
+    const accResult = simulateAccumulationPhase(params, refAge);
 
     const requiredWithoutPension = findRequiredSavings(refAge, [], params, accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis);
     const requiredWithPension = findRequiredSavings(refAge, pensions, params, accResult.savingsAccount, accResult.investments, accResult.investmentCostBasis);
@@ -539,8 +543,9 @@ export function getNetMonthlyContribution(
   mortgageEndAge: number,
   familyLoanMonthlyPayment: number,
   familyLoanEndAge: number,
+  inflationExpenseDelta: number = 0,
 ): number {
-  let net = grossMonthlyContribution;
+  let net = grossMonthlyContribution - inflationExpenseDelta;
   if (mortgageEndAge > 0 && monthlyMortgagePayment > 0 && age >= mortgageEndAge) {
     net += monthlyMortgagePayment;
   }
@@ -785,6 +790,7 @@ export function simulateDetailedPath(
         params.mortgageEndAge,
         params.familyLoanMonthlyPayment,
         params.familyLoanEndAge,
+        getInflationExpenseDelta(age, params),
       );
 
       const periodIndex = getDistributionPeriodIndex(age, params.lifeExpectancy, params.distributionPeriods.length);

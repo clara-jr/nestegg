@@ -6,11 +6,16 @@ import { useI18n } from '../lib/i18n';
 import {
   buildPensionSchedule,
   calculateAllRetirementAges,
+  DEFAULT_INFLATION_RATE,
   findRequiredSavings,
   generateDefaultPeriods,
   getDistributionPeriodIndex,
+  getFullRetirementAge,
+  getInflationExpenseDelta,
+  getInflationFactor,
   getNetMonthlyContribution,
   getPeriodAgeRange,
+  getTotalExpenses,
   simulateDetailedPath,
   simulateRetirementPath,
   type RetirementParams,
@@ -45,6 +50,11 @@ import {
 
 type ViewMode = 'sin-pension' | 'con-pension';
 
+// Ejemplo ilustrativo de la nota sobre inflación: cuánto cuesta hoy un gasto de
+// residencia y cuánto costaría dentro de RESIDENCE_EXAMPLE_YEARS años al ritmo actual.
+const RESIDENCE_EXAMPLE_NOW = 5000;
+const RESIDENCE_EXAMPLE_YEARS = 50;
+
 export default function RetirementSimulator() {
   const { t } = useI18n();
   const defaultMember: MemberConfig = {
@@ -74,6 +84,7 @@ export default function RetirementSimulator() {
       familyLoanDurationYears: 0,
       distributionPeriods: generateDefaultPeriods(lifeExpectancy),
       withdrawalPct: 10,
+      inflationRate: DEFAULT_INFLATION_RATE,
     };
   });
 
@@ -93,6 +104,7 @@ export default function RetirementSimulator() {
       const next = { ...prev };
       if (next.mortgageDurationYears === undefined) { next.mortgageDurationYears = 0; changed = true; }
       if (next.familyLoanDurationYears === undefined) { next.familyLoanDurationYears = 0; changed = true; }
+      if (next.inflationRate === undefined || next.inflationRate === null) { next.inflationRate = DEFAULT_INFLATION_RATE; changed = true; }
       return changed ? next : prev;
     });
   }, [storageReady]);
@@ -220,7 +232,7 @@ export default function RetirementSimulator() {
       return calculateAllRetirementAges(params);
     }
     return [] as RetirementAgeResult[];
-  }, [params.members, params.lifeExpectancy, params.distributionPeriods, params.monthlyContribution, params.initialSavingsAccount, params.initialInvestments, params.savingsAccountRate, params.investmentRate, params.monthlyExpensesPreResidency, params.monthlyExpensesInResidency, params.residencyAge, params.monthlyMortgagePayment, params.mortgageEndAge, params.familyLoanMonthlyPayment, params.familyLoanEndAge, params.withdrawalPct]);
+  }, [params.members, params.lifeExpectancy, params.distributionPeriods, params.monthlyContribution, params.initialSavingsAccount, params.initialInvestments, params.savingsAccountRate, params.investmentRate, params.monthlyExpensesPreResidency, params.monthlyExpensesInResidency, params.residencyAge, params.monthlyMortgagePayment, params.mortgageEndAge, params.familyLoanMonthlyPayment, params.familyLoanEndAge, params.withdrawalPct, params.inflationRate]);
 
   const visiblePeriods = useMemo(() => {
     const refAge = params.members[0].currentAge;
@@ -381,6 +393,7 @@ export default function RetirementSimulator() {
         params.mortgageEndAge,
         params.familyLoanMonthlyPayment,
         params.familyLoanEndAge,
+        getInflationExpenseDelta(ageDuringMonth, params),
       );
 
       const periodIndex = getDistributionPeriodIndex(
@@ -446,6 +459,7 @@ export default function RetirementSimulator() {
               params.mortgageEndAge,
               params.familyLoanMonthlyPayment,
               params.familyLoanEndAge,
+              getInflationExpenseDelta(ageDuringMonth, params),
             );
             if (netContrib > 0) {
               const toSavings = netContrib * (savingsPct / 100);
@@ -457,15 +471,7 @@ export default function RetirementSimulator() {
               yearInvestmentContrib += toInvestments;
             }
           } else {
-            const numM = params.members.length;
-            const refCA = params.members[0].currentAge;
-            let monthlyExpenses = params.members.reduce((sum, m) => {
-              const ma = m.currentAge + (ageDuringMonth - refCA);
-              return sum + (ma >= params.residencyAge
-                ? params.monthlyExpensesInResidency / numM
-                : params.monthlyExpensesPreResidency / numM);
-            }, 0);
-            monthlyExpenses = Math.round(monthlyExpenses * 100) / 100;
+            let monthlyExpenses = getTotalExpenses(ageDuringMonth, params);
 
             if (ageDuringMonth < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
               monthlyExpenses += params.monthlyMortgagePayment;
@@ -550,15 +556,7 @@ export default function RetirementSimulator() {
         firstAchievableAge = age;
       }
 
-      const numM = params.members.length;
-      const refCA = params.members[0].currentAge;
-      const rawExpenses = params.members.reduce((sum, m) => {
-        const ma = m.currentAge + (age - 1 - refCA);
-        return sum + (ma >= params.residencyAge
-          ? params.monthlyExpensesInResidency / numM
-          : params.monthlyExpensesPreResidency / numM);
-      }, 0);
-      let gastosMensuales = Math.round(rawExpenses * 100) / 100;
+      let gastosMensuales = getTotalExpenses(age - 1, params);
       if (age - 1 < params.mortgageEndAge && params.monthlyMortgagePayment > 0) {
         gastosMensuales += params.monthlyMortgagePayment;
       }
@@ -608,6 +606,10 @@ export default function RetirementSimulator() {
   const totalNet = params.members.reduce((sum, m) => sum + calculateNetSalary(m.currentSalary), 0);
   const monthlyNetSalary = totalNet / 12;
   const contributionExceedsSalary = params.monthlyContribution > monthlyNetSalary + 0.01;
+  const inflationRate = params.inflationRate ?? DEFAULT_INFLATION_RATE;
+  const residenceExampleFuture = Math.round(
+    RESIDENCE_EXAMPLE_NOW * getInflationFactor(RESIDENCE_EXAMPLE_YEARS, inflationRate),
+  );
   const distributionSliderPeriods: DistributionPeriod[] = visiblePeriods.map(p => ({
     label: sameDistributionForAll ? t('retirement.allPeriods') : t('retirement.periodYears', { start: p.startAge, end: p.endAge }),
     pct: sameDistributionForAll ? (params.distributionPeriods[0] ?? 50) : p.pct,
@@ -753,6 +755,17 @@ export default function RetirementSimulator() {
             onChange={(v) => handleInputChange('withdrawalPct', v)}
           />
         </FormSection>
+
+        <FormSection title={t('retirement.inflationSection')} cols="single">
+          <InputField
+            label={t('retirement.inflation')}
+            value={inflationRate}
+            onChange={(v) => handleInputChange('inflationRate', v)}
+            step="0.1"
+            min={0}
+            hint={t('retirement.inflationHint')}
+          />
+        </FormSection>
       </FormContainer>
 
       {!contributionExceedsSalary && results.length > 0 && (
@@ -760,6 +773,7 @@ export default function RetirementSimulator() {
           <ScenarioSection gridCols="grid grid-cols-1 min-[500px]:grid-cols-2 lg:grid-cols-3 gap-3">
             <ScenarioCard label={t('retirement.currentSavings')} value={formatCurrency(params.initialSavingsAccount + params.initialInvestments)} />
             <ScenarioCard label={t('retirement.yields')} value={t('retirement.yieldsValue', { acct: params.savingsAccountRate, inv: params.investmentRate })} />
+            <ScenarioCard label={t('retirement.inflationCard')} value={`${inflationRate}%`} />
             <ScenarioCard label={t('retirement.lifeExpectancy')} value={t('retirement.years', { count: params.lifeExpectancy })} />
             <ScenarioCard
               label={t('retirement.fixedExpenses')}
@@ -1009,6 +1023,12 @@ export default function RetirementSimulator() {
                 {t('retirement.noteB1')} <strong>{t('retirement.colTotal')}</strong> {t('retirement.noteB2')} <strong>{t('retirement.colNeeded')}</strong>{t('retirement.noteB3')}
                 {params.members.length > 1 && (
                   <> {t('retirement.noteC1')} <strong>{t('retirement.colAge')}</strong> {t('retirement.noteC2')} <strong>{t('retirement.member1')}</strong>{t('retirement.noteC3')}</>
+                )}
+                {inflationRate > 0 && (
+                  <>
+                    {t('retirement.noteInflationA')} <strong>{t('retirement.colExpenses')}</strong> {t('retirement.noteInflationB', { rate: inflationRate })}
+                    {t('retirement.noteResidenceA', { rate: inflationRate })}<strong>{formatCurrency(RESIDENCE_EXAMPLE_NOW)}</strong>{t('retirement.noteResidenceB', { to: formatCurrency(residenceExampleFuture), years: RESIDENCE_EXAMPLE_YEARS })}
+                  </>
                 )}
               </NoteBanner>
               <NoteBanner variant="warning">

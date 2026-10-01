@@ -4,13 +4,42 @@ import {
   getDistributionPeriodIndex,
   getFullAgeTableEntry,
   getFullRetirementAge,
+  getInflationExpenseDelta,
+  getInflationFactor,
+  getTotalExpenses,
   generateDefaultPeriods,
   getNetMonthlyContribution,
   getPeriodAgeRange,
   buildPensionSchedule,
   meetsRecentContributionsRequirement,
   type MemberConfig,
+  type RetirementParams,
 } from '../retirement';
+
+function makeParams(overrides: Partial<RetirementParams> = {}): RetirementParams {
+  return {
+    members: [{ currentAge: 30, currentSalary: 40000, yearsContributed: 10 }],
+    monthlyExpensesPreResidency: 1000,
+    monthlyExpensesInResidency: 1200,
+    residencyAge: 85,
+    lifeExpectancy: 95,
+    initialSavingsAccount: 0,
+    initialInvestments: 0,
+    monthlyContribution: 500,
+    savingsAccountRate: 2,
+    investmentRate: 7,
+    monthlyMortgagePayment: 0,
+    mortgageEndAge: 0,
+    mortgageDurationYears: 0,
+    familyLoanMonthlyPayment: 0,
+    familyLoanEndAge: 0,
+    familyLoanDurationYears: 0,
+    distributionPeriods: generateDefaultPeriods(95),
+    withdrawalPct: 10,
+    inflationRate: 3,
+    ...overrides,
+  };
+}
 
 describe('getFullAgeTableEntry', () => {
   it('clamps years before 2013 to the 2013 entry', () => {
@@ -198,6 +227,51 @@ describe('getNetMonthlyContribution', () => {
   it('returns 0 for negative results', () => {
     expect(getNetMonthlyContribution(40, 0, 0, 0, 0, 0)).toBe(0);
   });
+
+  it('subtracts the inflation expense delta from the contribution', () => {
+    // 1000 contribution, 100 of extra expenses from inflation → 900 to invest
+    expect(getNetMonthlyContribution(40, 1000, 0, 0, 0, 0, 100)).toBe(900);
+  });
+
+  it('never lets inflation produce a negative contribution', () => {
+    expect(getNetMonthlyContribution(40, 500, 0, 0, 0, 0, 1500)).toBe(0);
+  });
+
+  it('adds freed debt payments on top of the inflation-adjusted amount', () => {
+    expect(getNetMonthlyContribution(65, 1000, 500, 65, 0, 0, 100)).toBe(1400);
+  });
+});
+
+describe('getInflationExpenseDelta', () => {
+  it('is 0 at the current age', () => {
+    expect(getInflationExpenseDelta(30, makeParams())).toBe(0);
+  });
+
+  it('equals the compounded increase of fixed expenses', () => {
+    const params = makeParams();
+    expect(getInflationExpenseDelta(50, params)).toBeCloseTo(1000 * (Math.pow(1.03, 20) - 1), 1);
+  });
+
+  it('is 0 when inflation is 0%', () => {
+    expect(getInflationExpenseDelta(70, makeParams({ inflationRate: 0 }))).toBe(0);
+  });
+
+  it('measures the jump when moving into residence expenses', () => {
+    const params = makeParams({ residencyAge: 60 });
+    // 1000 → 1200/month at age 60, inflated 30 years
+    expect(getInflationExpenseDelta(60, params)).toBeCloseTo(
+      1200 * Math.pow(1.03, 30) - 1000,
+      1,
+    );
+  });
+
+  it('erodes the contribution so the same income is split between both', () => {
+    const params = makeParams({ monthlyContribution: 3000 });
+    const delta = getInflationExpenseDelta(60, params);
+    const net = getNetMonthlyContribution(60, 3000, 0, 0, 0, 0, delta);
+    // What goes into savings plus what inflation added to expenses stays at 3000
+    expect(net + delta).toBeCloseTo(3000, 2);
+  });
 });
 
 describe('getPeriodAgeRange', () => {
@@ -211,6 +285,66 @@ describe('getPeriodAgeRange', () => {
     const range = getPeriodAgeRange(1, 95);
     expect(range.endAge).toBe(85);
     expect(range.startAge).toBe(76);
+  });
+});
+
+describe('getInflationFactor', () => {
+  it('returns 1 for zero years or zero inflation', () => {
+    expect(getInflationFactor(0, 3)).toBe(1);
+    expect(getInflationFactor(10, 0)).toBe(1);
+  });
+
+  it('compounds annually', () => {
+    expect(getInflationFactor(1, 3)).toBeCloseTo(1.03, 10);
+    expect(getInflationFactor(35, 3)).toBeCloseTo(Math.pow(1.03, 35), 10);
+  });
+
+  it('never discounts past years', () => {
+    expect(getInflationFactor(-5, 3)).toBe(1);
+  });
+
+  it('treats a missing rate as zero', () => {
+    expect(getInflationFactor(5, Number.NaN)).toBe(1);
+  });
+});
+
+describe('getTotalExpenses', () => {
+  it('keeps today\'s expenses unchanged at the current age', () => {
+    expect(getTotalExpenses(30, makeParams())).toBe(1000);
+  });
+
+  it('inflates fixed expenses 3% per year from the current age', () => {
+    const params = makeParams();
+    expect(getTotalExpenses(40, params)).toBeCloseTo(1000 * Math.pow(1.03, 10), 1);
+    expect(getTotalExpenses(50, params)).toBeGreaterThan(getTotalExpenses(40, params));
+  });
+
+  it('does not inflate when inflation is 0%', () => {
+    expect(getTotalExpenses(70, makeParams({ inflationRate: 0 }))).toBe(1000);
+  });
+
+  it('switches to residence expenses and keeps inflating them', () => {
+    const params = makeParams({ residencyAge: 60 });
+    // At 60 the member turns 60 → pre-residency expenses still apply
+    expect(getTotalExpenses(59, params)).toBeCloseTo(1000 * Math.pow(1.03, 29), 1);
+    expect(getTotalExpenses(60, params)).toBeCloseTo(1200 * Math.pow(1.03, 30), 1);
+  });
+
+  it('keeps household expenses constant when split across members', () => {
+    const params = makeParams({
+      members: [
+        { currentAge: 30, currentSalary: 40000, yearsContributed: 10 },
+        { currentAge: 35, currentSalary: 30000, yearsContributed: 8 },
+      ],
+    });
+    expect(getTotalExpenses(30, params)).toBe(1000);
+    expect(getTotalExpenses(40, params)).toBeCloseTo(1000 * Math.pow(1.03, 10), 1);
+  });
+
+  it('falls back to the default rate when inflationRate is missing', () => {
+    const params = makeParams();
+    delete (params as Partial<RetirementParams>).inflationRate;
+    expect(getTotalExpenses(40, params)).toBeCloseTo(1000 * Math.pow(1.03, 10), 1);
   });
 });
 
