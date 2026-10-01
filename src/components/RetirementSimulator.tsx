@@ -1008,7 +1008,7 @@ export default function RetirementSimulator() {
                 {t('retirement.noteA1')} <strong>{t('retirement.colNeeded')}</strong> {t('retirement.noteA2')} <strong>{t('retirement.wordEnd')}</strong> {t('retirement.noteA3')} <strong>{t('retirement.colTotal')}</strong> {t('retirement.noteA4')} <strong>{t('retirement.wordEnd')}</strong> {t('retirement.noteA5')}
                 {t('retirement.noteB1')} <strong>{t('retirement.colTotal')}</strong> {t('retirement.noteB2')} <strong>{t('retirement.colNeeded')}</strong>{t('retirement.noteB3')}
                 {params.members.length > 1 && (
-                  <> {t('retirement.noteC1')} <strong>{t('retirement.colAge')}</strong> {t('retirement.noteC2')} <strong>{t('retirement.member1')}</strong>. {t('retirement.noteC3')}</>
+                  <> {t('retirement.noteC1')} <strong>{t('retirement.colAge')}</strong> {t('retirement.noteC2')} <strong>{t('retirement.member1')}</strong>{t('retirement.noteC3')}</>
                 )}
               </NoteBanner>
               <NoteBanner variant="warning">
