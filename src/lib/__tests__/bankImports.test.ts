@@ -251,6 +251,32 @@ describe('parseMyInvestorFunds', () => {
     expect(sell.type).toBe('sell');
     expect(sell.amount).toBeCloseTo(1100);
   });
+
+  it('añade a la operación el código del traspaso si viene en otra celda de la fila', () => {
+    const result = parseMyInvestorFunds([
+      ['Fechas', '', 'Operación', 'Mercado', 'Serie', 'ISIN', 'Valor', 'Títulos/NOMINAL', 'Divisa', 'Precio Neto', 'Importe neto'],
+      ['Operación', 'Liquidación', '', '', '', '', '', '', '', '', ''],
+      ['08/09/2026', '10/09/2026', 'REEMB.POR TRASPASO', 'BME', 'I', 'IE00BYWYCC39', 'FONDO ORIGEN', '182,65', 'EUR', '20,337', '3.714,55'],
+      ['11/09/2026', '11/09/2026', 'SUSCR.POR TRASPASO', 'BME', 'E', 'IE000QAZP7L2', 'FONDO DESTINO', '262,95', 'EUR', '14,126', '3.714,55'],
+    ] as string[][]);
+
+    expect(result.movements[0].assetClass).toBe('REEMB.POR TRASPASO I');
+    expect(result.movements[1].assetClass).toBe('SUSCR.POR TRASPASO E');
+  });
+
+  it('deja la operación intacta si la celda contigua no es un código de traspaso', () => {
+    const result = parseMyInvestorFunds([
+      ['Fechas', '', 'Operación', 'Mercado', 'Serie', 'ISIN', 'Valor', 'Títulos/NOMINAL', 'Divisa', 'Precio Neto', 'Importe neto'],
+      ['Operación', 'Liquidación', '', '', '', '', '', '', '', '', ''],
+      ['01/03/2024', '05/03/2024', 'SUSCRIPCIÓN', 'BME', 'A', 'ES0173377016', 'FONDO TEST', '100', 'EUR', '10,58', '-1.058,00'],
+      ['08/09/2026', '10/09/2026', 'REEMB.POR TRASPASO', 'BME', 'Fondo', 'IE00BYWYCC39', 'FONDO ORIGEN', '182,65', 'EUR', '20,337', '3.714,55'],
+    ] as string[][]);
+
+    // Sólo los traspasos llevan código de serie: en una suscripción la celda
+    // contigua es texto cualquiera y no se debe adjoining a la operación.
+    expect(result.movements[0].assetClass).toBe('SUSCRIPCION');
+    expect(result.movements[1].assetClass).toBe('REEMB.POR TRASPASO');
+  });
 });
 
 const CAIXA_CSV = `Fecha Valor;Fecha Contable;Concepto;Importe

@@ -1044,6 +1044,19 @@ function detectFundsColumnsByData(matrix: CellMatrix, headerIdx: number): Invers
   return null;
 }
 
+/**
+ * Código con el que el banco numera cada traspaso al final de la operación
+ * («REEMB.POR TRASPASO I», «SUSCR.POR TRASPASO E»). No siempre es una letra
+ * romana, así que se admite cualquier código corto pegado al final del texto.
+ * Sin él no se puede saber a qué traspaso pertenece cada movimiento cuando
+ * coexisten varios en las mismas fechas.
+ */
+const TRANSFER_SERIES_RE = /TRASPASO(?![A-Z0-9])[^A-Z0-9]*([A-Z0-9]{1,4})\s*$/;
+
+export function transferSeriesCode(text: string): string | undefined {
+  return TRANSFER_SERIES_RE.exec(norm(text))?.[1];
+}
+
 function classifyInversisOperation(text: string, amount: number): MovementType {
   const t = norm(text);
   if (/SUSCR|COMPRA|APORTAC/.test(t)) return 'buy';
@@ -1119,6 +1132,18 @@ export function parseMyInvestorFunds(matrix: CellMatrix): ParsedBankFile {
     }
 
     const type = classifyInversisOperation(rawOp, importe);
+    // Si el banco manda la letra en otra celda de la fila en vez de rematar la
+    // operación, se adjoining para que el emparejamiento de traspasos la tenga.
+    if (opCol >= 0 && rawOp.includes('TRASPASO') && !transferSeriesCode(rawOp)) {
+      for (let c = dateCol + 1; c < effectiveCols.isin && c < row.length; c++) {
+        if (c === opCol || c === effectiveCols.mercado) continue;
+        const cell = norm(row[c]);
+        if (/^[A-Z]{1,3}$/.test(cell)) {
+          rawOp = `${rawOp} ${cell}`;
+          break;
+        }
+      }
+    }
     let name = (effectiveCols.valor >= 0 ? row[effectiveCols.valor] : '') || '';
     if (!name || ISIN_REGEX.test(norm(name)) || /^\s*[-+]?\d[\d.,\s]*$/.test(name)) {
       // busca una descripción textual entre las columnas de fecha y el ISIN

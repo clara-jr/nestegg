@@ -1,4 +1,4 @@
-import type { Movement } from './bankImports';
+import { transferSeriesCode, type Movement } from './bankImports';
 
 // ---------------------------------------------------------------------------
 // Cartera (ETFs, acciones y fondos)
@@ -25,6 +25,13 @@ export interface Holding {
   totalPnl: number;
   /** Fecha ISO de la primera compra registrada para el producto. */
   firstBuyDate?: string;
+  /**
+   * El producto interviene en un traspaso entre fondos (como origen o como
+   * destino). En ese caso `investedCost` conserva el coste de adquisición
+   * primario heredado del fondo de origen, no el capital desembolsado por el
+   * usuario en este fondo; la interfaz lo advierte con un tooltip.
+   */
+  hasTransfer?: boolean;
   /** TIR % anual indicada por el usuario para un depósito a plazo. */
   plazoRate?: number;
   /** Duración del plazo en meses, indicada por el usuario. */
@@ -69,6 +76,8 @@ interface HoldingAccumulator {
    *  reclasifica como «realized» cuando el plazo se vende totalmente. */
   pendingInterest: number;
   firstBuyDate?: string;
+  /** Ha participado en un traspaso, como fondo de origen o como destino. */
+  hasTransfer?: boolean;
 }
 
 function holdingKey(movement: Movement): string {
@@ -92,16 +101,204 @@ function formatPlazoName(isoDate: string): string {
   return `${d}-${m}-${y}`;
 }
 
+// ---------------------------------------------------------------------------
+// Traspasos entre fondos
+//
+// Un traspaso traslada participaciones de un fondo a otro conservando el coste
+// de adquisición primario original. El banco lo refleja con dos grupos de
+// movimientos: un reembolso en el fondo de origen («REEMB.POR TRASPASO X»)
+// y una o varias suscripciones en el fondo destino («SUSCR.POR TRASPASO X»)
+// cuyo importe suma lo reembolsado. Sin emparejarlos, el importe del reembolso
+// se tomaría como una venta y el de la suscripción como capital nuevo, lo que
+// borraría la plusvalía acumulada en el fondo de origen.
+// ---------------------------------------------------------------------------
+
+type TransferSide = 'out' | 'in';
+
+/** Días de margen entre un reembolso de origen y sus suscripciones destino. */
+const TRANSFER_WINDOW_DAYS = 7;
+/** Suscripciones candidatas máximas para enumerar subconjuntos (2^n). */
+const TRANSFER_MAX_BATCH = 14;
+/** Tolerancia relativa al cuadrar un lote destino con el reembolso de origen:
+ *  los importes vienen redondeados al céntimo por el banco. */
+const TRANSFER_TOLERANCE = 0.005;
+const TRANSFER_MIN_TOLERANCE = 0.05;
+/** Texto que describe la operación del banco (columna de operación del fichero
+ *  de fondos y, como respaldo, el concepto del movimiento). */
+function transferText(m: Movement): string {
+  return `${m.assetClass ?? ''} ${m.concept ?? ''}`.toUpperCase();
+}
+
+/** Lado del traspaso que representa un movimiento, según la clase de activo
+ *  que declara el banco (columna de operación del fichero de fondos). */
+function transferSide(m: Movement): TransferSide | undefined {
+  const text = transferText(m);
+  if (!text.includes('TRASPASO')) return undefined;
+  if (text.includes('REEMB')) return 'out';
+  if (text.includes('SUSCR')) return 'in';
+  return undefined;
+}
+
+/** Código con el que el banco numera el traspaso al final de la operación
+ *  («…TRASPASO I», «…TRASPASO E»). Se busca en cada campo por separado: al
+ *  concatenarlos, el final del nombre del fondo («… FTSE») se leería como un
+ *  código que el banco nunca declaró. */
+function transferSeries(m: Movement): string | undefined {
+  for (const field of [m.assetClass, m.concept]) {
+    const series = field ? transferSeriesCode(field) : undefined;
+    if (series) return series;
+  }
+  return undefined;
+}
+
+/** Un reembolso y sus suscripciones sólo son el mismo traspaso si el banco no
+ *  les asigna códigos distintos. Si a alguno le falta el código (no lo declara
+ *  el banco) se admite el emparejamiento, porque no hay contradicción. */
+function sameTransferSeries(a: string | undefined, b: string | undefined): boolean {
+  return a === undefined || b === undefined || a === b;
+}
+
+function daysBetween(from: string, to: string): number {
+  const fromMs = Date.parse(from);
+  const toMs = Date.parse(to);
+  if (Number.isNaN(fromMs) || Number.isNaN(toMs)) return Number.POSITIVE_INFINITY;
+  return (toMs - fromMs) / 86400000;
+}
+
+/** Fecha más reciente de un lote, para desempatar de forma estable. */
+function lastDate(batch: Movement[]): string {
+  let latest = '';
+  for (const m of batch) if (m.date > latest) latest = m.date;
+  return latest;
+}
+
+/**
+ * Elige el grupo de suscripciones cuyo importe reproduce el del reembolso.
+ * Un traspaso suele llegar troceado en varios lotes, así que se busca el
+ * subconjunto que mejor cuadra; con lotes desmedidos se recurre al acumulado
+ * cronológico para no enumerar 2^n combinaciones.
+ *
+ * Devuelve las suscripciones en orden cronológico o una lista vacía si ninguna
+ * combinación cuadra con el importe del reembolso.
+ */
+function selectTransferBatch(target: number, candidates: Movement[]): Movement[] {
+  if (target <= 0 || !candidates.length) return [];
+  const tolerance = Math.max(TRANSFER_MIN_TOLERANCE, target * TRANSFER_TOLERANCE);
+  let best: { batch: Movement[]; diff: number } | undefined;
+
+  const consider = (batch: Movement[], sum: number): void => {
+    const diff = Math.abs(sum - target);
+    if (diff > tolerance) return;
+    if (best) {
+      if (diff > best.diff) return;
+      if (diff === best.diff && batch.length > best.batch.length) return;
+      if (diff === best.diff && batch.length === best.batch.length && lastDate(batch) >= lastDate(best.batch)) return;
+    }
+    best = { batch: [...batch], diff };
+  };
+
+  if (candidates.length <= TRANSFER_MAX_BATCH) {
+    const chosen: Movement[] = [];
+    const walk = (from: number, sum: number): void => {
+      if (chosen.length > 0) consider(chosen, sum);
+      for (let i = from; i < candidates.length; i++) {
+        const next = sum + Math.abs(candidates[i].amount);
+        if (next > target + tolerance) continue;
+        chosen.push(candidates[i]);
+        walk(i + 1, next);
+        chosen.pop();
+      }
+    };
+    walk(0, 0);
+  } else {
+    const batch: Movement[] = [];
+    let sum = 0;
+    for (const candidate of candidates) {
+      if (sum >= target - tolerance) break;
+      batch.push(candidate);
+      sum += Math.abs(candidate.amount);
+    }
+    consider(batch, sum);
+  }
+
+  return best?.batch ?? [];
+}
+
+/**
+ * Empareja cada suscripción por traspaso («SUSCR.POR TRASPASO») con su reembolso
+ * de origen («REEMB.POR TRASPASO») y devuelve el mapa suscripción → reembolso.
+ * Cada par se casa por fecha, importe y serie: el banco numera con una letra
+ * romana los traspasos que coexisten en el mismo periodo, así que una
+ * suscripción «II» nunca es el destino de un reembolso «I» aunque los importes
+ * cuadren.
+ */
+export function matchTransferSubscriptions(movements: Movement[]): Map<string, string> {
+  const order = [...movements].sort((a, b) => a.date.localeCompare(b.date));
+  const origins = order.filter(m => transferSide(m) === 'out' && Math.abs(m.amount) > 0);
+  const targets = order.filter(m => transferSide(m) === 'in' && Math.abs(m.amount) > 0);
+  const links = new Map<string, string>();
+  const consumed = new Set<string>();
+
+  for (const origin of origins) {
+    const series = transferSeries(origin);
+    const candidates = targets.filter(
+      target =>
+        !consumed.has(target.id) &&
+        target.date >= origin.date &&
+        daysBetween(origin.date, target.date) <= TRANSFER_WINDOW_DAYS &&
+        sameTransferSeries(series, transferSeries(target))
+    );
+    const batch = selectTransferBatch(Math.abs(origin.amount), candidates);
+    if (!batch.length) continue;
+    for (const target of batch) {
+      consumed.add(target.id);
+      links.set(target.id, origin.id);
+    }
+  }
+  return links;
+}
+
+/** Aplica una venta al acumulador: realiza la plusvalía sobre el coste medio y
+ *  descuenta las participaciones vendidas con su coste. */
+function applySell(acc: HoldingAccumulator, m: Movement, quantity: number): void {
+  const avgCost = acc.shares > 0 ? acc.cost / acc.shares : 0;
+  const soldShares = Math.min(quantity, acc.shares > 0 ? acc.shares : quantity);
+  const soldCost = avgCost * soldShares;
+  acc.realized += Math.abs(m.amount) - soldCost;
+  acc.shares -= soldShares;
+  acc.cost = Math.max(0, acc.cost - soldCost);
+  if (acc.shares <= 1e-9) {
+    acc.shares = 0;
+    acc.cost = 0;
+  }
+}
+
 export function computePortfolio(
   movements: Movement[],
   getPrice: (key: string, ticker?: string, isin?: string) => number | undefined,
   plazoConfig?: Record<string, PlazoFijoConfig>
 ): PortfolioResult {
+  const transferLinks = matchTransferSubscriptions(movements);
+  // El estado de cada fondo se acumula en orden cronológico: el traspaso solo
+  // se resuelve bien si el reembolso de origen se procesa antes que las
+  // suscripciones destino a las que transfiere su coste de adquisición.
   const sorted = [...movements].sort((a, b) => a.date.localeCompare(b.date));
   const accs = new Map<string, HoldingAccumulator>();
   let accountFeesAndTaxes = 0;
   // Clave del depósito a plazo abierto por banco (s uno a la vez).
   const currentPlazo = new Map<string, string>();
+  // Suscripciones destino agrupadas por su reembolso de origen (cronológicas).
+  const transferBatches = new Map<string, Movement[]>();
+  for (const m of sorted) {
+    const originId = transferLinks.get(m.id);
+    if (!originId) continue;
+    const batch = transferBatches.get(originId);
+    if (batch) batch.push(m);
+    else transferBatches.set(originId, [m]);
+  }
+  // Coste de adquisición primario heredado por suscripción destino. Se rellena
+  // al procesar el reembolso de origen, cuando ya se conoce el coste del fondo.
+  const inheritedCost = new Map<string, number>();
 
   for (const m of sorted) {
     if (m.type === 'fee' || m.type === 'tax') {
@@ -109,7 +306,10 @@ export function computePortfolio(
       continue;
     }
 
-    if (m.type !== 'buy' && m.type !== 'sell' && m.type !== 'dividend') continue;
+    const side = transferSide(m);
+    // Los traspasos de efectivo no tocan la cartera: solo interesan las
+    // operaciones de fondos y los reembolsos que arrastran un traspaso.
+    if (m.type !== 'buy' && m.type !== 'sell' && m.type !== 'dividend' && side !== 'out') continue;
     // En MyInvestor, las compras/ventas de la cuenta representan traspasos de
     // efectivo a fondos; la suscripción real (con participaciones) está en el
     // fichero de fondos (fundOperation). Solo contamos las del fichero de fondos.
@@ -216,6 +416,67 @@ export function computePortfolio(
       continue;
     }
 
+    // -- Traspaso: reembolso de origen («REEMB.POR TRASPASO») ----------------
+    if (side === 'out') {
+      const batch = transferBatches.get(m.id) ?? [];
+      if (!batch.length) {
+        // Sin suscripciones destino el reembolso no es un traspaso: se
+        // comporta como una venta convencional por el importe íntegro.
+        accountFeesAndTaxes += Math.abs(m.fee ?? 0);
+        applySell(acc, m, sharesAmount > 0 ? sharesAmount : Math.abs(m.amount));
+        continue;
+      }
+
+      // Las participaciones salen del fondo de origen arrastrando su coste
+      // primario proporcional. No hay venta, así que no se realiza plusvalía:
+      // ese coste viaja al fondo destino y mantiene visible la ganancia
+      // acumulada desde que las participaciones se adquirieron.
+      const movedShares = Math.min(sharesAmount, acc.shares);
+      const ratio = acc.shares > 0 ? movedShares / acc.shares : 0;
+      const transferredCost = acc.cost * ratio;
+      acc.hasTransfer = true;
+      acc.shares = Math.max(0, acc.shares - movedShares);
+      acc.cost = Math.max(0, acc.cost - transferredCost);
+      if (acc.shares <= 1e-9) {
+        acc.shares = 0;
+        acc.cost = 0;
+      }
+
+      // Sin coste base (el fondo de origen no viene en los datos) no hay nada
+      // que repartir: las suscripciones destino caen en el caso normal.
+      if (transferredCost <= 0) continue;
+
+      // Reparto del coste traspasado entre los lotes destino, proporcional a
+      // su importe (el último lote absorbe el redondeo del resto).
+      const batchAmount = batch.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+      let left = transferredCost;
+      batch.forEach((target, i) => {
+        const part =
+          i === batch.length - 1 ? left : (Math.abs(target.amount) / batchAmount) * transferredCost;
+        left -= part;
+        inheritedCost.set(target.id, part);
+      });
+      continue;
+    }
+
+    // -- Traspaso: suscripción destino («SUSCR.POR TRASPASO») ----------------
+    if (side === 'in') {
+      const quantity = sharesAmount > 0 ? sharesAmount : Math.abs(m.amount);
+      const unitPrice = m.price ?? (quantity > 0 ? Math.abs(m.amount) / quantity : 0);
+      const inherited = inheritedCost.get(m.id);
+      acc.firstBuyDate ??= m.date;
+      // El importe de la suscripción es solo la foto del valor de mercado en el
+      // momento del traspaso: sirve para participaciones, precio medio y valor
+      // actual, pero no como desembolso. «Invertido» suma el coste primario
+      // heredado; si no se localizó el reembolso de origen, se trata como una
+      // compra convencional por el importe íntegro.
+      acc.cost += inherited ?? quantity * unitPrice;
+      acc.shares += quantity;
+      acc.hasTransfer = inherited !== undefined;
+      accountFeesAndTaxes += Math.abs(m.fee ?? 0);
+      continue;
+    }
+
     if (m.type === 'buy') {
       const quantity = sharesAmount > 0 ? sharesAmount : Math.abs(m.amount);
       const unitPrice = m.price ?? (quantity > 0 ? Math.abs(m.amount) / quantity : 0);
@@ -228,17 +489,8 @@ export function computePortfolio(
       accountFeesAndTaxes += Math.abs(m.fee ?? 0);
     } else if (m.type === 'sell') {
       const quantity = sharesAmount > 0 ? sharesAmount : Math.abs(m.amount);
-      const avgCost = acc.shares > 0 ? acc.cost / acc.shares : 0;
-      const soldShares = Math.min(quantity, acc.shares > 0 ? acc.shares : quantity);
-      const soldCost = avgCost * soldShares;
-      acc.realized += Math.abs(m.amount) - soldCost;
       accountFeesAndTaxes += Math.abs(m.fee ?? 0);
-      acc.shares -= soldShares;
-      acc.cost = Math.max(0, acc.cost - soldCost);
-      if (acc.shares <= 1e-9) {
-        acc.shares = 0;
-        acc.cost = 0;
-      }
+      applySell(acc, m, quantity);
     }
   }
 
@@ -249,7 +501,7 @@ export function computePortfolio(
     const storedPrice = getPrice(key, acc.ticker, acc.isin);
     const priceSource = storedPrice !== undefined ? 'stored' : 'fallback';
     const currentPrice = storedPrice ?? avgPrice;
-    const value = acc.shares * currentPrice;
+    let value = acc.shares * currentPrice;
     // Para depósitos a plazo, «Recibido» (realizedPnl) es únicamente el
     // interés acumulado; la devolución de capital solo reduce Invertido/Valor.
     const isPF = acc.assetClass === 'plazo-fijo';
@@ -271,6 +523,10 @@ export function computePortfolio(
       } else {
         unrealizedPnl = 0;
       }
+      // En los plazos vigentes el «Valor Actual» es el capital más el latente:
+      // lo que recibirás al vencimiento (el latente ya está en 0 si el plazo
+      // está cerrado o no tiene TIR/duración declaradas).
+      value += unrealizedPnl;
     }
 
     holdings.push({
@@ -290,6 +546,7 @@ export function computePortfolio(
       unrealizedPnl,
       totalPnl: (isPF ? acc.pendingInterest : acc.realized) + unrealizedPnl + (isPF ? 0 : acc.dividends),
       firstBuyDate: acc.firstBuyDate,
+      hasTransfer: acc.hasTransfer,
       plazoRate,
       plazoMonths,
       plazoProjectedGain,

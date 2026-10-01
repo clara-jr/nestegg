@@ -61,7 +61,7 @@ export function Tooltip({ text, textKey, children, className }: { text?: string;
           }}
           className="px-3 py-1.5 rounded-xl bg-zinc-100 text-gray-700 border border-gray-200 text-xs leading-tight whitespace-normal max-w-[min(36rem,calc(100vw-2rem))] break-words shadow-lg z-50 pointer-events-none normal-case tracking-normal font-normal text-left"
         >
-          {translatedText}
+          {translatedText}{textKey === 'page.banks.bank.myinvestor.hint' && ' (www.inversis.com/cbmyinvestor).' }
         </span>
       )}
     </span>

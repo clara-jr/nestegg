@@ -260,7 +260,7 @@ export default function AffordabilitySimulator() {
           <strong><Icon name="warning" className="h-4 w-4 inline mr-1.5 -mt-0.5 text-amber-600" /></strong> {hasSalary && result.constraintType === 'income'
             ? (<><strong>{t('affordability.limitIncomeTitle')}</strong>{t('affordability.limitIncomeBody', { maxMortgage: formatCurrency(result.maxMortgageByIncome), capital: formatCurrency(result.availableForHouse) })}</>)
             : hasSalary
-              ? (<><strong>{t('affordability.limitCapitalTitle')}</strong>{t('affordability.limitCapitalBody', { ltv: params.ltvRatio ?? 80, available: formatCurrency(result.availableForHouse), downPaymentPct: 100 - (params.ltvRatio ?? 80), taxPct: params.isNewBuild ? '11,2%' : '6,5%', commissionPct: params.realEstatePercentage })}</>)
+              ? (<><strong>{t('affordability.limitCapitalTitle')}</strong>{t('affordability.limitCapitalBody', { ltv: params.ltvRatio ?? 80, available: formatCurrency(result.availableForHouse), downPaymentPct: 100 - (params.ltvRatio ?? 80), taxPct: params.isNewBuild ? '11,2%' : '6,5%', commissionPct: `${(params.realEstatePercentage).toString().replaceAll('.', ',')}%` })}</>)
               : t('affordability.noSalary')
           } {hasSalary && t('affordability.effortNote', { ratio: params.debtToIncomeRatio, joint: params.members.length > 1 ? t('affordability.joint') : '', netIncome: formatCurrency(result.totalNetMonthlyIncome) })}
         </NoteCard>

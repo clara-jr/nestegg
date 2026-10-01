@@ -318,7 +318,7 @@ export default function InvestmentsSimulator() {
 
   const totalCapital = portfolio.summary.currentValue + cashBalance;
   const totalBenefit = portfolio.summary.totalBenefit + interest.total;
-  const benefitPct = meaningfulPct(totalBenefit, totalCapital);
+  const benefitPct = meaningfulPct(totalBenefit, totalCapital - totalBenefit);
 
   const handleBankChange = (value: string) => {
     setBank(value as BankId);
@@ -824,7 +824,7 @@ export default function InvestmentsSimulator() {
                 options={ORDERED_BANKS.map(b => ({ value: b.id, label: b.label, icon: <BankLogo bank={b.id} size={18} /> }))}
               />
               <span className="block text-xs text-gray-500 mt-1">
-                {t(`page.bancos.bank.${bank}.hint`)}
+                {t(`page.banks.bank.${bank}.hint`)}
               </span>
             </label>
             <label className="block">
@@ -1527,7 +1527,20 @@ function PortfolioSection({
                   ),
                 }
               : '—',
-            !hasValue ? '—' : formatCurrency(h.investedCost),
+            !hasValue
+              ? '—'
+              : h.hasTransfer
+                ? {
+                    content: (
+                      <span className="inline-flex items-center justify-end gap-1">
+                        {formatCurrency(h.investedCost)}
+                        <Tooltip text={t('investments.portfolio.transferInvestedHint')}>
+                          <Icon name="info" className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                        </Tooltip>
+                      </span>
+                    ),
+                  }
+                : formatCurrency(h.investedCost),
             !hasValue ? '—' : formatCurrency(h.value),
             !hasValue
               ? '—'

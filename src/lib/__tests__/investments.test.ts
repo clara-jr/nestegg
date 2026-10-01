@@ -13,6 +13,7 @@ import {
   buildConceptCategoryMap,
   resolveExpenseCategory,
   isMovementJoint,
+  matchTransferSubscriptions,
 } from '../investments';
 import type { Movement } from '../bankImports';
 import { computeJointSummary } from '../joint';
@@ -264,7 +265,29 @@ describe('computePortfolio', () => {
     expect(h.realizedPnl).toBeCloseTo(100, 2);
     expect(h.unrealizedPnl).toBeCloseTo(100, 2);
     expect(h.totalPnl).toBeCloseTo(200, 2);
+    // Valor Actual del plazo vigente = capital + latente
+    expect(h.value).toBeCloseTo(10100, 2);
+    expect(summary.currentValue).toBeCloseTo(10100, 2);
     expect(summary.unrealized).toBeCloseTo(100, 2);
+    expect(summary.totalBenefit).toBeCloseTo(200, 2);
+  });
+
+  it('plazo fijo cerrado no suma latente al Valor Actual', () => {
+    const plazoMovements: Movement[] = [
+      mk({ type: 'buy', date: '2024-01-10', concept: 'CONST. AHORRO PLAZO', amount: -10000 }),
+      mk({ type: 'sell', date: '2024-06-10', concept: 'CANCEL.AHORRO PLAZO', amount: 10000 }),
+      mk({ type: 'sell', date: '2024-06-15', concept: 'INTERESES PLAZO', amount: 200 }),
+    ];
+    const key = 'plazo-fijo|trade-republic|2024-01-10';
+    const { holdings, summary } = computePortfolio(
+      plazoMovements,
+      () => undefined,
+      { [key]: { rate: 4, months: 6 } }
+    );
+    const h = holdings[0];
+    expect(h.value).toBeCloseTo(0, 2);
+    expect(h.unrealizedPnl).toBeCloseTo(0, 2);
+    expect(summary.currentValue).toBeCloseTo(0, 2);
     expect(summary.totalBenefit).toBeCloseTo(200, 2);
   });
 
@@ -277,6 +300,239 @@ describe('computePortfolio', () => {
     expect(h.plazoRate).toBeUndefined();
     expect(h.unrealizedPnl).toBeCloseTo(0);
     expect(h.totalPnl).toBeCloseTo(0);
+  });
+});
+
+describe('computePortfolio — traspasos entre fondos', () => {
+  const ORIGIN = 'IE00BYWYCC39';
+  const TARGET = 'IE000QAZP7L2';
+
+  /** Reembolso por traspaso (fondo de origen), tal y como lo emite Inversis. */
+  const reimb: Pick<Movement, 'type'> & Partial<Movement> = {
+    type: 'transfer',
+    concept: 'ISHRS EMRG MARKT INDX FND D EU (FONDOS EXTRANJEROS)',
+    assetClass: 'REEMB.POR TRASPASO I',
+    fundOperation: true,
+    bank: 'myinvestor',
+  };
+  /** Suscripción por traspaso (fondo de destino). */
+  const suscr: Pick<Movement, 'type'> & Partial<Movement> = {
+    type: 'buy',
+    concept: 'ISHARES EMERGING MRK IND S EUR (FONDOS EXTRANJEROS)',
+    assetClass: 'SUSCR.POR TRASPASO I',
+    fundOperation: true,
+    bank: 'myinvestor',
+  };
+
+  /** Traspaso real: 182,65 participaciones de A (20,337 €) y 4 lotes en B. */
+  const transferMovements = (originBuys: Movement[]): Movement[] => [
+    ...originBuys,
+    mk({ ...reimb, id: '15mfe2t', date: '2026-09-08', amount: 3714.55, isin: ORIGIN, shares: 182.65, price: 20.337 }),
+    mk({ ...suscr, id: '1g3wko', date: '2026-09-11', amount: 264.6, isin: TARGET, shares: 18.73, price: 14.126 }),
+    mk({ ...suscr, id: '1ev94r7', date: '2026-09-11', amount: 255.83, isin: TARGET, shares: 18.11, price: 14.126 }),
+    mk({ ...suscr, id: '3k3qzp', date: '2026-09-11', amount: 147.76, isin: TARGET, shares: 10.46, price: 14.126 }),
+    mk({ ...suscr, id: '16z8zpi', date: '2026-09-11', amount: 3046.36, isin: TARGET, shares: 215.65, price: 14.126 }),
+  ];
+
+  it('hereda el coste primario en el fondo destino y lo descuenta del origen', () => {
+    // El fondo de origen se compró a 15 €/participación: ese es el coste
+    // primario que el traspaso debe conservar en B (2739,75 €), no los
+    // 3714,55 € a los que se valoraron las participaciones en el traspaso.
+    const originBuys: Movement[] = [
+      mk({ type: 'buy', date: '2024-01-10', concept: 'ISHRS EMRG MRKT INDX FND D EU', isin: ORIGIN, amount: -2739.75, shares: 182.65, price: 15 }),
+    ];
+    const { holdings, summary } = computePortfolio(transferMovements(originBuys), key =>
+      key === TARGET ? 14.126 : 20.337
+    );
+
+    // A se vacía por completo: sin participaciones ni plusvalía realizada.
+    expect(holdings.map(h => h.isin)).toEqual([TARGET]);
+    // B: participaciones y valor de mercado salen de los lotes de la suscripción…
+    const b = holdings[0];
+    expect(b.shares).toBeCloseTo(262.95, 4);
+    expect(b.value).toBeCloseTo(262.95 * 14.126, 2);
+    // …pero «Invertido» es el coste primario heredado del fondo de origen.
+    expect(b.investedCost).toBeCloseTo(2739.75, 2);
+    expect(b.hasTransfer).toBe(true);
+    // Latente = Valor − Invertido: recoge la ganancia de A y la de B.
+    expect(b.unrealizedPnl).toBeCloseTo(262.95 * 14.126 - 2739.75, 2);
+    expect(b.realizedPnl).toBeCloseTo(0);
+    expect(summary.investedCost).toBeCloseTo(2739.75, 2);
+    expect(summary.totalBenefit).toBeCloseTo(b.totalPnl, 6);
+  });
+
+  it('reparte el coste traspasado entre los lotes destino de forma proporcional', () => {
+    // Un solo lote destino con todo el importe del reembolso: hereda el coste
+    // primario íntegro sin repartir.
+    const single: Movement[] = [
+      mk({ type: 'buy', date: '2024-01-10', concept: 'F', isin: ORIGIN, amount: -1000, shares: 100, price: 10 }),
+      mk({ ...reimb, id: 'out', date: '2026-09-08', amount: 3714.55, isin: ORIGIN, shares: 100, price: 37.1455 }),
+      mk({ ...suscr, id: 'in', date: '2026-09-11', amount: 3714.55, isin: TARGET, shares: 262.95, price: 14.126 }),
+    ];
+    const { holdings } = computePortfolio(single, () => undefined);
+    expect(holdings.length).toBe(1);
+    expect(holdings[0].investedCost).toBeCloseTo(1000, 6);
+    expect(holdings[0].shares).toBeCloseTo(262.95, 4);
+
+    // Traspaso parcial: el origen conserva el resto de participaciones y coste.
+    const partial = computePortfolio(
+      [
+        mk({ type: 'buy', date: '2024-01-10', concept: 'F', isin: ORIGIN, amount: -2000, shares: 200, price: 10 }),
+        mk({ ...reimb, id: 'out2', date: '2026-09-08', amount: 1500, isin: ORIGIN, shares: 100, price: 15 }),
+        mk({ ...suscr, id: 'in2', date: '2026-09-11', amount: 1500, isin: TARGET, shares: 100, price: 15 }),
+      ],
+      () => undefined
+    );
+    const byIsin = new Map(partial.holdings.map(h => [h.isin, h]));
+    expect(byIsin.get(ORIGIN)!.shares).toBeCloseTo(100);
+    expect(byIsin.get(ORIGIN)!.investedCost).toBeCloseTo(1000);
+    expect(byIsin.get(ORIGIN)!.hasTransfer).toBe(true);
+    expect(byIsin.get(TARGET)!.investedCost).toBeCloseTo(1000);
+    expect(byIsin.get(TARGET)!.hasTransfer).toBe(true);
+  });
+
+  it('tolera el redondeo al céntimo del banco al cuadrar el lote', () => {
+    const links = matchTransferSubscriptions([
+      mk({ ...reimb, id: 'out', date: '2026-09-08', amount: 1000, isin: ORIGIN, shares: 50, price: 20 }),
+      mk({ ...suscr, id: 'in', date: '2026-09-11', amount: 999.99, isin: TARGET, shares: 70, price: 14.28 }),
+    ]);
+    expect(links.get('in')).toBe('out');
+  });
+
+  it('sin suscripción destino el reembolso por traspaso es una venta convencional', () => {
+    const { holdings } = computePortfolio(
+      [
+        mk({ type: 'buy', date: '2024-01-10', concept: 'F', isin: ORIGIN, amount: -1000, shares: 100, price: 10 }),
+        mk({ ...reimb, id: 'out', date: '2026-09-08', amount: 600, isin: ORIGIN, shares: 50, price: 12 }),
+      ],
+      () => undefined
+    );
+    const h = holdings[0];
+    expect(h.realizedPnl).toBeCloseTo(100);
+    expect(h.shares).toBeCloseTo(50);
+    expect(h.investedCost).toBeCloseTo(500);
+    // Sin traspaso emparejado no se hereda coste: no aplica el aviso de la UI.
+    expect(h.hasTransfer).toBeFalsy();
+  });
+
+  it('sin reembolso origen la suscripción por traspaso es una compra convencional', () => {
+    const { holdings } = computePortfolio(
+      [
+        mk({ ...suscr, id: 'in', date: '2026-09-11', amount: 1500, isin: TARGET, shares: 100, price: 15 }),
+      ],
+      () => undefined
+    );
+    const h = holdings[0];
+    expect(h.investedCost).toBeCloseTo(1500, 2);
+    expect(h.hasTransfer).toBeFalsy();
+  });
+
+  it('empareja las suscripciones con su reembolso por importe y fecha', () => {
+    const links = matchTransferSubscriptions(transferMovements([]));
+    expect(links.get('15mfe2t')).toBeUndefined();
+    for (const id of ['1g3wko', '1ev94r7', '3k3qzp', '16z8zpi']) {
+      expect(links.get(id)).toBe('15mfe2t');
+    }
+  });
+
+  it('no empareja suscripciones cuyo importe no cuadra con el reembolso', () => {
+    const links = matchTransferSubscriptions([
+      mk({ ...reimb, id: 'out', date: '2026-09-08', amount: 1000, isin: ORIGIN, shares: 50, price: 20 }),
+      mk({ ...suscr, id: 'in', date: '2026-09-11', amount: 600, isin: TARGET, shares: 60, price: 10 }),
+    ]);
+    expect(links.size).toBe(0);
+  });
+
+  it('no empareja suscripciones anteriores al reembolso de origen', () => {
+    const links = matchTransferSubscriptions([
+      mk({ ...suscr, id: 'in', date: '2026-09-05', amount: 1000, isin: TARGET, shares: 70, price: 14.29 }),
+      mk({ ...reimb, id: 'out', date: '2026-09-08', amount: 1000, isin: ORIGIN, shares: 50, price: 20 }),
+    ]);
+    expect(links.size).toBe(0);
+  });
+
+  it('distingue traspasos simultáneos por su letra romana', () => {
+    // Dos traspasos en las mismas fechas y con el mismo importe: sólo la
+    // serie («I»/«II») dice cuál es el reembolso de cuál.
+    const links = matchTransferSubscriptions([
+      mk({ ...reimb, id: 'outI', date: '2026-09-08', amount: 1000, isin: ORIGIN, assetClass: 'REEMB.POR TRASPASO I' }),
+      mk({ ...reimb, id: 'outII', date: '2026-09-08', amount: 1000, isin: 'IE00XXXXXXXX', assetClass: 'REEMB.POR TRASPASO II' }),
+      mk({ ...suscr, id: 'inI', date: '2026-09-11', amount: 1000, isin: TARGET, assetClass: 'SUSCR.POR TRASPASO I' }),
+      mk({ ...suscr, id: 'inII', date: '2026-09-11', amount: 1000, isin: 'IE00YYYYYYYY', assetClass: 'SUSCR.POR TRASPASO II' }),
+    ]);
+    expect(links.get('inI')).toBe('outI');
+    expect(links.get('inII')).toBe('outII');
+  });
+
+  it('no casa una suscripción con un reembolso de otra serie aunque cuadre el importe', () => {
+    const links = matchTransferSubscriptions([
+      mk({ ...reimb, id: 'outI', date: '2026-09-08', amount: 1000, isin: ORIGIN, assetClass: 'REEMB.POR TRASPASO I' }),
+      mk({ ...suscr, id: 'inII', date: '2026-09-11', amount: 1000, isin: TARGET, assetClass: 'SUSCR.POR TRASPASO II' }),
+    ]);
+    expect(links.size).toBe(0);
+  });
+
+  it('lee la serie declarada en el concepto cuando el banco no la pone en la operación', () => {
+    const links = matchTransferSubscriptions([
+      mk({
+        ...reimb,
+        id: 'outC',
+        date: '2026-09-08',
+        amount: 1000,
+        isin: ORIGIN,
+        assetClass: undefined,
+        concept: 'REEMB.POR TRASPASO II',
+      }),
+      mk({ ...suscr, id: 'inI', date: '2026-09-11', amount: 1000, isin: TARGET, assetClass: 'SUSCR.POR TRASPASO I' }),
+      mk({ ...suscr, id: 'inII', date: '2026-09-11', amount: 1000, isin: 'IE00YYYYYYYY', assetClass: undefined, concept: 'SUSCR.POR TRASPASO II' }),
+    ]);
+    expect(links.get('inI')).toBeUndefined();
+    expect(links.get('inII')).toBe('outC');
+  });
+
+  it('empareja igual si alguno de los dos movimientos no declara serie', () => {
+    const links = matchTransferSubscriptions([
+      mk({ ...reimb, id: 'out', date: '2026-09-08', amount: 1000, isin: ORIGIN, assetClass: 'REEMB.POR TRASPASO I' }),
+      mk({ ...suscr, id: 'in', date: '2026-09-11', amount: 999.99, isin: TARGET, assetClass: 'SUSCR.POR TRASPASO' }),
+    ]);
+    expect(links.get('in')).toBe('out');
+  });
+
+  it('acepta códigos que no son letras romanas', () => {
+    const links = matchTransferSubscriptions([
+      mk({ ...reimb, id: 'outE', date: '2026-09-08', amount: 1000, isin: ORIGIN, assetClass: 'REEMB.POR TRASPASO E' }),
+      mk({ ...reimb, id: 'outI', date: '2026-09-08', amount: 1000, isin: 'IE00XXXXXXXX', assetClass: 'REEMB.POR TRASPASO I' }),
+      mk({ ...suscr, id: 'inE', date: '2026-09-11', amount: 1000, isin: TARGET, assetClass: 'SUSCR.POR TRASPASO E' }),
+      mk({ ...suscr, id: 'inI', date: '2026-09-11', amount: 1000, isin: 'IE00YYYYYYYY', assetClass: 'SUSCR.POR TRASPASO I' }),
+    ]);
+    expect(links.get('inE')).toBe('outE');
+    expect(links.get('inI')).toBe('outI');
+  });
+
+  it('no confunde el final del nombre del fondo con un código de traspaso', () => {
+    // El nombre del producto acaba en un código corto («… FTSE»): si se leyera
+    // como serie, el reembolso y la suscripción dejarían de emparejarse.
+    const links = matchTransferSubscriptions([
+      mk({
+        ...reimb,
+        id: 'out',
+        date: '2026-09-08',
+        amount: 1000,
+        isin: ORIGIN,
+        assetClass: 'REEMB.POR TRASPASO',
+        concept: 'ISHARES FTSE MIB UCITS ETF',
+      }),
+      mk({
+        ...suscr,
+        id: 'in',
+        date: '2026-09-11',
+        amount: 1000,
+        isin: TARGET,
+        assetClass: 'SUSCR.POR TRASPASO',
+        concept: 'ISHARES CORE FTSE MIB',
+      }),
+    ]);
+    expect(links.get('in')).toBe('out');
   });
 });
 

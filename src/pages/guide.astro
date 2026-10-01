@@ -12,18 +12,18 @@ interface GuideSection {
 }
 
 const sections: GuideSection[] = [
-  { titleKey: 'page.guia.savingsTitle', textKey: 'page.guia.savingsText', icon: 'wallet', stepKeys: ['page.guia.savingsStep1', 'page.guia.savingsStep2', 'page.guia.savingsStep3', 'page.guia.savingsStep4', 'page.guia.savingsStep5'] },
-  { titleKey: 'page.guia.retirementTitle', textKey: 'page.guia.retirementText', icon: 'calendar', stepKeys: ['page.guia.retirementStep1', 'page.guia.retirementStep2', 'page.guia.retirementStep3', 'page.guia.retirementStep4', 'page.guia.retirementStep5'] },
-  { titleKey: 'page.guia.homeTitle', textKey: 'page.guia.homeText', icon: 'home', stepKeys: ['page.guia.homeStep1', 'page.guia.homeStep2', 'page.guia.homeStep3', 'page.guia.homeStep4', 'page.guia.homeStep5'] },
-  { titleKey: 'page.guia.financesTitle', textKey: 'page.guia.financesText', icon: 'trendingUp', stepKeys: ['page.guia.financesStep1', 'page.guia.financesStep2', 'page.guia.financesStep3', 'page.guia.financesStep4', 'page.guia.financesStep5', 'page.guia.financesStep6'] },
-  { titleKey: 'page.guia.profilesTitle', textKey: 'page.guia.profilesText', icon: 'users', stepKeys: ['page.guia.profilesStep1', 'page.guia.profilesStep2', 'page.guia.profilesStep3', 'page.guia.profilesStep4', 'page.guia.profilesStep5'] },
-  { titleKey: 'page.guia.backupTitle', textKey: 'page.guia.backupText', icon: 'floppy', stepKeys: ['page.guia.backupStep1', 'page.guia.backupStep2', 'page.guia.backupStep3', 'page.guia.backupStep4', 'page.guia.backupStep5'] },
+  { titleKey: 'page.guide.savingsTitle', textKey: 'page.guide.savingsText', icon: 'wallet', stepKeys: ['page.guide.savingsStep1', 'page.guide.savingsStep2', 'page.guide.savingsStep3', 'page.guide.savingsStep4', 'page.guide.savingsStep5'] },
+  { titleKey: 'page.guide.retirementTitle', textKey: 'page.guide.retirementText', icon: 'calendar', stepKeys: ['page.guide.retirementStep1', 'page.guide.retirementStep2', 'page.guide.retirementStep3', 'page.guide.retirementStep4', 'page.guide.retirementStep5'] },
+  { titleKey: 'page.guide.homeTitle', textKey: 'page.guide.homeText', icon: 'home', stepKeys: ['page.guide.homeStep1', 'page.guide.homeStep2', 'page.guide.homeStep3', 'page.guide.homeStep4', 'page.guide.homeStep5'] },
+  { titleKey: 'page.guide.financesTitle', textKey: 'page.guide.financesText', icon: 'trendingUp', stepKeys: ['page.guide.financesStep1', 'page.guide.financesStep2', 'page.guide.financesStep3', 'page.guide.financesStep4', 'page.guide.financesStep5', 'page.guide.financesStep6'] },
+  { titleKey: 'page.guide.profilesTitle', textKey: 'page.guide.profilesText', icon: 'users', stepKeys: ['page.guide.profilesStep1', 'page.guide.profilesStep2', 'page.guide.profilesStep3', 'page.guide.profilesStep4', 'page.guide.profilesStep5'] },
+  { titleKey: 'page.guide.backupTitle', textKey: 'page.guide.backupText', icon: 'floppy', stepKeys: ['page.guide.backupStep1', 'page.guide.backupStep2', 'page.guide.backupStep3', 'page.guide.backupStep4', 'page.guide.backupStep5'] },
 ];
 ---
 
 <SimplePage
-  dataTitle="page.guia.title"
-  dataDescription="page.guia.metaDescription"
+  dataTitle="page.guide.title"
+  dataDescription="page.guide.metaDescription"
   description="Guía de uso de NestEgg: simulador de ahorros, calculadora de jubilación, calculadora de hogar y agregador de finanzas."
 >
   <header class="px-3 sm:px-4 lg:px-8 pt-4 sm:pt-5 lg:pt-6">
@@ -37,8 +37,8 @@ const sections: GuideSection[] = [
 
   <div class="px-8 py-10 sm:py-14">
     <div class="mx-auto max-w-4xl">
-      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight" data-i18n="page.guia.title"></h1>
-      <p class="mt-3 leading-relaxed text-gray-500" data-i18n="page.guia.subtitle"></p>
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 tracking-tight" data-i18n="page.guide.title"></h1>
+      <p class="mt-3 leading-relaxed text-gray-500" data-i18n="page.guide.subtitle"></p>
 
       <div class="mt-10 flex flex-col gap-6">
         {sections.map((s) => (
@@ -48,7 +48,7 @@ const sections: GuideSection[] = [
               <h2 class="text-lg font-bold text-gray-900 tracking-tight" data-i18n={s.titleKey}></h2>
             </div>
             <p class="mt-3 leading-relaxed text-gray-500" data-i18n={s.textKey}></p>
-            <p class="mt-5 text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="page.guia.howtoLabel"></p>
+            <p class="mt-5 text-xs font-semibold uppercase tracking-widest text-gray-400" data-i18n="page.guide.howtoLabel"></p>
             <ol class="mt-3 space-y-2.5">
               {s.stepKeys.map((step, j) => (
                 <li class="flex items-start gap-2.5">
