@@ -1,12 +1,13 @@
 import * as XLSX from 'xlsx';
 
-export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank' | 'santander' | 'paypal' | 'revolut';
+export type BankId = 'trade-republic' | 'myinvestor' | 'caixabank' | 'santander' | 'bankinter' | 'paypal' | 'revolut';
 
 export const BANKS: ReadonlyArray<{ id: BankId; label: string; hint: string }> = [
   { id: 'trade-republic', label: 'Trade Republic', hint: 'CSV exportado por Trade Republic con datetime, type, name, shares, price, amount…' },
   { id: 'myinvestor', label: 'MyInvestor', hint: 'Movimientos de cuenta (CSV obtenido de MyInvestor) o de fondos (XLS exportado por Inversis)' },
   { id: 'caixabank', label: 'CaixaBank', hint: 'XLS/CSV exportado por CaixaBank con fechas, concepto o movimiento, importe y saldo' },
   { id: 'santander', label: 'Santander', hint: 'XLS/XLSX exportado por Santander con fecha operación, fecha valor, concepto, importe y saldo' },
+  { id: 'bankinter', label: 'Bankinter', hint: 'XLS/XLSX exportado por Bankinter con fecha contable, fecha valor, descripción, importe, saldo y divisa' },
   { id: 'paypal', label: 'PayPal', hint: 'CSV exportado por PayPal con fecha, hora, descripción, nombre, bruto/comisión/neto y saldo' },
   { id: 'revolut', label: 'Revolut', hint: 'CSV exportado por Revolut con tipo, producto, fechas, descripción, importe, comisión, divisa y saldo' },
 ];
@@ -1490,6 +1491,92 @@ export function parseSantander(matrix: CellMatrix): ParsedBankFile {
 }
 
 // ---------------------------------------------------------------------------
+// Bankinter
+// ---------------------------------------------------------------------------
+
+function classifyBankinterConcept(concept: string, amount: number): MovementType {
+  const t = norm(concept);
+  if (/INTERES/.test(t)) return 'interest';
+  if (/COMISION/.test(t)) return 'fee';
+  if (/DEV\.?IMPUESTOS|IMPUESTO|RETENCION|IRPF MOD|I\.V\.A\.? MOD|TGSS/.test(t)) return 'tax';
+  if (/DEVOLUCION|DEVOLUCIÓN|BIZUM RECIBIDO|REEMBOLSO|REFUND/.test(t)) return 'refund';
+  if (/NOMINA|PENSION|SUELDO|INGRESO/.test(t)) return 'income';
+  // «TRANS» es la abreviatura que usa Bankinter para transferencias
+  // («TRANS INM/», «TRANS /V.»), a menudo sin la palabra completa.
+  if (/TRASPASO|TRANSFERENCIA|\bTRANS\b|BIZUM ENV/.test(t)) return 'transfer';
+  if (
+    /RECIBO|TARJETA|COMERCIO|DOMICILI|SEPA|TELEFON|SEGUR|LUZ|GAS\b|AGUA|HIPOTECA|PRESTAMO|TRIBUTOS|SUSCRIP|BIZUM|PAGO A PLAZOS|COMPRA CON/.test(t)
+  ) {
+    return 'expense';
+  }
+  return amount <= 0 ? 'expense' : 'income';
+}
+
+export function parseBankinter(matrix: CellMatrix): ParsedBankFile {
+  // El extracto incluye metadatos («MOVIMIENTOS DE LA CUENTA…», «Fecha»,
+  // «Importe»…) antes de la cabecera real de columnas. Se elige la fila que
+  // más nombres de columna esperados contiene.
+  const headerKeywords = ['FECHA CONTABLE', 'FECHA VALOR', 'DESCRIPCION', 'IMPORTE', 'SALDO', 'DIVISA'];
+  let headerIdx = -1;
+  let bestScore = 0;
+  for (let r = 0; r < matrix.length; r++) {
+    const row = matrix[r].map(norm);
+    let score = 0;
+    for (const kw of headerKeywords) {
+      if (row.some(c => c.includes(kw))) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      headerIdx = r;
+    }
+  }
+  if (headerIdx < 0 || bestScore < 3) return { movements: [], skipped: matrix.length };
+  const header = matrix[headerIdx].map(c => norm(c));
+
+  const contableCol = findColumn(header, c => c.includes('FECHA CONTABLE'));
+  const valorCol = findColumn(header, c => c.includes('FECHA VALOR'));
+  const dateCol = valorCol >= 0 ? valorCol : contableCol >= 0 ? contableCol : findColumn(header, c => c.startsWith('FECHA'));
+  const conceptCol = findColumn(header, c => c.includes('DESCRIPCION') || c.includes('CONCEPTO'));
+  const amountCol = findColumn(header, c => c.includes('IMPORTE'));
+  const balanceCol = findColumn(header, c => c.includes('SALDO'));
+
+  if (dateCol < 0 || amountCol < 0) return { movements: [], skipped: matrix.length };
+
+  const movements: Movement[] = [];
+  let skipped = 0;
+
+  for (let r = headerIdx + 1; r < matrix.length; r++) {
+    const row = matrix[r];
+    if (!row.some(c => c.length > 0)) continue;
+
+    const date = parseDateToISO(row[dateCol]);
+    const amount = parseNumber(row[amountCol]);
+    if (!date || amount === undefined) {
+      skipped++;
+      continue;
+    }
+
+    const concept = (conceptCol >= 0 ? row[conceptCol] : '') || 'Movimiento Bankinter';
+    const type = classifyBankinterConcept(concept, amount);
+    const balanceRaw = balanceCol >= 0 ? (row[balanceCol] ?? '') : '';
+    const balance = parseNumber(balanceRaw);
+
+    movements.push({
+      id: movementId('bankinter', date, type, concept, amount, balanceRaw),
+      fileId: '',
+      bank: 'bankinter',
+      date,
+      type,
+      concept,
+      amount,
+      balance: balance ?? undefined,
+    });
+  }
+
+  return { movements, skipped };
+}
+
+// ---------------------------------------------------------------------------
 // PayPal
 // ---------------------------------------------------------------------------
 
@@ -1743,6 +1830,9 @@ export function parseBankMatrix(bank: BankId, _fileName: string, matrix: CellMat
       break;
     case 'santander':
       parsed = parseSantander(matrix);
+      break;
+    case 'bankinter':
+      parsed = parseBankinter(matrix);
       break;
     case 'paypal':
       parsed = parsePayPal(matrix);

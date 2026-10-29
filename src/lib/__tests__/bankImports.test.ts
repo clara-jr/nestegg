@@ -19,6 +19,7 @@ import {
   parseMyInvestorFunds,
   parseCaixaBank,
   parseSantander,
+  parseBankinter,
   parseBankMatrix,
   parsePayPal,
   paypalDuplicateIds,
@@ -412,6 +413,51 @@ describe('parseSantander', () => {
     expect(result.movements[0].type).toBe('expense');
     expect(result.movements[0].bank).toBe('santander');
     expect(result.movements[1].type).toBe('income');
+  });
+});
+
+describe('parseBankinter', () => {
+  const rows: string[][] = [
+    ['MOVIMIENTOS DE LA CUENTA XXXXXXXXXXXXXXXXXXXXXXXX'],
+    [],
+    ['MOVIMIENTOS'],
+    ['Concepto', '-'],
+    ['Fecha', '31/07/2026 - 29/10/2026'],
+    ['Tipo de movimiento', '-'],
+    ['Importe', 'Desde 0,00 hasta -'],
+    [],
+    ['Fecha contable', 'Fecha valor', 'Descripción', 'Importe', 'Saldo', 'Divisa'],
+    ['29/10/2026', '29/10/2026', 'TRANS /V.M.Dia-Clara Jimenez R', '-48,000.00', '10,428.08', 'EUR'],
+    ['08/10/2026', '08/10/2026', 'TRANS INM/ Clara Jim nez Recio', '8,428.08', '58,428.08', 'EUR'],
+    ['08/10/2026', '07/10/2026', 'COMPRA TARJETA MERCADONA', '-52.10', '50,000.00', 'EUR'],
+  ];
+
+  it('importa el extracto XLSX de Bankinter', () => {
+    const result = parseBankinter(rows);
+    expect(result.skipped).toBe(0);
+    expect(result.movements.length).toBe(3);
+
+    const [salida, entrada, compra] = result.movements;
+    expect(salida.bank).toBe('bankinter');
+    expect(salida.date).toBe('2026-10-29');
+    expect(salida.type).toBe('transfer');
+    expect(salida.amount).toBeCloseTo(-48000);
+    expect(salida.balance).toBeCloseTo(10428.08);
+    expect(salida.concept).toBe('TRANS /V.M.Dia-Clara Jimenez R');
+
+    expect(entrada.type).toBe('transfer');
+    expect(entrada.amount).toBeCloseTo(8428.08);
+    expect(entrada.balance).toBeCloseTo(58428.08);
+
+    expect(compra.date).toBe('2026-10-07');
+    expect(compra.type).toBe('expense');
+    expect(compra.amount).toBeCloseTo(-52.1);
+  });
+
+  it('se enruta desde parseBankMatrix', () => {
+    const result = parseBankMatrix('bankinter', 'Movimientos_29_10_2026.xlsx', rows);
+    expect(result.movements.length).toBe(3);
+    expect(result.movements.every(m => m.bank === 'bankinter')).toBe(true);
   });
 });
 

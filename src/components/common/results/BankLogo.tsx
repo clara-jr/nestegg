@@ -5,6 +5,8 @@ interface BankLogoConfig {
   /** Tono de fondo muy claro del círculo (familiar al color de la marca). */
   bg: string;
   viewBox: string;
+  /** Dibuja el icono a tamaño completo del círculo (sin margen interior). */
+  fullBleed?: boolean;
   icon: (gradientId?: string) => ReactNode;
 }
 
@@ -83,6 +85,18 @@ const BANK_LOGOS: Record<BankId, BankLogoConfig> = {
       />
     ),
   },
+  bankinter: {
+    bg: '#f76900',
+    viewBox: '-51 -135 480 480',
+    fullBleed: true,
+    icon: () => (
+      <g fill="#ffffff" fillRule="evenodd">
+        <path d="M 8.5 8 L 42 8.5 L 42.5 73 L 62.5 65 Q 80 61.5 102.5 63 Q 117.8 64.2 129.5 69 L 147 81.5 Q 164.5 103.5 161 146.5 Q 159.1 175.1 142.5 189 Q 129.9 199.4 109.5 202 L 71.5 203 Q 54.2 201.8 40.5 197 Q 27.8 192.2 20 182.5 Q 9.5 169.5 8 147.5 L 8.5 8 Z M 72 90 L 56 95 L 47 107 L 44 126 L 45 152 L 49 166 L 60 174 L 75 177 L 105 176 L 117 171 L 122 164 L 126 144 Q 128 118 121 102 Q 116 93 105 91 L 72 90 Z" />
+        <path d="M 178.5 8 L 213 8.5 L 213.5 116 Q 227.3 117.8 234.5 113 L 283.5 66 L 323.5 66 L 271 119.5 L 261 130.5 L 328 200.5 L 283.5 201 L 236.5 151 L 229.5 147 L 213.5 146 L 212.5 201 L 178 200.5 L 178.5 8 Z" />
+        <path d="M 336.5 167 L 371 167.5 L 370.5 201 L 336 200.5 L 336.5 167 Z" />
+      </g>
+    ),
+  },
   paypal: {
     bg: '#e6ecf7',
     viewBox: '0 0 154.728 190.5',
@@ -123,15 +137,16 @@ export function BankLogo({ bank, size = 14, className }: { bank: BankId | 'all';
   const config = BANK_LOGOS[bank];
   const pad = Math.max(2, Math.round(size * 0.32));
   const circle = size + pad * 2;
+  const viewport = config.fullBleed ? circle : size;
   return (
     <span
-      className={`inline-flex items-center justify-center flex-shrink-0 rounded-full ${className ?? ''}`}
+      className={`inline-flex items-center justify-center flex-shrink-0 rounded-full overflow-hidden ${className ?? ''}`}
       style={{ backgroundColor: config.bg, width: `${circle}px`, height: `${circle}px` }}
       aria-hidden="true"
     >
       <svg
-        width={size}
-        height={size}
+        width={viewport}
+        height={viewport}
         viewBox={config.viewBox}
         preserveAspectRatio="xMidYMid meet"
         xmlns="http://www.w3.org/2000/svg"
